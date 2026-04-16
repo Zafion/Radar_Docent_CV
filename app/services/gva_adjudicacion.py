@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 from typing import Literal, Optional, Sequence
 from urllib.parse import urljoin, urlparse, urlunparse
+from uuid import uuid4
 
 import httpx
 from bs4 import BeautifulSoup, Tag
@@ -61,6 +62,7 @@ class GvaAdjudicacionService:
         self.files_dir.mkdir(parents=True, exist_ok=True)
 
         self.index_path = self.download_dir / "index.json"
+        self.sync_runs_path = self.download_dir / "sync_runs.json"
 
         self.headers = {
             "User-Agent": "RadarDocentCV/0.1 (+https://ceice.gva.es/)"
@@ -157,6 +159,43 @@ class GvaAdjudicacionService:
             encoding="utf-8",
         )
         return output_path
+
+    def append_sync_run(
+        self,
+        candidates: list[PdfCandidate],
+        downloads: list[DownloadedPdf],
+        started_at: str,
+        finished_at: str,
+    ) -> Path:
+        payload = self._load_sync_runs()
+
+        run_record = {
+            "run_id": str(uuid4()),
+            "started_at": started_at,
+            "finished_at": finished_at,
+            "source_page": self.discovery_url,
+            "allowed_sections": list(self.allowed_sections),
+            "summary": {
+                "discovered_links_count": len(candidates),
+                "unique_pdfs_processed_count": len(downloads),
+                "new_versions_count": sum(
+                    1 for item in downloads if item.status == "new_version_saved"
+                ),
+                "known_versions_count": sum(
+                    1 for item in downloads if item.status == "already_known_hash"
+                ),
+            },
+            "discovered_links": [asdict(item) for item in candidates],
+            "processed_pdfs": [asdict(item) for item in downloads],
+        }
+
+        payload["runs"].append(run_record)
+
+        self.sync_runs_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return self.sync_runs_path
 
     def _download_and_index_pdf(
         self,
@@ -257,6 +296,21 @@ class GvaAdjudicacionService:
             json.dumps(index, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+
+    def _load_sync_runs(self) -> dict:
+        if not self.sync_runs_path.exists():
+            return {"runs": []}
+
+        payload = json.loads(self.sync_runs_path.read_text(encoding="utf-8"))
+
+        if not isinstance(payload, dict):
+            return {"runs": []}
+
+        runs = payload.get("runs")
+        if not isinstance(runs, list):
+            return {"runs": []}
+
+        return payload
 
     def _find_record_by_hash(self, index: dict, sha256: str) -> Optional[dict]:
         for record in index.get("versions", []):
