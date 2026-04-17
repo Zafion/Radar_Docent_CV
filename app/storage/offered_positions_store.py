@@ -12,7 +12,12 @@ class OfferedPositionsStore:
     def close(self) -> None:
         self.connection.close()
 
-    def list_offered_position_documents(self) -> list[sqlite3.Row]:
+    def list_offered_position_documents(
+        self,
+        *,
+        parser_key: str,
+        parser_version: str,
+    ) -> list[sqlite3.Row]:
         return self.connection.execute(
             """
             SELECT
@@ -34,8 +39,17 @@ class OfferedPositionsStore:
             JOIN sources s
                 ON s.id = d.source_id
             WHERE d.doc_family = 'offered_positions'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM document_parse_runs pr
+                  WHERE pr.document_version_id = d.document_version_id
+                    AND pr.parser_key = ?
+                    AND pr.parser_version = ?
+                    AND pr.status = 'success'
+              )
             ORDER BY d.id
-            """
+            """,
+            (parser_key, parser_version),
         ).fetchall()
 
     def create_parse_run(
@@ -96,6 +110,19 @@ class OfferedPositionsStore:
         self.connection.commit()
 
     def clear_offered_positions_for_document(self, document_id: int) -> None:
+        self.connection.execute(
+            """
+            UPDATE award_assignments
+            SET matched_offered_position_id = NULL
+            WHERE matched_offered_position_id IN (
+                SELECT id
+                FROM offered_positions
+                WHERE document_id = ?
+            )
+            """,
+            (document_id,),
+        )
+
         self.connection.execute(
             """
             DELETE FROM offered_positions

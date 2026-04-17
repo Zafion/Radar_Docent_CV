@@ -52,7 +52,10 @@ class OfferedPositionsParserService:
         summaries: list[dict] = []
 
         try:
-            documents = store.list_offered_position_documents()
+            documents = store.list_offered_position_documents(
+                parser_key=PARSER_KEY,
+                parser_version=PARSER_VERSION,
+            )
 
             for document in documents:
                 started_at = self._utc_now_iso()
