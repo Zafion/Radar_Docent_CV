@@ -26,6 +26,7 @@ class DiscoveredAsset:
 class BaseDiscoveryAdapter(ABC):
     source_key: str = ""
     source_url: str = ""
+    source_label: str = ""
 
     def __init__(self, timeout: float = 20.0) -> None:
         self.timeout = timeout

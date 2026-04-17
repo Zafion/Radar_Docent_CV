@@ -8,6 +8,7 @@ from app.services.discovery.base import BaseDiscoveryAdapter, DiscoveredAsset
 class Resolucion1Adapter(BaseDiscoveryAdapter):
     source_key = "resolucion1"
     source_url = "https://ceice.gva.es/es/web/rrhh-educacion/resolucion1"
+    source_label = "Difícil cobertura"
 
     def discover_assets(self) -> list[DiscoveredAsset]:
         soup = self._get_soup()

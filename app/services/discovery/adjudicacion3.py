@@ -6,6 +6,7 @@ from app.services.discovery.base import BaseDiscoveryAdapter, DiscoveredAsset
 class Adjudicacion3Adapter(BaseDiscoveryAdapter):
     source_key = "adjudicacion3"
     source_url = "https://ceice.gva.es/es/web/rrhh-educacion/adjudicacion3"
+    source_label = "Adjudicación inicio de curso"
 
     allowed_sections = (
         "Cuerpo de Maestros",

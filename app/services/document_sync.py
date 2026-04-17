@@ -11,6 +11,7 @@ from typing import Literal, Optional
 import httpx
 
 from app.services.discovery.base import BaseDiscoveryAdapter, DiscoveredAsset
+from app.storage.sync_store import SyncStore
 
 
 @dataclass(slots=True)
@@ -23,6 +24,7 @@ class SyncedAsset:
     section: Optional[str]
     publication_date_text: Optional[str]
     downloadable: bool
+    document_version_id: Optional[int]
     original_filename: Optional[str]
     stored_filename: Optional[str]
     file_path: Optional[str]
@@ -43,7 +45,7 @@ class DocumentSyncService:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout
         self.headers = {
-            "User-Agent": "RadarDocentCV/0.2 (+https://ceice.gva.es/)"
+            "User-Agent": "RadarDocentCV/0.3 (+https://ceice.gva.es/)"
         }
 
     def sync_adapter(self, adapter: BaseDiscoveryAdapter) -> dict:
@@ -54,100 +56,164 @@ class DocumentSyncService:
         source_dir.mkdir(parents=True, exist_ok=True)
         files_dir.mkdir(parents=True, exist_ok=True)
 
-        index_path = source_dir / "index.json"
         discovered_path = source_dir / "discovered_assets.json"
         report_path = source_dir / "sync_report.json"
-        runs_path = source_dir / "sync_runs.json"
 
-        assets = adapter.discover_assets()
-        discovered_path.write_text(
-            json.dumps([asdict(item) for item in assets], ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        store = SyncStore()
 
-        index = self._load_json(index_path, default={"versions": []})
+        assets: list[DiscoveredAsset] = []
         results: list[SyncedAsset] = []
         processed_urls: dict[str, SyncedAsset] = {}
 
-        for asset in assets:
-            if not asset.downloadable:
-                results.append(
-                    SyncedAsset(
-                        source_key=asset.source_key,
-                        asset_role=asset.asset_role,
-                        title=asset.title,
-                        url=asset.url,
-                        canonical_url=asset.canonical_url,
-                        section=asset.section,
-                        publication_date_text=asset.publication_date_text,
-                        downloadable=False,
-                        original_filename=None,
-                        stored_filename=None,
-                        file_path=None,
-                        content_type=None,
-                        size_bytes=None,
-                        sha256=None,
-                        status="non_downloadable",
-                    )
-                )
-                continue
+        source_id = store.ensure_source(
+            source_key=adapter.source_key,
+            source_url=adapter.source_url,
+            label=adapter.source_label or adapter.source_key,
+        )
+        run_id = store.create_sync_run(
+            source_id=source_id,
+            started_at=started_at,
+        )
 
-            if asset.canonical_url in processed_urls:
-                previous = processed_urls[asset.canonical_url]
-                results.append(replace(previous, status="same_run_duplicate", title=asset.title, section=asset.section))
-                continue
+        try:
+            assets = adapter.discover_assets()
 
-            synced = self._download_and_index_asset(
-                asset=asset,
-                index=index,
-                files_dir=files_dir,
+            self._write_json(
+                discovered_path,
+                [asdict(item) for item in assets],
             )
-            processed_urls[asset.canonical_url] = synced
-            results.append(synced)
 
-        self._write_json(index_path, index)
-        self._write_json(report_path, [asdict(item) for item in results])
+            for asset in assets:
+                asset_id = store.create_asset(
+                    source_id=source_id,
+                    sync_run_id=run_id,
+                    asset=asset,
+                )
 
-        finished_at = self._utc_now_iso()
-        runs_payload = self._load_json(runs_path, default={"runs": []})
-        runs_payload["runs"].append(
-            {
-                "started_at": started_at,
-                "finished_at": finished_at,
+                if not asset.downloadable:
+                    results.append(
+                        SyncedAsset(
+                            source_key=asset.source_key,
+                            asset_role=asset.asset_role,
+                            title=asset.title,
+                            url=asset.url,
+                            canonical_url=asset.canonical_url,
+                            section=asset.section,
+                            publication_date_text=asset.publication_date_text,
+                            downloadable=False,
+                            document_version_id=None,
+                            original_filename=None,
+                            stored_filename=None,
+                            file_path=None,
+                            content_type=None,
+                            size_bytes=None,
+                            sha256=None,
+                            status="non_downloadable",
+                        )
+                    )
+                    continue
+
+                if asset.canonical_url in processed_urls:
+                    previous = processed_urls[asset.canonical_url]
+
+                    if previous.document_version_id is not None:
+                        store.set_asset_document_version(
+                            asset_id=asset_id,
+                            document_version_id=previous.document_version_id,
+                        )
+
+                    results.append(
+                        replace(
+                            previous,
+                            asset_role=asset.asset_role,
+                            title=asset.title,
+                            url=asset.url,
+                            canonical_url=asset.canonical_url,
+                            section=asset.section,
+                            publication_date_text=asset.publication_date_text,
+                            status="same_run_duplicate",
+                        )
+                    )
+                    continue
+
+                synced = self._download_and_store_asset(
+                    asset=asset,
+                    files_dir=files_dir,
+                    store=store,
+                )
+
+                if synced.document_version_id is not None:
+                    store.set_asset_document_version(
+                        asset_id=asset_id,
+                        document_version_id=synced.document_version_id,
+                    )
+
+                processed_urls[asset.canonical_url] = synced
+                results.append(synced)
+
+            self._write_json(
+                report_path,
+                [asdict(item) for item in results],
+            )
+
+            finished_at = self._utc_now_iso()
+            store.finish_sync_run(
+                run_id=run_id,
+                finished_at=finished_at,
+                status="success",
+                discovered_assets_count=len(assets),
+                downloadable_assets_count=sum(1 for item in assets if item.downloadable),
+                new_versions_count=sum(1 for item in results if item.status == "new_version_saved"),
+                known_versions_count=sum(1 for item in results if item.status == "already_known_hash"),
+                duplicate_assets_count=sum(1 for item in results if item.status == "same_run_duplicate"),
+                non_downloadable_count=sum(1 for item in results if item.status == "non_downloadable"),
+                error_message=None,
+            )
+
+            return {
                 "source_key": adapter.source_key,
                 "source_url": adapter.source_url,
-                "summary": {
-                    "discovered_assets_count": len(assets),
-                    "downloadable_assets_count": sum(1 for item in assets if item.downloadable),
-                    "new_versions_count": sum(1 for item in results if item.status == "new_version_saved"),
-                    "known_versions_count": sum(1 for item in results if item.status == "already_known_hash"),
-                    "same_run_duplicate_count": sum(1 for item in results if item.status == "same_run_duplicate"),
-                    "non_downloadable_count": sum(1 for item in results if item.status == "non_downloadable"),
-                },
-                "results": [asdict(item) for item in results],
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "source_dir": str(source_dir),
+                "discovered_assets_count": len(assets),
+                "downloadable_assets_count": sum(1 for item in assets if item.downloadable),
+                "new_versions_count": sum(1 for item in results if item.status == "new_version_saved"),
+                "known_versions_count": sum(1 for item in results if item.status == "already_known_hash"),
+                "same_run_duplicate_count": sum(1 for item in results if item.status == "same_run_duplicate"),
+                "non_downloadable_count": sum(1 for item in results if item.status == "non_downloadable"),
             }
-        )
-        self._write_json(runs_path, runs_payload)
 
-        return {
-            "source_key": adapter.source_key,
-            "source_url": adapter.source_url,
-            "started_at": started_at,
-            "finished_at": finished_at,
-            "source_dir": str(source_dir),
-            "discovered_assets_count": len(assets),
-            "downloadable_assets_count": sum(1 for item in assets if item.downloadable),
-            "new_versions_count": sum(1 for item in results if item.status == "new_version_saved"),
-            "known_versions_count": sum(1 for item in results if item.status == "already_known_hash"),
-            "same_run_duplicate_count": sum(1 for item in results if item.status == "same_run_duplicate"),
-            "non_downloadable_count": sum(1 for item in results if item.status == "non_downloadable"),
-        }
+        except Exception as exc:
+            finished_at = self._utc_now_iso()
 
-    def _download_and_index_asset(
+            self._write_json(
+                report_path,
+                [asdict(item) for item in results],
+            )
+
+            store.finish_sync_run(
+                run_id=run_id,
+                finished_at=finished_at,
+                status="failed",
+                discovered_assets_count=len(assets),
+                downloadable_assets_count=sum(1 for item in assets if item.downloadable),
+                new_versions_count=sum(1 for item in results if item.status == "new_version_saved"),
+                known_versions_count=sum(1 for item in results if item.status == "already_known_hash"),
+                duplicate_assets_count=sum(1 for item in results if item.status == "same_run_duplicate"),
+                non_downloadable_count=sum(1 for item in results if item.status == "non_downloadable"),
+                error_message=str(exc),
+            )
+            raise
+
+        finally:
+            store.close()
+
+    def _download_and_store_asset(
         self,
         asset: DiscoveredAsset,
-        index: dict,
         files_dir: Path,
+        store: SyncStore,
     ) -> SyncedAsset:
         response = httpx.get(
             asset.url,
@@ -162,11 +228,10 @@ class DocumentSyncService:
         content_type = response.headers.get("content-type")
         size_bytes = len(content)
         original_filename = self._filename_from_url(asset.canonical_url)
-        seen_at = self._utc_now_iso()
+        downloaded_at = self._utc_now_iso()
 
-        existing_record = self._find_record_by_hash(index, sha256)
-        if existing_record is not None:
-            self._touch_record_source(existing_record, asset, seen_at)
+        existing_version = store.get_document_version_by_sha256(sha256)
+        if existing_version is not None:
             return SyncedAsset(
                 source_key=asset.source_key,
                 asset_role=asset.asset_role,
@@ -176,11 +241,12 @@ class DocumentSyncService:
                 section=asset.section,
                 publication_date_text=asset.publication_date_text,
                 downloadable=True,
+                document_version_id=int(existing_version["id"]),
                 original_filename=original_filename,
-                stored_filename=existing_record["stored_filename"],
-                file_path=existing_record["file_path"],
-                content_type=existing_record.get("content_type") or content_type,
-                size_bytes=existing_record.get("size_bytes", size_bytes),
+                stored_filename=existing_version["stored_filename"],
+                file_path=existing_version["file_path"],
+                content_type=existing_version["content_type"] or content_type,
+                size_bytes=existing_version["size_bytes"],
                 sha256=sha256,
                 status="already_known_hash",
             )
@@ -189,32 +255,15 @@ class DocumentSyncService:
         file_path = files_dir / stored_filename
         file_path.write_bytes(content)
 
-        record = {
-            "sha256": sha256,
-            "size_bytes": size_bytes,
-            "content_type": content_type,
-            "original_filename": original_filename,
-            "stored_filename": stored_filename,
-            "file_path": str(file_path),
-            "first_seen_at": seen_at,
-            "last_seen_at": seen_at,
-            "sources": [
-                {
-                    "source_key": asset.source_key,
-                    "source_url": asset.source_url,
-                    "asset_role": asset.asset_role,
-                    "title": asset.title,
-                    "section": asset.section,
-                    "url": asset.url,
-                    "canonical_url": asset.canonical_url,
-                    "publication_label": asset.publication_label,
-                    "publication_date_text": asset.publication_date_text,
-                    "first_seen_at": seen_at,
-                    "last_seen_at": seen_at,
-                }
-            ],
-        }
-        index["versions"].append(record)
+        document_version_id = store.create_document_version(
+            sha256=sha256,
+            original_filename=original_filename,
+            stored_filename=stored_filename,
+            file_path=str(file_path),
+            content_type=content_type,
+            size_bytes=size_bytes,
+            downloaded_at=downloaded_at,
+        )
 
         return SyncedAsset(
             source_key=asset.source_key,
@@ -225,6 +274,7 @@ class DocumentSyncService:
             section=asset.section,
             publication_date_text=asset.publication_date_text,
             downloadable=True,
+            document_version_id=document_version_id,
             original_filename=original_filename,
             stored_filename=stored_filename,
             file_path=str(file_path),
@@ -233,50 +283,6 @@ class DocumentSyncService:
             sha256=sha256,
             status="new_version_saved",
         )
-
-    def _touch_record_source(self, record: dict, asset: DiscoveredAsset, seen_at: str) -> None:
-        record["last_seen_at"] = seen_at
-        sources = record.setdefault("sources", [])
-
-        for source in sources:
-            if (
-                source.get("source_key") == asset.source_key
-                and source.get("asset_role") == asset.asset_role
-                and source.get("canonical_url") == asset.canonical_url
-                and source.get("section") == asset.section
-            ):
-                source["last_seen_at"] = seen_at
-                return
-
-        sources.append(
-            {
-                "source_key": asset.source_key,
-                "source_url": asset.source_url,
-                "asset_role": asset.asset_role,
-                "title": asset.title,
-                "section": asset.section,
-                "url": asset.url,
-                "canonical_url": asset.canonical_url,
-                "publication_label": asset.publication_label,
-                "publication_date_text": asset.publication_date_text,
-                "first_seen_at": seen_at,
-                "last_seen_at": seen_at,
-            }
-        )
-
-    def _find_record_by_hash(self, index: dict, sha256: str) -> dict | None:
-        for record in index.get("versions", []):
-            if record.get("sha256") == sha256:
-                return record
-        return None
-
-    def _load_json(self, path: Path, default: dict | list) -> dict | list:
-        if not path.exists():
-            return default
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            return default
 
     def _write_json(self, path: Path, payload: dict | list) -> None:
         path.write_text(
