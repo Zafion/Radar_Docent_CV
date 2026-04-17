@@ -13,29 +13,48 @@ from app.storage.award_results_store import AwardResultsStore
 
 
 PARSER_KEY = "final_award_listing_secundaria_parser"
-PARSER_VERSION = "0.1.0"
+PARSER_VERSION = "0.2.0"
 
 ENTRY_START_WITH_NAME_RE = re.compile(r"^(?P<order>\d{1,5})\s+(?P<name>.+,\s*.+)$")
 ENTRY_START_ONLY_ORDER_RE = re.compile(r"^(?P<order>\d{1,5})$")
+
 CENTER_LINE_RE = re.compile(
     r"^(?P<locality>.+?)\((?P<center_code>\d{8})\)(?P<center_name>.+)$"
 )
-SPECIALTY_LINE_RE = re.compile(
+ASSIGNMENT_SPECIALTY_RE = re.compile(
     r"^(?P<code>[0-9A-Z]{2,5})\s*/\s*(?P<name>.+)$"
 )
 POSITION_CODE_RE = re.compile(r"^\d{6}$")
-HOURS_LINE_RE = re.compile(r"^(?P<hours>\d{1,2}(?:,\d+)?)\s+horas?$", re.IGNORECASE)
-PETITION_LINE_RE = re.compile(
-    r"^(?P<name>.+?)\s+Petici[oó]n:\s*(?P<request_type>.+?)\s+(?P<petition_number>\d+)$",
-    re.IGNORECASE,
+NUMERIC_HOURS_RE = re.compile(r"^(?P<hours>\d{1,2}(?:,\d+)?)\s+hores?$", re.IGNORECASE)
+
+# Encabezado de especialidad tipo:
+# CUINA I PASTISSERIA 3A1
+# MATEMÀTIQUES 206
+HEADING_SPECIALTY_RE = re.compile(
+    r"^(?P<name>.+?)\s+(?P<code>[0-9A-Z]{2,5})$"
 )
 
-BODY_LINE_RE = re.compile(
-    r"^(?:CUERPO/COS:\s*)?(?P<body>.+)$",
-    re.IGNORECASE,
+STATUS_VALUES = (
+    "Adjudicat",
+    "No adjudicat",
+    "Ha participat",
+    "No ha participat",
+    "Desactivat",
 )
-HEADING_SPECIALTY_RE_1 = re.compile(r"^(?P<code>[0-9A-Z]{2,5})\s*-\s*(?P<name>.+)$")
-HEADING_SPECIALTY_RE_2 = re.compile(r"^(?P<code>[0-9A-Z]{2,5})\s+(?P<name>.+)$")
+
+ASSIGNMENT_KIND_VALUES = (
+    "VACANT",
+    "SUBSTITUCIÓ DETERMINADA",
+    "SUBSTITUCIÓ INDETERMINADA",
+)
+
+REQUEST_KEYWORDS = (
+    "Petición:",
+    "Peticio:",
+    "Voluntaria",
+    "PREFERÈNCIA",
+    "PREFERENCIA",
+)
 
 
 @dataclass(slots=True)
@@ -232,7 +251,10 @@ class FinalAwardListingSecundariaParserService:
                     )
                     current_block = []
 
-                current_specialty_code, current_specialty_name = self._parse_specialty_heading(line)
+                (
+                    current_specialty_code,
+                    current_specialty_name,
+                ) = self._parse_specialty_heading(line)
                 continue
 
             if self._is_entry_start(lines, index):
@@ -315,7 +337,6 @@ class FinalAwardListingSecundariaParserService:
 
         if status == "Adjudicat":
             assignment = self._parse_assignment(remaining_lines)
-
             if assignment is not None and assignment.petition_text:
                 person_display_name = assignment.petition_text
 
@@ -372,7 +393,7 @@ class FinalAwardListingSecundariaParserService:
                     continue
 
             if specialty_code is None:
-                specialty_match = SPECIALTY_LINE_RE.match(line)
+                specialty_match = ASSIGNMENT_SPECIALTY_RE.match(line)
                 if specialty_match:
                     specialty_code = specialty_match.group("code").strip()
                     specialty_name = specialty_match.group("name").strip()
@@ -382,18 +403,13 @@ class FinalAwardListingSecundariaParserService:
                 position_code = line
                 continue
 
-            if hours_text is None:
-                hours_match = HOURS_LINE_RE.match(line)
-                if hours_match:
-                    hours_text = hours_match.group("hours")
-                    hours_value = self._coerce_hours(hours_text)
-                    continue
+            if hours_text is None and self._looks_like_hours_line(line):
+                hours_text = line
+                hours_value = self._extract_numeric_hours(line)
+                continue
 
-            petition_match = PETITION_LINE_RE.match(line)
-            if petition_match:
-                petition_text = petition_match.group("name").strip()
-                request_type = petition_match.group("request_type").strip()
-                petition_number = int(petition_match.group("petition_number"))
+            if petition_text is None and self._looks_like_petition_line(line):
+                petition_text, request_type, petition_number = self._parse_petition_line(line)
                 continue
 
         if assignment_kind is None and not assignment_lines:
@@ -416,19 +432,10 @@ class FinalAwardListingSecundariaParserService:
         )
 
     def _extract_status(self, lines: list[str]) -> Optional[str]:
-        statuses = (
-            "Adjudicat",
-            "No adjudicat",
-            "Ha participat",
-            "No ha participat",
-            "Desactivat",
-        )
-
         for line in reversed(lines):
-            for status in statuses:
+            for status in STATUS_VALUES:
                 if line == status:
                     return status
-
         return None
 
     def _extract_clean_lines(self, pdf_path: Path) -> list[str]:
@@ -456,45 +463,85 @@ class FinalAwardListingSecundariaParserService:
         ignored_prefixes = (
             "ADJUDICACIÓ DE PERSONAL DOCENT INTERÍ DIA",
             "ADJUDICACIÓN DE PERSONAL DOCENTE INTERINO DÍA",
+            "ADJUDICACIÓ DE PERSONAL DOCENT INICI DE CURS",
+            "ADJUDICACIÓN DE PERSONAL DOCENTE INICIO DE CURSO",
             "PÀG ",
             "PÁG ",
             "PAG ",
-            "LISTADO DE ADJUDICACIÓN",
-            "LISTAT D'ADJUDICACIÓ",
+            "ALTRES COSSOS / OTROS CUERPOS",
+            "COS / CUERPO",
+            "ESPECIALITAT / ESPECIALIDAD",
+            "ESPECIALIDAD Y NÚMERO DE ORDEN",
         )
 
         return upper.startswith(ignored_prefixes)
 
     def _is_body_heading(self, line: str) -> bool:
         upper = line.upper()
-        return upper.startswith("CUERPO/COS:")
 
-    def _parse_body_heading(self, line: str) -> str:
-        return line.split(":", 1)[1].strip()
+        if "," in line:
+            return False
+        if line in STATUS_VALUES:
+            return False
+        if self._is_assignment_kind_line(line):
+            return False
+        if self._is_specialty_heading(line):
+            return False
+        if ENTRY_START_WITH_NAME_RE.match(line) or ENTRY_START_ONLY_ORDER_RE.match(line):
+            return False
 
-    def _is_specialty_heading(self, line: str) -> bool:
-        upper = line.upper()
-        if upper.startswith("ESPECIALIDAD/ESPECIALITAT:"):
-            return True
-
-        return (
-            not ENTRY_START_WITH_NAME_RE.match(line)
-            and not ENTRY_START_ONLY_ORDER_RE.match(line)
-            and (HEADING_SPECIALTY_RE_1.match(line) or HEADING_SPECIALTY_RE_2.match(line))
+        body_markers = (
+            "PROFESSORS ",
+            "PROFESORES ",
+            "MESTRES",
+            "MAESTROS",
+            "CATEDRÀTICS",
+            "CATEDRATICOS",
         )
 
+        return upper.startswith(body_markers)
+
+    def _parse_body_heading(self, line: str) -> str:
+        return line.strip()
+
+    def _is_specialty_heading(self, line: str) -> bool:
+        if "," in line:
+            return False
+        if line in STATUS_VALUES:
+            return False
+        if self._is_assignment_kind_line(line):
+            return False
+        if ENTRY_START_WITH_NAME_RE.match(line) or ENTRY_START_ONLY_ORDER_RE.match(line):
+            return False
+        if "(" in line and ")" in line:
+            return False
+        if "/" in line:
+            return False
+        if POSITION_CODE_RE.match(line):
+            return False
+
+        match = HEADING_SPECIALTY_RE.match(line)
+        if not match:
+            return False
+
+        code = match.group("code").strip()
+        name = match.group("name").strip()
+
+        if not code:
+            return False
+        if not name:
+            return False
+        if code.isdigit() and len(code) > 3:
+            return False
+
+        return True
+
     def _parse_specialty_heading(self, line: str) -> tuple[Optional[str], Optional[str]]:
-        value = line.split(":", 1)[1].strip() if ":" in line else line.strip()
+        match = HEADING_SPECIALTY_RE.match(line.strip())
+        if not match:
+            return None, line.strip()
 
-        match = HEADING_SPECIALTY_RE_1.match(value)
-        if match:
-            return match.group("code").strip(), match.group("name").strip()
-
-        match = HEADING_SPECIALTY_RE_2.match(value)
-        if match:
-            return match.group("code").strip(), match.group("name").strip()
-
-        return None, value
+        return match.group("code").strip(), match.group("name").strip()
 
     def _is_entry_start(self, lines: list[str], index: int) -> bool:
         line = lines[index]
@@ -510,12 +557,68 @@ class FinalAwardListingSecundariaParserService:
         return self._is_assignment_kind_line(next_line)
 
     def _is_assignment_kind_line(self, line: str) -> bool:
+        return line.upper() in ASSIGNMENT_KIND_VALUES
+
+    def _looks_like_hours_line(self, line: str) -> bool:
+        lower = line.lower()
+        return "jornada" in lower or "hora" in lower
+
+    def _extract_numeric_hours(self, line: str) -> Optional[float]:
+        match = NUMERIC_HOURS_RE.match(line)
+        if not match:
+            return None
+
+        try:
+            return float(match.group("hours").replace(",", "."))
+        except ValueError:
+            return None
+
+    def _looks_like_petition_line(self, line: str) -> bool:
+        if "," not in line:
+            return False
+
         upper = line.upper()
-        return upper in {
-            "VACANT",
-            "SUBSTITUCIÓ DETERMINADA",
-            "SUBSTITUCIÓ INDETERMINADA",
-        }
+        return any(keyword.upper() in upper for keyword in REQUEST_KEYWORDS)
+
+    def _parse_petition_line(
+        self,
+        line: str,
+    ) -> tuple[str, Optional[str], Optional[int]]:
+        value = line.strip()
+
+        if "Petición:" in value:
+            name, tail = value.split("Petición:", 1)
+            person_name = name.strip()
+            request_type, petition_number = self._parse_request_tail(tail.strip())
+            return person_name, request_type, petition_number
+
+        if "Peticio:" in value:
+            name, tail = value.split("Peticio:", 1)
+            person_name = name.strip()
+            request_type, petition_number = self._parse_request_tail(tail.strip())
+            return person_name, request_type, petition_number
+
+        name_part, tail = self._split_name_and_request_tail(value)
+        request_type, petition_number = self._parse_request_tail(tail)
+        return name_part, request_type, petition_number
+
+    def _split_name_and_request_tail(self, value: str) -> tuple[str, str]:
+        for keyword in ("Voluntaria", "PREFERÈNCIA", "PREFERENCIA"):
+            idx = value.upper().find(keyword.upper())
+            if idx != -1:
+                return value[:idx].strip(), value[idx:].strip()
+
+        return value.strip(), ""
+
+    def _parse_request_tail(self, value: str) -> tuple[Optional[str], Optional[int]]:
+        if not value:
+            return None, None
+
+        match = re.match(r"^(?P<text>.+?)\s+(?P<number>\d+)$", value)
+        if match:
+            return match.group("text").strip(), int(match.group("number"))
+
+        return value.strip(), None
 
     def _normalize_person_name(self, value: str) -> str:
         value = value.strip().upper()
@@ -523,15 +626,6 @@ class FinalAwardListingSecundariaParserService:
         value = "".join(char for char in value if not unicodedata.combining(char))
         value = re.sub(r"\s+", " ", value)
         return value
-
-    def _coerce_hours(self, value: Optional[str]) -> Optional[float]:
-        if not value:
-            return None
-
-        try:
-            return float(value.replace(",", "."))
-        except ValueError:
-            return None
 
     def _normalize_spaces(self, value: str) -> str:
         return " ".join(value.split())
