@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block hero %}
+<section class="hero hero--landing">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--landing">
+    <p class="eyebrow">Tu portal de gestión para el funcionario</p>
+    <div class="ad-slot ad-slot--728">Publicidad 728x90</div>
+
+    <section class="entry-card">
+      <h1>¿Qué deseas hacer?</h1>
+      <div class="entry-card__choice">
+        <div class="service-option">
+          <div class="service-option__icon">🧑‍🏫</div>
+          <div>
+            <h2>Consulta de Plazas y Adjudicaciones Docentes en la Comunidad Valenciana</h2>
+            <p>Consulta plazas ofertadas y situación actual por persona.</p>
+          </div>
+        </div>
+      </div>
+      <a class="button button--primary button--large" href="/valencia-docentes">Acceder</a>
+    </section>
+
+    <div class="ad-row ad-row--centered">
+      <div class="ad-slot ad-slot--300">Publicidad 300x250</div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="ad-grid">
+    <div class="ad-slot ad-slot--wide">Publicidad 300x250</div>
+    <div class="ad-slot ad-slot--300">Publicidad 300x250</div>
+  </div>
+</section>
+{% endblock %}

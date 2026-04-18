@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Consulta de Plazas y Adjudicaciones Docentes en la Comunidad Valenciana</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">Inicio <span>›</span> Consulta de Plazas y Adjudicaciones Docentes</div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>Consulta de Plazas y Adjudicaciones Docentes</h1>
+        <p>Comunidad Valenciana</p>
+      </div>
+    </div>
+
+    <div class="ad-slot ad-slot--728">Publicidad 728x90</div>
+
+    <div class="module-grid">
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">📋</span>
+          <h2>Consultar Plazas Ofertadas</h2>
+        </div>
+
+        <p class="panel-card__meta">
+          Última actualización: <strong id="latest-offers-date">Cargando...</strong>
+        </p>
+
+        <div class="stack-actions">
+          <button id="load-latest-offers" class="button button--secondary button--full" type="button">
+            Ver últimas plazas ofertadas
+          </button>
+          <a class="button button--ghost button--full" href="{{ official_resolucion_url }}" target="_blank" rel="noopener noreferrer">
+            Visitar Conselleria
+          </a>
+        </div>
+
+        <p class="panel-card__hint">
+          Muestra el listado más reciente de plazas ofertadas disponibles en la API y acceso directo a la publicación oficial.
+        </p>
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🔎</span>
+          <h2>Consultar por Persona</h2>
+        </div>
+
+        <form id="person-search-form" class="search-form">
+          <label class="sr-only" for="person-query">Nombre y apellidos</label>
+          <div class="search-form__row">
+            <input
+              id="person-query"
+              name="q"
+              type="text"
+              placeholder="Apellido1 Apellido2, Nombre"
+              minlength="2"
+              autocomplete="off"
+            >
+            <button class="button button--accent search-form__button" type="submit">Buscar</button>
+          </div>
+          <p class="search-form__help">Ejemplo: Gómez Valencia, Cristina Lucia</p>
+        </form>
+
+        <div id="person-search-feedback" class="feedback"></div>
+        <div id="person-search-results" class="result-list"></div>
+      </article>
+    </div>
+
+    <div class="ad-slot ad-slot--728">Publicidad 728x90</div>
+  </section>
+
+  <div class="side-ad-layout">
+    <aside class="ad-slot ad-slot--300">Publicidad 300x250</aside>
+
+    <section class="content-stack">
+      <section id="offers-section" class="content-card is-hidden">
+        <div class="content-card__header">
+          <div>
+            <h2>Últimas plazas ofertadas</h2>
+            <p id="offers-publication-meta">Cargando datos...</p>
+          </div>
+          <a class="button button--ghost" href="{{ official_resolucion_url }}" target="_blank" rel="noopener noreferrer">
+            Ver publicación oficial
+          </a>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Especialidad</th>
+                <th>Tipo</th>
+                <th>Centro</th>
+                <th>Localidad</th>
+                <th>Código</th>
+              </tr>
+            </thead>
+            <tbody id="offers-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="person-profile-section" class="content-card is-hidden">
+        <div class="content-card__header">
+          <div>
+            <h2>Resultado por persona</h2>
+            <p>Resumen legible y detalle técnico de la información disponible.</p>
+          </div>
+        </div>
+
+        <div id="person-profile-summary"></div>
+        <div id="person-profile-history"></div>
+      </section>
+    </section>
+
+    <aside class="ad-slot ad-slot--300">Publicidad 300x250</aside>
+  </div>
+
+  <div class="ad-row ad-row--centered section-space--sm">
+    <div class="ad-slot ad-slot--728">Publicidad 728x90</div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.RADAR_DOCENT_CONFIG = {
+    officialResUrl: {{ official_resolucion_url | tojson }},
+    officialAdjUrl: {{ official_adjudicaciones_url | tojson }}
+  };
+</script>
+<script src="{{ url_for('static', path='js/app.js') }}"></script>
+{% endblock %}

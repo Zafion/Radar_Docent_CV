@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title or 'funcionario.com' }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell site-header__inner site-header__inner--centered">
+      <a href="/" class="brand" aria-label="funcionario.com inicio">
+        <span class="brand__primary">funcionario</span><span class="brand__accent">.com</span>
+      </a>
+
+      <a href="/" class="site-header__logo" aria-label="Volver a inicio">
+        <img src="{{ url_for('static', path='img/logo.png') }}" alt="Logo de funcionario.com">
+      </a>
+    </div>
+  </header>
+
+  {% block hero %}{% endblock %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell site-footer__inner">
+      <div>
+        <strong>funcionario.com</strong>
+        <p>Portal de consulta y servicios digitales para empleo público.</p>
+      </div>
+      <div class="site-footer__links">
+        <a href="/">Inicio</a>
+        <a href="/quienes-somos">Quiénes Somos</a>
+        <a href="/contacto">Contacto</a>
+      </div>
+    </div>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

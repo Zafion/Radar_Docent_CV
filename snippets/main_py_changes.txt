@@ -1,0 +1,15 @@
+Añade estos imports en app/api/main.py:
+
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from app.web.routes import router as web_router
+
+Añade después de crear app = FastAPI(...):
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "web" / "static")), name="static")
+app.include_router(web_router)
+
+Añade al requirements.txt:
+
+jinja2

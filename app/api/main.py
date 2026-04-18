@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from app.web.routes import router as web_router
+
 import os
 import sqlite3
 import unicodedata
@@ -17,6 +21,10 @@ app = FastAPI(
     version="0.1.0",
     description="API de solo lectura sobre SQLite para consultar adjudicaciones y puestos docentes.",
 )
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "web" / "static")), name="static")
+app.include_router(web_router)
 
 app.add_middleware(
     CORSMiddleware,
