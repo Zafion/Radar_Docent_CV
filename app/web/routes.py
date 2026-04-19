@@ -14,6 +14,9 @@ router = APIRouter(include_in_schema=False)
 OFFICIAL_SECTION_URL = "https://ceice.gva.es/es/web/rrhh-educacion"
 OFFICIAL_RESOLUCION_URL = "https://ceice.gva.es/es/web/rrhh-educacion/resolucion"
 OFFICIAL_ADJUDICACIONES_URL = "https://ceice.gva.es/es/web/rrhh-educacion/adjudicaciones"
+PROJECT_EMAIL = "funkcionarios@gmail.com"
+PROJECT_OWNER = "Jose Luis Montañana Llopis"
+PROJECT_LINKEDIN = "https://www.linkedin.com/in/jose-luis-monta%C3%B1ana-llopis-116941172/?lipi=urn%3Ali%3Apage%3Ad_flagship3_feed%3BtjegxX7vR4msI4sRX5YxCQ%3D%3D"
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -23,7 +26,7 @@ def home(request: Request):
         name="home.html",
         context={
             "active_page": "home",
-            "page_title": "funcionario.com | Inicio",
+            "page_title": "funkcionario.com | Inicio",
         },
     )
 
@@ -35,7 +38,7 @@ def valencia_docentes(request: Request):
         name="valencia_docentes.html",
         context={
             "active_page": "valencia-docentes",
-            "page_title": "funcionario.com | Consulta de Plazas y Adjudicaciones Docentes",
+            "page_title": "funkcionario.com | Consulta de Plazas y Adjudicaciones Docentes",
             "official_section_url": OFFICIAL_SECTION_URL,
             "official_resolucion_url": OFFICIAL_RESOLUCION_URL,
             "official_adjudicaciones_url": OFFICIAL_ADJUDICACIONES_URL,
@@ -50,7 +53,8 @@ def quienes_somos(request: Request):
         name="quienes_somos.html",
         context={
             "active_page": "quienes-somos",
-            "page_title": "funcionario.com | Quiénes Somos",
+            "page_title": "funkcionario.com | Quiénes Somos",
+            "project_owner": PROJECT_OWNER,
         },
     )
 
@@ -62,6 +66,9 @@ def contacto(request: Request):
         name="contacto.html",
         context={
             "active_page": "contacto",
-            "page_title": "funcionario.com | Contacto",
+            "page_title": "funkcionario.com | Contacto",
+            "project_email": PROJECT_EMAIL,
+            "project_owner": PROJECT_OWNER,
+            "project_linkedin": PROJECT_LINKEDIN,
         },
     )

@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% block body_class %}page-inner{% endblock %}
+
 {% block hero %}
 <section class="hero hero--module hero--compact">
   <div class="hero__backdrop"></div>
@@ -20,13 +22,15 @@
     </div>
 
     <div class="page-copy">
-      <p><strong>funcionario.com</strong> es un portal orientado a facilitar la consulta de información útil para personal funcionario e interino, empezando por la consulta de plazas y adjudicaciones docentes en la Comunitat Valenciana.</p>
+      <p><strong>funkcionario.com</strong> es un proyecto creado para facilitar a los funcionarios interinos sin plaza fija el seguimiento de sus posiciones, de las plazas ofertadas, de las posibles adjudicaciones y de la información relacionada con las mismas.</p>
 
-      <p>El objetivo del proyecto es ofrecer una interfaz clara para consultar datos públicos publicados por fuentes oficiales, simplificando la búsqueda por persona y la revisión de plazas ofertadas.</p>
+      <p>En esta primera etapa, la plataforma está enfocada en maestros y profesorado de la Comunitat Valenciana, con una interfaz pensada para que consultar publicaciones oficiales sea más rápido, más claro y más útil para el usuario final.</p>
+
+      <p>El objetivo a medio plazo es ampliar la cobertura a otros sectores y a otras comunidades autónomas, atendiendo a las necesidades reales del personal funcionario interino y priorizando siempre la consulta práctica de información relevante.</p>
 
       <div class="info-note">
-        <strong>Contenido pendiente de personalización.</strong>
-        <p>Esta página ya está preparada. Falta sustituir este texto provisional por la descripción definitiva del proyecto, autoría y alcance.</p>
+        <strong>Responsable del proyecto</strong>
+        <p>{{ project_owner }}</p>
       </div>
     </div>
   </section>

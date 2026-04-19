@@ -1,10 +1,12 @@
 {% extends "base.html" %}
 
+{% block body_class %}page-inner{% endblock %}
+
 {% block hero %}
 <section class="hero hero--module">
   <div class="hero__backdrop"></div>
   <div class="shell hero__content hero__content--module">
-    <p class="eyebrow">Consulta de Plazas y Adjudicaciones Docentes en la Comunidad Valenciana</p>
+    <p class="eyebrow">Consulta de plazas y adjudicaciones docentes en la Comunitat Valenciana</p>
   </div>
 </section>
 {% endblock %}
@@ -17,11 +19,9 @@
     <div class="module-card__header">
       <div>
         <h1>Consulta de Plazas y Adjudicaciones Docentes</h1>
-        <p>Comunidad Valenciana</p>
+        <p>Comunitat Valenciana · maestros y profesorado interino</p>
       </div>
     </div>
-
-    <div class="ad-slot ad-slot--728">Publicidad 728x90</div>
 
     <div class="module-grid">
       <article class="panel-card">
@@ -44,7 +44,7 @@
         </div>
 
         <p class="panel-card__hint">
-          Muestra el listado más reciente de plazas ofertadas disponibles en la API y acceso directo a la publicación oficial.
+          Consulta el listado más reciente de plazas ofertadas detectadas en la API y accede a la publicación oficial.
         </p>
       </article>
 
@@ -74,60 +74,48 @@
         <div id="person-search-results" class="result-list"></div>
       </article>
     </div>
-
-    <div class="ad-slot ad-slot--728">Publicidad 728x90</div>
   </section>
 
-  <div class="side-ad-layout">
-    <aside class="ad-slot ad-slot--300">Publicidad 300x250</aside>
-
-    <section class="content-stack">
-      <section id="offers-section" class="content-card is-hidden">
-        <div class="content-card__header">
-          <div>
-            <h2>Últimas plazas ofertadas</h2>
-            <p id="offers-publication-meta">Cargando datos...</p>
-          </div>
-          <a class="button button--ghost" href="{{ official_resolucion_url }}" target="_blank" rel="noopener noreferrer">
-            Ver publicación oficial
-          </a>
+  <section class="content-stack content-stack--standalone">
+    <section id="offers-section" class="content-card is-hidden">
+      <div class="content-card__header">
+        <div>
+          <h2>Últimas plazas ofertadas</h2>
+          <p id="offers-publication-meta">Cargando datos...</p>
         </div>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Especialidad</th>
-                <th>Tipo</th>
-                <th>Centro</th>
-                <th>Localidad</th>
-                <th>Código</th>
-              </tr>
-            </thead>
-            <tbody id="offers-table-body"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section id="person-profile-section" class="content-card is-hidden">
-        <div class="content-card__header">
-          <div>
-            <h2>Resultado por persona</h2>
-            <p>Resumen legible y detalle técnico de la información disponible.</p>
-          </div>
-        </div>
-
-        <div id="person-profile-summary"></div>
-        <div id="person-profile-history"></div>
-      </section>
+        <a class="button button--ghost" href="{{ official_resolucion_url }}" target="_blank" rel="noopener noreferrer">
+          Ver publicación oficial
+        </a>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Especialidad</th>
+              <th>Tipo</th>
+              <th>Centro</th>
+              <th>Localidad</th>
+              <th>Código</th>
+            </tr>
+          </thead>
+          <tbody id="offers-table-body"></tbody>
+        </table>
+      </div>
     </section>
 
-    <aside class="ad-slot ad-slot--300">Publicidad 300x250</aside>
-  </div>
+    <section id="person-profile-section" class="content-card is-hidden">
+      <div class="content-card__header">
+        <div>
+          <h2>Resultado por persona</h2>
+          <p>Resumen claro para el usuario y detalle del historial disponible.</p>
+        </div>
+      </div>
 
-  <div class="ad-row ad-row--centered section-space--sm">
-    <div class="ad-slot ad-slot--728">Publicidad 728x90</div>
-  </div>
+      <div id="person-profile-summary"></div>
+      <div id="person-profile-history"></div>
+    </section>
+  </section>
 </section>
 {% endblock %}
 

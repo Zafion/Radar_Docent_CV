@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% block body_class %}page-inner{% endblock %}
+
 {% block hero %}
 <section class="hero hero--module hero--compact">
   <div class="hero__backdrop"></div>
@@ -15,23 +17,102 @@
     <div class="module-card__header">
       <div>
         <h1>Contacto</h1>
-        <p>Canales de contacto e información básica</p>
+        <p>Feedback, sugerencias y necesidades de mejora</p>
       </div>
     </div>
 
     <div class="contact-grid">
       <article class="panel-card panel-card--plain">
-        <h2>Consultas generales</h2>
-        <p>Esta sección está preparada para mostrar el correo o formulario principal de contacto del proyecto.</p>
-        <p><strong>Email:</strong> pendiente@funcionario.com</p>
+        <h2>Canales de contacto</h2>
+        <p>Se acepta feedback, propuestas de mejora y necesidades funcionales que puedan ayudar a priorizar futuras evoluciones de la plataforma.</p>
+        <p><strong>Responsable:</strong> {{ project_owner }}</p>
+        <p><strong>Email:</strong> <a href="mailto:{{ project_email }}">{{ project_email }}</a></p>
+        <p><strong>LinkedIn:</strong> <a href="{{ project_linkedin }}" target="_blank" rel="noopener noreferrer">Perfil profesional</a></p>
+        <div class="info-note info-note--compact">
+          <strong>Nota</strong>
+          <p>El formulario inferior prepara un correo al buzón de contacto desde tu aplicación de email. Para envío automático real habría que configurar un servicio SMTP o API de correo en el backend.</p>
+        </div>
       </article>
 
       <article class="panel-card panel-card--plain">
-        <h2>Información adicional</h2>
-        <p>Aquí puedes incluir horarios de respuesta, redes sociales, canal de soporte o aclaraciones legales básicas.</p>
-        <p><strong>Estado:</strong> contenido provisional pendiente de personalización.</p>
+        <h2>Formulario de contacto</h2>
+        <form id="contact-form" class="contact-form">
+          <div class="form-field">
+            <label for="contact-name">Nombre</label>
+            <input id="contact-name" name="name" type="text" placeholder="Tu nombre o alias" required>
+          </div>
+
+          <div class="form-field">
+            <label for="contact-email">Email</label>
+            <input id="contact-email" name="email" type="email" placeholder="tu@email.com" required>
+          </div>
+
+          <div class="form-field">
+            <label for="contact-subject">Asunto</label>
+            <input id="contact-subject" name="subject" type="text" placeholder="Feedback, incidencia o propuesta de mejora" required>
+          </div>
+
+          <div class="form-field">
+            <label for="contact-message">Mensaje</label>
+            <textarea id="contact-message" name="message" rows="6" placeholder="Cuéntanos tu sugerencia, problema o necesidad." required></textarea>
+          </div>
+
+          <div class="stack-actions">
+            <button id="contact-submit" class="button button--primary" type="submit">Preparar email</button>
+          </div>
+
+          <p id="contact-feedback" class="feedback"></p>
+        </form>
       </article>
     </div>
   </section>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (() => {
+    const form = document.getElementById('contact-form');
+    const feedback = document.getElementById('contact-feedback');
+    const email = {{ project_email | tojson }};
+
+    if (!form) return;
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      const name = document.getElementById('contact-name')?.value.trim() || '';
+      const fromEmail = document.getElementById('contact-email')?.value.trim() || '';
+      const subject = document.getElementById('contact-subject')?.value.trim() || '';
+      const message = document.getElementById('contact-message')?.value.trim() || '';
+
+      if (!name || !fromEmail || !subject || !message) {
+        if (feedback) {
+          feedback.textContent = 'Completa todos los campos antes de continuar.';
+          feedback.classList.add('feedback--error');
+        }
+        return;
+      }
+
+      const mailSubject = `[funkcionario.com] ${subject}`;
+      const body = [
+        `Nombre: ${name}`,
+        `Email de contacto: ${fromEmail}`,
+        '',
+        'Mensaje:',
+        message,
+        '',
+        '---',
+        'Enviado desde el formulario de contacto de funkcionario.com'
+      ].join('\n');
+
+      window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(mailSubject)}&body=${encodeURIComponent(body)}`;
+
+      if (feedback) {
+        feedback.textContent = 'Se ha abierto tu aplicación de correo para enviar el mensaje.';
+        feedback.classList.remove('feedback--error');
+      }
+    });
+  })();
+</script>
 {% endblock %}
