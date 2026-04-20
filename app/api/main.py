@@ -13,6 +13,13 @@ from typing import Any, Iterable
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.services.geo import (
+    haversine_km,
+    build_google_maps_search_url,
+    build_google_maps_directions_url,
+)
+from app.storage.centers_store import get_center_by_code
+
 DB_PATH = os.getenv("RADAR_DOCENT_DB_PATH", "/mnt/data/radar_docent_cv.db")
 
 
@@ -123,6 +130,75 @@ def map_list_scope_label(list_scope: str | None) -> str | None:
         return None
     return mapping.get(list_scope, list_scope.replace("_", " ").capitalize())
 
+def enrich_center_geo_fields(
+    item: dict[str, Any],
+    origin_lat: float | None = None,
+    origin_lon: float | None = None,
+) -> dict[str, Any]:
+    lat = item.get("center_latitude")
+    lon = item.get("center_longitude")
+
+    item["center_maps_url"] = None
+    item["center_directions_url"] = None
+    item["distance_km"] = None
+
+    if lat is None or lon is None:
+        return item
+
+    lat_f = float(lat)
+    lon_f = float(lon)
+
+    item["center_maps_url"] = build_google_maps_search_url(lat_f, lon_f)
+    item["center_directions_url"] = build_google_maps_directions_url(
+        lat_f,
+        lon_f,
+        origin_lat,
+        origin_lon,
+    )
+
+    if origin_lat is not None and origin_lon is not None:
+        item["distance_km"] = round(
+            haversine_km(float(origin_lat), float(origin_lon), lat_f, lon_f),
+            2,
+        )
+
+    return item
+
+
+def center_row_to_payload(
+    row: sqlite3.Row,
+    origin_lat: float | None = None,
+    origin_lon: float | None = None,
+) -> dict[str, Any]:
+    item = dict(row)
+
+    lat = item.get("latitude")
+    lon = item.get("longitude")
+
+    item["maps_url"] = None
+    item["directions_url"] = None
+    item["distance_km"] = None
+
+    if lat is not None and lon is not None:
+        lat_f = float(lat)
+        lon_f = float(lon)
+
+        item["maps_url"] = build_google_maps_search_url(lat_f, lon_f)
+        item["directions_url"] = build_google_maps_directions_url(
+            lat_f,
+            lon_f,
+            origin_lat,
+            origin_lon,
+        )
+
+        if origin_lat is not None and origin_lon is not None:
+            item["distance_km"] = round(
+                haversine_km(float(origin_lat), float(origin_lon), lat_f, lon_f),
+                2,
+            )
+
+    return item
+
 
 def build_user_view(
     person: dict[str, Any],
@@ -157,6 +233,14 @@ def build_user_view(
         "assigned_center": None,
         "assigned_locality": None,
         "recommended_action": None,
+        "assigned_center_code": None,
+        "assigned_center_address": None,
+        "assigned_center_phone": None,
+        "assigned_center_latitude": None,
+        "assigned_center_longitude": None,
+        "assigned_center_maps_url": None,
+        "assigned_center_directions_url": None,
+        "assigned_distance_km": None,
     }
 
     if latest_awarded:
@@ -176,6 +260,14 @@ def build_user_view(
             "assigned_center": first_assignment.get("center_name") if first_assignment else None,
             "assigned_locality": first_assignment.get("locality") if first_assignment else None,
             "recommended_action": "Consulta la resolución oficial y el centro adjudicado para los siguientes pasos administrativos.",
+            "assigned_center_code": first_assignment.get("center_code") if first_assignment else None,
+            "assigned_center_address": first_assignment.get("center_full_address") if first_assignment else None,
+            "assigned_center_phone": first_assignment.get("center_phone") if first_assignment else None,
+            "assigned_center_latitude": first_assignment.get("center_latitude") if first_assignment else None,
+            "assigned_center_longitude": first_assignment.get("center_longitude") if first_assignment else None,
+            "assigned_center_maps_url": first_assignment.get("center_maps_url") if first_assignment else None,
+            "assigned_center_directions_url": first_assignment.get("center_directions_url") if first_assignment else None,
+            "assigned_distance_km": first_assignment.get("distance_km") if first_assignment else None,
         }
 
     if latest_award:
@@ -250,6 +342,14 @@ def build_user_view(
             "assigned_center": selected_difficult.get("center_name"),
             "assigned_locality": selected_difficult.get("locality"),
             "recommended_action": "Consulta la publicación oficial para confirmar el resultado y los pasos administrativos siguientes.",
+            "assigned_center_code": selected_difficult.get("center_code"),
+            "assigned_center_address": selected_difficult.get("center_full_address"),
+            "assigned_center_phone": selected_difficult.get("center_phone"),
+            "assigned_center_latitude": selected_difficult.get("center_latitude"),
+            "assigned_center_longitude": selected_difficult.get("center_longitude"),
+            "assigned_center_maps_url": selected_difficult.get("center_maps_url"),
+            "assigned_center_directions_url": selected_difficult.get("center_directions_url"),
+            "assigned_distance_km": selected_difficult.get("distance_km"),
         }
 
     if difficult_coverage:
@@ -288,6 +388,7 @@ def health() -> dict[str, Any]:
             "difficult_coverage_candidates": conn.execute(
                 "SELECT COUNT(*) FROM difficult_coverage_candidates"
             ).fetchone()[0],
+            "centers": conn.execute("SELECT COUNT(*) FROM centers").fetchone()[0],
         }
         latest_docs = rows_to_dicts(
             conn.execute(
@@ -305,6 +406,25 @@ def health() -> dict[str, Any]:
         "db_path": DB_PATH,
         "counts": counts,
         "latest_documents": latest_docs,
+    }
+
+
+# ---------- center search ----------
+
+@app.get("/api/centers/{center_code}")
+def get_center_detail(
+    center_code: str,
+    origin_lat: float | None = Query(None),
+    origin_lon: float | None = Query(None),
+) -> dict[str, Any]:
+    with get_connection() as conn:
+        _register_normalize_function(conn)
+        center = get_center_by_code(conn, center_code)
+        if center is None:
+            raise HTTPException(status_code=404, detail="center_code no encontrado")
+
+    return {
+        "center": center_row_to_payload(center, origin_lat, origin_lon),
     }
 
 
@@ -372,6 +492,8 @@ def get_person_profile(
         min_length=2,
         description="Valor exacto devuelto por /api/search/persons -> normalized_name",
     ),
+    origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
+    origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
 ) -> dict[str, Any]:
     with get_connection() as conn:
         _register_normalize_function(conn)
@@ -524,6 +646,17 @@ def get_person_profile(
                         aa.petition_number,
                         aa.request_type,
                         aa.matched_offered_position_id,
+
+                        c.denomination AS center_catalog_name,
+                        c.regime AS center_regime,
+                        c.full_address AS center_full_address,
+                        c.postal_code AS center_postal_code,
+                        c.comarca AS center_comarca,
+                        c.phone AS center_phone,
+                        c.fax AS center_fax,
+                        c.latitude AS center_latitude,
+                        c.longitude AS center_longitude,
+
                         op.source_type AS matched_source_type,
                         op.position_type AS matched_position_type,
                         op.province AS matched_province,
@@ -534,6 +667,7 @@ def get_person_profile(
                         op.observations AS matched_observations
                     FROM award_assignments aa
                     LEFT JOIN offered_positions op ON op.id = aa.matched_offered_position_id
+                    LEFT JOIN centers c ON c.center_code = aa.center_code
                     WHERE aa.award_result_id IN ({placeholders})
                     ORDER BY aa.award_result_id ASC, aa.id ASC
                     """,
@@ -541,9 +675,14 @@ def get_person_profile(
                 ).fetchall()
             )
 
+            assignment_rows = [
+                enrich_center_geo_fields(row, origin_lat, origin_lon)
+                for row in assignment_rows
+            ]
+
             for row in assignment_rows:
                 award_result_id = row["award_result_id"]
-                assignments_by_award.setdefault(award_result_id, []).append(row)
+                assignments_by_award.setdefault(award_result_id, []).append(row)            
 
         for award in awards:
             award["assignments"] = assignments_by_award.get(award["id"], [])
@@ -574,17 +713,33 @@ def get_person_profile(
                     dc.has_master_text,
                     dc.valenciano_requirement_text,
                     dc.adjudication_group_text,
-                    dc.assigned_position_code
+                    dc.assigned_position_code,
+
+                    c.denomination AS center_catalog_name,
+                    c.regime AS center_regime,
+                    c.full_address AS center_full_address,
+                    c.postal_code AS center_postal_code,
+                    c.comarca AS center_comarca,
+                    c.phone AS center_phone,
+                    c.fax AS center_fax,
+                    c.latitude AS center_latitude,
+                    c.longitude AS center_longitude
                 FROM difficult_coverage_candidates dc
                 JOIN difficult_coverage_positions p ON p.id = dc.position_id
                 JOIN documents d ON d.id = p.document_id
                 JOIN sources s ON s.id = d.source_id
+                LEFT JOIN centers c ON c.center_code = p.center_code
                 WHERE dc.full_name_normalized = ?
                 ORDER BY COALESCE(d.document_date_iso, '') DESC, dc.is_selected DESC, dc.row_number ASC, dc.id ASC
                 """,
                 [normalized_name],
             ).fetchall()
         )
+
+        difficult_coverage = [
+            enrich_center_geo_fields(row, origin_lat, origin_lon)
+            for row in difficult_coverage
+        ]
 
     user_view = build_user_view(dict(person), awards, difficult_coverage)
 
@@ -710,7 +865,11 @@ def list_awards(
 
 
 @app.get("/api/awards/{award_result_id}")
-def get_award_detail(award_result_id: int) -> dict[str, Any]:
+def get_award_detail(
+    award_result_id: int,
+    origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
+    origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
+) -> dict[str, Any]:
     with get_connection() as conn:
         _register_normalize_function(conn)
         award = conn.execute(
@@ -762,6 +921,17 @@ def get_award_detail(award_result_id: int) -> dict[str, Any]:
                     aa.request_type,
                     aa.matched_offered_position_id,
                     aa.raw_assignment_text,
+
+                    c.denomination AS center_catalog_name,
+                    c.regime AS center_regime,
+                    c.full_address AS center_full_address,
+                    c.postal_code AS center_postal_code,
+                    c.comarca AS center_comarca,
+                    c.phone AS center_phone,
+                    c.fax AS center_fax,
+                    c.latitude AS center_latitude,
+                    c.longitude AS center_longitude,
+
                     op.document_id AS matched_document_id,
                     op.source_type AS matched_source_type,
                     op.position_type AS matched_position_type,
@@ -773,12 +943,18 @@ def get_award_detail(award_result_id: int) -> dict[str, Any]:
                     op.observations AS matched_observations
                 FROM award_assignments aa
                 LEFT JOIN offered_positions op ON op.id = aa.matched_offered_position_id
+                LEFT JOIN centers c ON c.center_code = aa.center_code
                 WHERE aa.award_result_id = ?
                 ORDER BY aa.id ASC
                 """,
                 [award_result_id],
             ).fetchall()
         )
+
+        assignments = [
+            enrich_center_geo_fields(item, origin_lat, origin_lon)
+            for item in assignments
+        ]
 
     return {"award": dict(award), "assignments": assignments}
 
@@ -799,6 +975,8 @@ def list_offered_positions(
     position_code: str | None = None,
     position_type: str | None = None,
     only_unmatched: bool | None = Query(None, description="True = puestos que no aparecen enlazados desde award_assignments"),
+    origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
+    origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
     order_by: str = Query("document_date"),
     order_dir: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
@@ -851,6 +1029,7 @@ def list_offered_positions(
         FROM offered_positions op
         JOIN documents d ON d.id = op.document_id
         JOIN sources s ON s.id = d.source_id
+        LEFT JOIN centers c ON c.center_code = op.center_code
         {where_sql}
     """
 
@@ -878,6 +1057,17 @@ def list_offered_positions(
             op.position_type,
             op.composition,
             op.observations,
+
+            c.denomination AS center_catalog_name,
+            c.regime AS center_regime,
+            c.full_address AS center_full_address,
+            c.postal_code AS center_postal_code,
+            c.comarca AS center_comarca,
+            c.phone AS center_phone,
+            c.fax AS center_fax,
+            c.latitude AS center_latitude,
+            c.longitude AS center_longitude,
+
             (
                 SELECT COUNT(*)
                 FROM award_assignments aa
@@ -894,6 +1084,7 @@ def list_offered_positions(
         _register_normalize_function(conn)
         total = conn.execute(count_sql, params).fetchone()[0]
         items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
+    items = [enrich_center_geo_fields(item, origin_lat, origin_lon) for item in items]
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
@@ -910,6 +1101,8 @@ def list_difficult_positions(
     center_code: str | None = None,
     position_code: str | None = None,
     selected_only: bool | None = Query(None, description="True = solo puestos con al menos una persona seleccionada"),
+    origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
+    origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
     order_by: str = Query("document_date"),
     order_dir: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
@@ -951,6 +1144,7 @@ def list_difficult_positions(
         FROM difficult_coverage_positions p
         JOIN documents d ON d.id = p.document_id
         JOIN sources s ON s.id = d.source_id
+        LEFT JOIN centers c ON c.center_code = p.center_code
         {where_sql}
     """
 
@@ -973,6 +1167,17 @@ def list_difficult_positions(
             p.sorteo_number,
             p.registro_superior,
             p.registro_inferior,
+
+            c.denomination AS center_catalog_name,
+            c.regime AS center_regime,
+            c.full_address AS center_full_address,
+            c.postal_code AS center_postal_code,
+            c.comarca AS center_comarca,
+            c.phone AS center_phone,
+            c.fax AS center_fax,
+            c.latitude AS center_latitude,
+            c.longitude AS center_longitude,
+
             (
                 SELECT COUNT(*)
                 FROM difficult_coverage_candidates dc
@@ -994,6 +1199,7 @@ def list_difficult_positions(
         _register_normalize_function(conn)
         total = conn.execute(count_sql, params).fetchone()[0]
         items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
+    items = [enrich_center_geo_fields(item, origin_lat, origin_lon) for item in items]
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
@@ -1002,6 +1208,8 @@ def list_difficult_positions(
 def get_difficult_candidates(
     position_id: int,
     selected_only: bool | None = None,
+    origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
+    origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
@@ -1025,10 +1233,21 @@ def get_difficult_candidates(
                 p.num_participants,
                 p.sorteo_number,
                 p.registro_superior,
-                p.registro_inferior
+                p.registro_inferior,
+
+                c.denomination AS center_catalog_name,
+                c.regime AS center_regime,
+                c.full_address AS center_full_address,
+                c.postal_code AS center_postal_code,
+                c.comarca AS center_comarca,
+                c.phone AS center_phone,
+                c.fax AS center_fax,
+                c.latitude AS center_latitude,
+                c.longitude AS center_longitude
             FROM difficult_coverage_positions p
             JOIN documents d ON d.id = p.document_id
             JOIN sources s ON s.id = d.source_id
+            LEFT JOIN centers c ON c.center_code = p.center_code
             WHERE p.id = ?
             """,
             [position_id],
@@ -1072,8 +1291,10 @@ def get_difficult_candidates(
         total = conn.execute(count_sql, params).fetchone()[0]
         items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
 
+    position_payload = enrich_center_geo_fields(dict(position), origin_lat, origin_lon)
+
     return {
-        "position": dict(position),
+        "position": position_payload,
         "items": items,
         "total": total,
         "limit": limit,

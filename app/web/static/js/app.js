@@ -13,6 +13,14 @@
   const personProfileSummary = document.getElementById("person-profile-summary");
   const personProfileHistory = document.getElementById("person-profile-history");
 
+  const locationStatusEl = document.getElementById("location-status");
+  const useMyLocationButton = document.getElementById("use-my-location");
+
+  let userOrigin = {
+    lat: null,
+    lon: null,
+  };
+
   let latestOffersDate = null;
 
   function setFeedback(message, isError = false) {
@@ -35,6 +43,83 @@
     const [year, month, day] = dateIso.split("-");
     if (!year || !month || !day) return dateIso;
     return `${day}/${month}/${year}`;
+  }
+
+  function formatDistance(distanceKm) {
+    if (distanceKm === null || distanceKm === undefined || Number.isNaN(Number(distanceKm))) {
+      return (userOrigin.lat === null || userOrigin.lon === null)
+        ? "Activa ubicación"
+        : "—";
+    }
+    return `${Number(distanceKm).toFixed(2)} km`;
+  }
+
+  function updateLocationStatus() {
+    if (!locationStatusEl) return;
+
+    if (userOrigin.lat !== null && userOrigin.lon !== null) {
+      locationStatusEl.textContent = `Activa (${userOrigin.lat.toFixed(4)}, ${userOrigin.lon.toFixed(4)})`;
+      return;
+    }
+
+    locationStatusEl.textContent = "No activada · sin distancia calculada";
+  }
+
+  async function ensureUserLocation() {
+    if (!navigator.geolocation) {
+      throw new Error("Tu navegador no permite geolocalización.");
+    }
+
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          userOrigin.lat = position.coords.latitude;
+          userOrigin.lon = position.coords.longitude;
+          updateLocationStatus();
+          resolve(userOrigin);
+        },
+        () => {
+          reject(new Error("No se pudo obtener tu ubicación."));
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000,
+        }
+      );
+    });
+  }
+
+  function appendOriginParams(params) {
+    if (userOrigin.lat !== null && userOrigin.lon !== null) {
+      params.set("origin_lat", String(userOrigin.lat));
+      params.set("origin_lon", String(userOrigin.lon));
+    }
+    return params;
+  }
+
+  function buildCenterActions(item) {
+    const actions = [];
+
+    if (item.center_code) {
+      actions.push(
+        `<a class="button button--ghost button--xs" href="/centros/${encodeURIComponent(item.center_code)}" target="_blank" rel="noopener noreferrer">Centro</a>`
+      );
+    }
+
+    if (item.center_maps_url) {
+      actions.push(
+        `<a class="button button--ghost button--xs" href="${escapeHtml(item.center_maps_url)}" target="_blank" rel="noopener noreferrer">Mapa</a>`
+      );
+    }
+
+    if (item.center_directions_url) {
+      actions.push(
+        `<a class="button button--ghost button--xs" href="${escapeHtml(item.center_directions_url)}" target="_blank" rel="noopener noreferrer">Ruta</a>`
+      );
+    }
+
+    return actions.join(" ");
   }
 
   function buildStatusPillClass(resultKey) {
@@ -125,7 +210,7 @@
       : "No se ha podido determinar la fecha de publicación.";
 
     if (!items.length) {
-      offersTableBody.innerHTML = '<tr><td colspan="6" class="muted">No hay plazas ofertadas disponibles para la última fecha publicada.</td></tr>';
+            offersTableBody.innerHTML = '<tr><td colspan="8" class="muted">No hay plazas ofertadas disponibles para la última fecha publicada.</td></tr>';
       return;
     }
 
@@ -136,9 +221,15 @@
           <td>${escapeHtml(formatDate(item.document_date_iso))}</td>
           <td>${escapeHtml(specialty)}</td>
           <td>${escapeHtml(item.position_type || "—")}</td>
-          <td>${escapeHtml(item.center_name || "—")}</td>
+          <td>
+            <strong>${escapeHtml(item.center_name || "—")}</strong>
+            ${item.center_full_address ? `<br><span class="muted">${escapeHtml(item.center_full_address)}</span>` : ""}
+            ${item.center_phone ? `<br><span class="muted">Tel: ${escapeHtml(item.center_phone)}</span>` : ""}
+          </td>
           <td>${escapeHtml(item.locality || "—")}</td>
           <td>${escapeHtml(item.position_code || "—")}</td>
+          <td>${escapeHtml(formatDistance(item.distance_km))}</td>
+          <td>${buildCenterActions(item)}</td>
         </tr>
       `;
     }).join("");
@@ -155,7 +246,10 @@
         latestOffersDate = meta.items?.[0]?.document_date_iso || null;
       }
 
-      const params = new URLSearchParams({ limit: "50", order_by: "locality", order_dir: "asc" });
+      const params = appendOriginParams(
+        new URLSearchParams({ limit: "50", order_by: "locality", order_dir: "asc" })
+      );
+
       if (latestOffersDate) {
         params.set("document_date", latestOffersDate);
       }
@@ -165,7 +259,7 @@
       offersSection?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
       if (offersTableBody) {
-        offersTableBody.innerHTML = `<tr><td colspan="6" class="muted">${escapeHtml(error.message)}</td></tr>`;
+        offersTableBody.innerHTML = `<tr><td colspan="8" class="muted">${escapeHtml(error.message)}</td></tr>`;
       }
       offersSection?.classList.remove("is-hidden");
     } finally {
@@ -203,6 +297,7 @@
     if (!personProfileSection || !personProfileSummary || !personProfileHistory) return;
 
     const userView = profile.user_view || fallbackUserView(profile);
+    const latestAwardWithId = (profile.awards || []).find((award) => award?.id);
 
     personProfileSection.classList.remove("is-hidden");
 
@@ -218,7 +313,23 @@
           <div class="status-grid__item"><span>Ámbito</span><strong>${escapeHtml(userView.latest_scope_label || '—')}</strong></div>
           <div class="status-grid__item"><span>Especialidad</span><strong>${escapeHtml(userView.latest_specialty_label || '—')}</strong></div>
           <div class="status-grid__item"><span>Centro / localidad</span><strong>${escapeHtml([userView.assigned_center, userView.assigned_locality].filter(Boolean).join(' · ') || '—')}</strong></div>
-        </div>
+          <div class="status-grid__item"><span>Distancia</span><strong>${escapeHtml(formatDistance(userView.assigned_distance_km))}</strong></div>        </div>
+                  ${userView.assigned_center_address ? `<p><strong>Dirección:</strong> ${escapeHtml(userView.assigned_center_address)}</p>` : ''}
+        ${userView.assigned_center_phone ? `<p><strong>Teléfono:</strong> ${escapeHtml(userView.assigned_center_phone)}</p>` : ''}
+        ${(userView.assigned_center_maps_url || userView.assigned_center_directions_url || userView.assigned_center_code) ? `
+          <p class="stack-actions">
+            ${userView.assigned_center_code ? `<a class="button button--ghost button--xs" href="/centros/${encodeURIComponent(userView.assigned_center_code)}" target="_blank" rel="noopener noreferrer">Centro</a>` : ''}
+            ${userView.assigned_center_maps_url ? `<a class="button button--ghost button--xs" href="${escapeHtml(userView.assigned_center_maps_url)}" target="_blank" rel="noopener noreferrer">Mapa</a>` : ''}
+            ${userView.assigned_center_directions_url ? `<a class="button button--ghost button--xs" href="${escapeHtml(userView.assigned_center_directions_url)}" target="_blank" rel="noopener noreferrer">Ruta</a>` : ''}
+          </p>
+        ` : ''}
+                ${latestAwardWithId ? `
+          <p class="stack-actions">
+            <a class="button button--ghost button--xs" href="/adjudicaciones/${encodeURIComponent(latestAwardWithId.id)}" target="_blank" rel="noopener noreferrer">
+              Ver detalle de adjudicación
+            </a>
+          </p>
+        ` : ''}
         ${userView.recommended_action ? `<p><strong>Siguiente paso orientativo:</strong> ${escapeHtml(userView.recommended_action)}</p>` : ''}
       </div>
     `;
@@ -233,9 +344,14 @@
           <td>${escapeHtml(firstAssignment?.center_name || '—')}</td>
           <td>${escapeHtml(firstAssignment?.locality || '—')}</td>
           <td>${escapeHtml(firstAssignment?.position_code || '—')}</td>
+          <td>
+            <a class="button button--ghost button--xs" href="/adjudicaciones/${encodeURIComponent(award.id)}" target="_blank" rel="noopener noreferrer">
+              Detalle
+            </a>
+          </td>
         </tr>
       `;
-    }).join("") || '<tr><td colspan="6" class="muted">No hay adjudicaciones registradas.</td></tr>';
+    }).join("") || '<tr><td colspan="7" class="muted">No hay adjudicaciones registradas.</td></tr>';
 
     const difficultRows = (profile.difficult_coverage || []).map((row) => `
       <tr>
@@ -246,7 +362,7 @@
         <td>${escapeHtml(row.locality || '—')}</td>
         <td>${escapeHtml(row.assigned_position_code || row.position_code || '—')}</td>
       </tr>
-    `).join("") || '<tr><td colspan="6" class="muted">No hay registros de difícil cobertura.</td></tr>';
+    `).join("") || '<tr><td colspan="7" class="muted">No hay registros de difícil cobertura.</td></tr>';
 
     personProfileHistory.innerHTML = `
       <div class="content-card section-space--sm">
@@ -266,6 +382,7 @@
                 <th>Centro</th>
                 <th>Localidad</th>
                 <th>Código puesto</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>${awardsRows}</tbody>
@@ -301,12 +418,15 @@
     personProfileSection.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  updateLocationStatus();
+
   async function loadPersonProfile(normalizedName) {
     if (!normalizedName) return;
 
     setFeedback("Cargando perfil...");
     try {
-      const data = await apiGet(`/api/persons/profile?normalized_name=${encodeURIComponent(normalizedName)}`);
+      const params = appendOriginParams(new URLSearchParams({ normalized_name: normalizedName }));
+      const data = await apiGet(`/api/persons/profile?${params.toString()}`);
       setFeedback("");
       renderProfile(data);
     } catch (error) {
@@ -335,6 +455,22 @@
       setFeedback(error.message, true);
     }
   }
+
+    useMyLocationButton?.addEventListener("click", async () => {
+    const originalText = useMyLocationButton.textContent;
+    useMyLocationButton.disabled = true;
+    useMyLocationButton.textContent = "Obteniendo ubicación...";
+
+    try {
+      await ensureUserLocation();
+      setFeedback("Ubicación activada correctamente.");
+    } catch (error) {
+      setFeedback(error.message, true);
+    } finally {
+      useMyLocationButton.disabled = false;
+      useMyLocationButton.textContent = originalText;
+    }
+  });
 
   loadLatestOffersMeta();
   loadLatestOffersButton?.addEventListener("click", loadLatestOffers);

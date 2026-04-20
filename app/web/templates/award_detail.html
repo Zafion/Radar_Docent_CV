@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Detalle de adjudicación</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="/valencia-docentes">Consulta de Plazas y Adjudicaciones Docentes</a>
+    <span>›</span>
+    Adjudicación {{ award_result_id }}
+  </div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1 id="award-title">Adjudicación {{ award_result_id }}</h1>
+        <p id="award-subtitle">Cargando información...</p>
+      </div>
+      <div class="stack-actions">
+        <button id="award-use-my-location" class="button button--ghost" type="button">
+          Usar mi ubicación
+        </button>
+        <a class="button button--ghost" href="{{ official_adjudicaciones_url }}" target="_blank" rel="noopener noreferrer">
+          Ver publicación oficial
+        </a>
+      </div>
+    </div>
+
+    <p class="panel-card__hint">
+      Activa tu ubicación para ver la distancia aproximada hasta el centro adjudicado y abrir una ruta directa en Maps.
+    </p>
+    <p class="panel-card__meta">
+      Ubicación: <strong id="award-location-status">No activada · sin distancia calculada</strong>
+    </p>
+
+    <div id="award-summary" class="content-card">
+      <p>Cargando detalle...</p>
+    </div>
+
+    <div id="award-assignments" class="content-card section-space--sm">
+      <p>Cargando asignaciones...</p>
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.AWARD_DETAIL_CONFIG = {
+    awardResultId: {{ award_result_id | tojson }}
+  };
+</script>
+<script src="{{ url_for('static', path='js/award_detail.js') }}"></script>
+{% endblock %}

@@ -14,6 +14,7 @@ router = APIRouter(include_in_schema=False)
 OFFICIAL_SECTION_URL = "https://ceice.gva.es/es/web/rrhh-educacion"
 OFFICIAL_RESOLUCION_URL = "https://ceice.gva.es/es/web/rrhh-educacion/resolucion"
 OFFICIAL_ADJUDICACIONES_URL = "https://ceice.gva.es/es/web/rrhh-educacion/adjudicaciones"
+OFFICIAL_ADJUDICACIONES_CONTINUAS_URL = "https://ceice.gva.es/es/web/rrhh-educacion/adjudicaciones-continuas"
 PROJECT_EMAIL = "funkcionarios@gmail.com"
 PROJECT_OWNER = "Jose Luis Montañana Llopis"
 PROJECT_LINKEDIN = "https://www.linkedin.com/in/jose-luis-monta%C3%B1ana-llopis-116941172/?lipi=urn%3Ali%3Apage%3Ad_flagship3_feed%3BtjegxX7vR4msI4sRX5YxCQ%3D%3D"
@@ -70,5 +71,43 @@ def contacto(request: Request):
             "project_email": PROJECT_EMAIL,
             "project_owner": PROJECT_OWNER,
             "project_linkedin": PROJECT_LINKEDIN,
+        },
+    )
+
+@router.get("/centros/{center_code}", response_class=HTMLResponse)
+def center_detail(request: Request, center_code: str):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="center_detail.html",
+        context={
+            "active_page": "valencia-docentes",
+            "page_title": f"funkcionario.com | Centro {center_code}",
+            "center_code": center_code,
+        },
+    )
+
+@router.get("/adjudicaciones/{award_result_id}", response_class=HTMLResponse)
+def award_detail(request: Request, award_result_id: int):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="award_detail.html",
+        context={
+            "active_page": "valencia-docentes",
+            "page_title": f"funkcionario.com | Adjudicación {award_result_id}",
+            "award_result_id": award_result_id,
+            "official_adjudicaciones_url": OFFICIAL_ADJUDICACIONES_URL,
+        },
+    )
+
+
+@router.get("/dificil-cobertura", response_class=HTMLResponse)
+def difficult_coverage(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="difficult_coverage.html",
+        context={
+            "active_page": "valencia-docentes",
+            "page_title": "funkcionario.com | Difícil Cobertura",
+            "official_adjudicaciones_continuas_url": OFFICIAL_ADJUDICACIONES_CONTINUAS_URL,
         },
     )

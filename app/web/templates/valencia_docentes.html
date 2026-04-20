@@ -34,10 +34,26 @@
           Última actualización: <strong id="latest-offers-date">Cargando...</strong>
         </p>
 
+        <div class="panel-card__meta">
+          Ubicación: <strong id="location-status">No activada</strong>
+        </div>
+
+        <div class="stack-actions">
+          <button id="use-my-location" class="button button--ghost button--full" type="button">
+            Usar mi ubicación
+          </button>
+          <p id="location-help" class="panel-card__hint">
+            Activa tu ubicación para ver la distancia aproximada hasta cada centro y abrir rutas directas en Maps. Sin ella, seguirás viendo las plazas y adjudicaciones, pero sin cálculo de cercanía.
+          </p>
+        </div>
+
         <div class="stack-actions">
           <button id="load-latest-offers" class="button button--secondary button--full" type="button">
             Ver últimas plazas ofertadas
           </button>
+          <a class="button button--ghost button--full" href="/dificil-cobertura">
+            Ver difícil cobertura
+          </a>
           <a class="button button--ghost button--full" href="{{ official_adjudicaciones_url }}" target="_blank" rel="noopener noreferrer">
             Visitar Conselleria
           </a>
@@ -97,6 +113,8 @@
               <th>Centro</th>
               <th>Localidad</th>
               <th>Código</th>
+              <th>Distancia</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="offers-table-body"></tbody>

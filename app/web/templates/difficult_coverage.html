@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Puestos de difícil cobertura</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="/valencia-docentes">Consulta de Plazas y Adjudicaciones Docentes</a>
+    <span>›</span>
+    Difícil cobertura
+  </div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>Difícil cobertura</h1>
+        <p>Puestos, centros, distancia y candidatos registrados.</p>
+      </div>
+      <div class="stack-actions">
+        <button id="dc-use-my-location" class="button button--ghost" type="button">
+          Usar mi ubicación
+        </button>
+        <a class="button button--ghost" href="{{ official_adjudicaciones_continuas_url }}" target="_blank" rel="noopener noreferrer">
+          Ver publicación oficial
+        </a>
+      </div>
+    </div>
+
+    <p class="panel-card__hint">
+      Activa tu ubicación para ver la distancia aproximada hasta cada centro y priorizar mejor los puestos más cercanos.
+    </p>
+    <p class="panel-card__meta">
+      Ubicación: <strong id="dc-location-status">No activada · sin distancia calculada</strong>
+    </p>
+
+    <form id="dc-filters-form" class="search-form">
+      <div class="search-form__row">
+        <input id="dc-locality" type="text" placeholder="Localidad">
+        <input id="dc-specialty-code" type="text" placeholder="Código especialidad">
+        <select id="dc-selected-only">
+          <option value="">Todos</option>
+          <option value="true">Con seleccionados</option>
+          <option value="false">Sin seleccionados</option>
+        </select>
+        <button class="button button--accent search-form__button" type="submit">Buscar</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="dc-list-section" class="content-card">
+    <div class="content-card__header">
+      <div>
+        <h2>Puestos encontrados</h2>
+        <p id="dc-results-meta">Cargando...</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Especialidad</th>
+            <th>Centro</th>
+            <th>Localidad</th>
+            <th>Candidatos</th>
+            <th>Seleccionados</th>
+            <th>Distancia</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="dc-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="dc-candidates-section" class="content-card is-hidden">
+    <div class="content-card__header">
+      <div>
+        <h2>Candidatos del puesto</h2>
+        <p id="dc-candidates-meta">Selecciona un puesto para ver sus candidatos.</p>
+      </div>
+    </div>
+    <div id="dc-position-summary"></div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Fila</th>
+            <th>Resultado</th>
+            <th>Nombre</th>
+            <th>Petición</th>
+            <th>Puesto asignado</th>
+          </tr>
+        </thead>
+        <tbody id="dc-candidates-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/difficult_coverage.js') }}"></script>
+{% endblock %}
