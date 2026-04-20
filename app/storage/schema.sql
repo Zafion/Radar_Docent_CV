@@ -196,6 +196,31 @@ CREATE TABLE IF NOT EXISTS difficult_coverage_candidates (
     FOREIGN KEY (position_id) REFERENCES difficult_coverage_positions(id)
 );
 
+CREATE TABLE IF NOT EXISTS centers (
+    center_code TEXT PRIMARY KEY,
+    denomination TEXT NOT NULL,
+    regime TEXT,
+    street_type TEXT,
+    street_name TEXT,
+    street_number TEXT,
+    postal_code TEXT,
+    locality TEXT,
+    province TEXT,
+    comarca TEXT,
+    phone TEXT,
+    fax TEXT,
+    latitude REAL,
+    longitude REAL,
+    full_address TEXT,
+    source_filename TEXT,
+    generic_name_es TEXT,
+    generic_name_val TEXT,
+    specific_name TEXT,
+    imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+
 CREATE INDEX IF NOT EXISTS idx_sources_key
     ON sources(source_key);
 
@@ -258,5 +283,11 @@ CREATE INDEX IF NOT EXISTS idx_difficult_candidates_position_id
 
 CREATE INDEX IF NOT EXISTS idx_difficult_candidates_full_name_norm
     ON difficult_coverage_candidates(full_name_normalized);
+
+CREATE INDEX IF NOT EXISTS idx_centers_locality
+    ON centers(locality);
+
+CREATE INDEX IF NOT EXISTS idx_centers_province
+    ON centers(province);
 
 COMMIT;
