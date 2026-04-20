@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Información legal</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>Política de Privacidad</h1>
+        <p>Resumen de tratamiento de datos técnicos del sitio.</p>
+      </div>
+    </div>
+
+    <div class="content-card">
+      <p>Esta web no requiere registro de usuarios para consultar la información publicada.</p>
+      <p>Si el usuario activa funciones opcionales del navegador, como la geolocalización o las alertas push, el sitio puede tratar datos técnicos necesarios para prestar dichas funciones.</p>
+      <p>En el caso de las alertas push, se almacena la suscripción técnica del navegador para poder enviar avisos generales de nuevas publicaciones.</p>
+      <p>La geolocalización solo se utiliza si el usuario concede permiso expresamente en su navegador. La web no necesita una cuenta de usuario para esta función.</p>
+      <p>Para cualquier consulta relacionada con privacidad, puedes contactar en <a href="mailto:{{ project_email }}">{{ project_email }}</a>.</p>
+    </div>
+  </section>
+</section>
+{% endblock %}

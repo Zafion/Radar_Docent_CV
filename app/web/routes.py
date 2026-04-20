@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -109,5 +109,38 @@ def difficult_coverage(request: Request):
             "active_page": "valencia-docentes",
             "page_title": "funkcionario.com | Difícil Cobertura",
             "official_adjudicaciones_continuas_url": OFFICIAL_ADJUDICACIONES_CONTINUAS_URL,
+        },
+    )
+
+
+@router.get("/sw.js", include_in_schema=False)
+def service_worker():
+    return FileResponse(BASE_DIR / "static" / "js" / "sw.js", media_type="application/javascript")
+
+
+@router.get("/politica-privacidad", response_class=HTMLResponse)
+def politica_privacidad(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="politica_privacidad.html",
+        context={
+            "active_page": "legal",
+            "page_title": "funkcionario.com | Política de Privacidad",
+            "project_email": PROJECT_EMAIL,
+            "project_owner": PROJECT_OWNER,
+        },
+    )
+
+
+@router.get("/politica-cookies", response_class=HTMLResponse)
+def politica_cookies(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="politica_cookies.html",
+        context={
+            "active_page": "legal",
+            "page_title": "funkcionario.com | Política de Cookies",
+            "project_email": PROJECT_EMAIL,
+            "project_owner": PROJECT_OWNER,
         },
     )

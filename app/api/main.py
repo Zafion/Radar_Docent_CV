@@ -19,6 +19,11 @@ from app.services.geo import (
     build_google_maps_directions_url,
 )
 from app.storage.centers_store import get_center_by_code
+from app.storage.push_subscription_store import (
+    upsert_push_subscription,
+    deactivate_push_subscription,
+)
+from app.services.push_notifications import get_vapid_public_key, is_push_configured
 
 DB_PATH = os.getenv("RADAR_DOCENT_DB_PATH", "/mnt/data/radar_docent_cv.db")
 
@@ -37,7 +42,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -407,6 +412,50 @@ def health() -> dict[str, Any]:
         "counts": counts,
         "latest_documents": latest_docs,
     }
+
+
+@app.get("/api/push/public-key")
+def get_push_public_key() -> dict[str, Any]:
+    return {
+        "configured": is_push_configured(),
+        "public_key": get_vapid_public_key() if is_push_configured() else None,
+    }
+
+
+@app.post("/api/push/subscribe")
+def subscribe_push(payload: dict[str, Any]) -> dict[str, Any]:
+    endpoint = payload.get("endpoint")
+    keys = payload.get("keys") or {}
+    p256dh_key = keys.get("p256dh")
+    auth_key = keys.get("auth")
+
+    if not endpoint or not p256dh_key or not auth_key:
+        raise HTTPException(status_code=400, detail="Suscripción push incompleta")
+
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        upsert_push_subscription(conn, endpoint, p256dh_key, auth_key)
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"ok": True}
+
+
+@app.post("/api/push/unsubscribe")
+def unsubscribe_push(payload: dict[str, Any]) -> dict[str, Any]:
+    endpoint = payload.get("endpoint")
+    if not endpoint:
+        raise HTTPException(status_code=400, detail="Falta endpoint")
+
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        deactivate_push_subscription(conn, endpoint)
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"ok": True}
 
 
 # ---------- center search ----------

@@ -221,6 +221,17 @@ CREATE TABLE IF NOT EXISTS centers (
 );
 
 
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh_key TEXT NOT NULL,
+    auth_key TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+
 CREATE INDEX IF NOT EXISTS idx_sources_key
     ON sources(source_key);
 
@@ -289,5 +300,8 @@ CREATE INDEX IF NOT EXISTS idx_centers_locality
 
 CREATE INDEX IF NOT EXISTS idx_centers_province
     ON centers(province);
+
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_active
+    ON push_subscriptions(is_active);
 
 COMMIT;

@@ -15,6 +15,7 @@
 
   const locationStatusEl = document.getElementById("location-status");
   const useMyLocationButton = document.getElementById("use-my-location");
+  const pushToggleButton = document.getElementById("push-toggle-button");
 
   let userOrigin = {
     lat: null,
@@ -184,6 +185,97 @@
       throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
     }
     return data;
+  }
+
+
+  async function apiJson(url, payload) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = data?.detail || `Error ${response.status}`;
+      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    }
+    return data;
+  }
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replaceAll("-", "+").replaceAll("_", "/");
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+  }
+
+  async function getPushSubscription() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      return null;
+    }
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    return registration.pushManager.getSubscription();
+  }
+
+  async function updatePushToggleLabel() {
+    if (!pushToggleButton) return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      pushToggleButton.textContent = "Alertas no disponibles";
+      pushToggleButton.disabled = true;
+      return;
+    }
+
+    try {
+      const keyData = await apiGet("/api/push/public-key");
+      if (!keyData.configured || !keyData.public_key) {
+        pushToggleButton.textContent = "Alertas no disponibles";
+        pushToggleButton.disabled = true;
+        return;
+      }
+
+      const sub = await getPushSubscription();
+      pushToggleButton.textContent = sub
+        ? "Desactivar alertas de novedades"
+        : "Activar alertas de novedades";
+    } catch (_) {
+      pushToggleButton.textContent = "Alertas no disponibles";
+      pushToggleButton.disabled = true;
+    }
+  }
+
+  async function subscribePush() {
+    const keyData = await apiGet("/api/push/public-key");
+    if (!keyData.configured || !keyData.public_key) {
+      throw new Error("Las alertas no están configuradas todavía.");
+    }
+
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyData.public_key)
+      });
+    }
+
+    await apiJson("/api/push/subscribe", subscription);
+    return subscription;
+  }
+
+  async function unsubscribePush() {
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    const subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      return;
+    }
+
+    await apiJson("/api/push/unsubscribe", { endpoint: subscription.endpoint });
+    await subscription.unsubscribe();
   }
 
   async function loadLatestOffersMeta() {
@@ -469,6 +561,35 @@
     } finally {
       useMyLocationButton.disabled = false;
       useMyLocationButton.textContent = originalText;
+    }
+  });
+
+  updatePushToggleLabel();
+
+  pushToggleButton?.addEventListener("click", async () => {
+    const originalText = pushToggleButton.textContent;
+    pushToggleButton.disabled = true;
+
+    try {
+      const current = await getPushSubscription();
+
+      if (current) {
+        pushToggleButton.textContent = "Desactivando alertas...";
+        await unsubscribePush();
+        setFeedback("Alertas de novedades desactivadas.");
+      } else {
+        pushToggleButton.textContent = "Activando alertas...";
+        await subscribePush();
+        setFeedback("Alertas de novedades activadas.");
+      }
+    } catch (error) {
+      setFeedback(error.message || "No se pudo cambiar el estado de las alertas.", true);
+    } finally {
+      pushToggleButton.disabled = false;
+      await updatePushToggleLabel();
+      if (!pushToggleButton.textContent) {
+        pushToggleButton.textContent = originalText;
+      }
     }
   });
 

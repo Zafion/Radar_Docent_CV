@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Información legal</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>Política de Cookies</h1>
+        <p>Uso de almacenamiento técnico y tecnologías del navegador.</p>
+      </div>
+    </div>
+
+    <div class="content-card">
+      <p>Este sitio puede utilizar almacenamiento técnico del navegador y tecnologías similares para funciones estrictamente técnicas, como la gestión de alertas push o el funcionamiento correcto de la aplicación web.</p>
+      <p>Actualmente no se informa aquí del uso de cookies de analítica o publicidad comportamental. Si en el futuro se incorporan, deberán gestionarse mediante el mecanismo de consentimiento correspondiente.</p>
+      <p>Las funciones opcionales del navegador, como geolocalización o notificaciones, requieren permiso expreso del usuario.</p>
+      <p>Para cualquier consulta relacionada con esta política, puedes contactar en <a href="mailto:{{ project_email }}">{{ project_email }}</a>.</p>
+    </div>
+  </section>
+</section>
+{% endblock %}
