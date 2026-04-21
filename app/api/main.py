@@ -22,6 +22,10 @@ from app.services.geo import (
 )
 from app.storage.centers_store import get_center_by_code
 
+from fastapi.responses import FileResponse
+
+
+
 DB_PATH = os.getenv("RADAR_DOCENT_DB_PATH", "/mnt/data/radar_docent_cv.db")
 
 
@@ -34,6 +38,10 @@ app = FastAPI(
 BASE_DIR = Path(__file__).resolve().parents[1]
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "web" / "static")), name="static")
 app.include_router(web_router)
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> FileResponse:
+    return FileResponse(BASE_DIR / "web" / "static" / "img" / "favicon.ico")
 
 app.add_middleware(
     CORSMiddleware,
