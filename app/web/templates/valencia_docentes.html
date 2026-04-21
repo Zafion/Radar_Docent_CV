@@ -48,9 +48,9 @@
         </div>
 
         <div class="stack-actions">
-          <button id="load-latest-offers" class="button button--secondary button--full" type="button">
+          <a id="view-offered-positions" class="button button--secondary button--full" href="/plazas-ofertadas">
             Ver últimas plazas ofertadas
-          </button>
+          </a>
           <a class="button button--ghost button--full" href="/dificil-cobertura">
             Ver difícil cobertura
           </a>
@@ -63,7 +63,7 @@
         </div>
 
         <p class="panel-card__hint">
-          Consulta el listado más reciente de plazas ofertadas detectadas en la API y accede a la publicación oficial.
+          Consulta las últimas plazas ofertadas en una vista completa con filtros y ordenación, o accede a difícil cobertura con opciones de búsqueda y distancia.
         </p>
         <p class="panel-card__hint">
           La ubicación y las alertas requieren permisos del navegador. Esta web puede utilizar almacenamiento técnico del navegador para funciones como las notificaciones. Consulta la
@@ -102,35 +102,6 @@
   </section>
 
   <section class="content-stack content-stack--standalone">
-    <section id="offers-section" class="content-card is-hidden">
-      <div class="content-card__header">
-        <div>
-          <h2>Últimas plazas ofertadas</h2>
-          <p id="offers-publication-meta">Cargando datos...</p>
-        </div>
-        <a class="button button--ghost" href="{{ official_adjudicaciones_url }}" target="_blank" rel="noopener noreferrer">
-          Ver publicación oficial
-        </a>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Especialidad</th>
-              <th>Tipo</th>
-              <th>Centro</th>
-              <th>Localidad</th>
-              <th>Código</th>
-              <th>Distancia</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="offers-table-body"></tbody>
-        </table>
-      </div>
-    </section>
-
     <section id="person-profile-section" class="content-card is-hidden">
       <div class="content-card__header">
         <div>

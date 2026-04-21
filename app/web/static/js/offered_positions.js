@@ -1,21 +1,20 @@
 (function () {
-  const localityInput = document.getElementById("dc-locality");
-  const specialtyCodeInput = document.getElementById("dc-specialty-code");
-  const selectedOnlyInput = document.getElementById("dc-selected-only");
-  const orderInput = document.getElementById("dc-order");
-  const filtersForm = document.getElementById("dc-filters-form");
+  const latestDateEl = document.getElementById("op-latest-date");
+  const localityInput = document.getElementById("op-locality");
+  const specialtyCodeInput = document.getElementById("op-specialty-code");
+  const positionTypeInput = document.getElementById("op-position-type");
+  const orderInput = document.getElementById("op-order");
+  const latestOnlyInput = document.getElementById("op-latest-only");
+  const onlyUnmatchedInput = document.getElementById("op-only-unmatched");
+  const filtersForm = document.getElementById("op-filters-form");
 
-  const locationStatusEl = document.getElementById("dc-location-status");
-  const useMyLocationButton = document.getElementById("dc-use-my-location");
+  const locationStatusEl = document.getElementById("op-location-status");
+  const useMyLocationButton = document.getElementById("op-use-my-location");
 
-  const resultsMetaEl = document.getElementById("dc-results-meta");
-  const tableBody = document.getElementById("dc-table-body");
+  const resultsMetaEl = document.getElementById("op-results-meta");
+  const tableBody = document.getElementById("op-table-body");
 
-  const candidatesSection = document.getElementById("dc-candidates-section");
-  const candidatesMetaEl = document.getElementById("dc-candidates-meta");
-  const positionSummaryEl = document.getElementById("dc-position-summary");
-  const candidatesTableBody = document.getElementById("dc-candidates-table-body");
-
+  let latestOffersDate = null;
   let userOrigin = loadStoredOrigin();
 
   function escapeHtml(value) {
@@ -119,80 +118,72 @@
     return { orderBy, orderDir };
   }
 
+  function buildCenterActions(item) {
+    const actions = [];
+
+    if (item.center_code) {
+      actions.push(
+        `<a class="button button--ghost button--xs" href="/centros/${encodeURIComponent(item.center_code)}" target="_blank" rel="noopener noreferrer">Centro</a>`
+      );
+    }
+    if (item.center_maps_url) {
+      actions.push(
+        `<a class="button button--ghost button--xs" href="${escapeHtml(item.center_maps_url)}" target="_blank" rel="noopener noreferrer">Mapa</a>`
+      );
+    }
+    if (item.center_directions_url) {
+      actions.push(
+        `<a class="button button--ghost button--xs" href="${escapeHtml(item.center_directions_url)}" target="_blank" rel="noopener noreferrer">Ruta</a>`
+      );
+    }
+
+    return actions.join(" ");
+  }
+
+  async function loadLatestOffersMeta() {
+    if (!latestDateEl) return;
+    latestDateEl.textContent = "Cargando...";
+
+    try {
+      const data = await apiGet("/api/offered-positions?limit=1&order_by=document_date&order_dir=desc");
+      latestOffersDate = data.items?.[0]?.document_date_iso || null;
+      latestDateEl.textContent = latestOffersDate ? formatDate(latestOffersDate) : "Sin datos";
+    } catch (error) {
+      latestDateEl.textContent = "No disponible";
+      resultsMetaEl.textContent = error.message;
+    }
+  }
+
   function renderPositions(items, total) {
-    resultsMetaEl.textContent = `${total} puestos encontrados`;
+    const latestLabel = latestOnlyInput.checked && latestOffersDate
+      ? ` · última publicación ${formatDate(latestOffersDate)}`
+      : "";
+    resultsMetaEl.textContent = `${total} plazas encontradas${latestLabel}`;
 
     if (!items.length) {
-      tableBody.innerHTML = '<tr><td colspan="8" class="muted">No hay puestos para los filtros actuales.</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="8" class="muted">No hay plazas para los filtros actuales.</td></tr>';
       return;
     }
 
     tableBody.innerHTML = items.map((item) => {
       const specialty = [item.specialty_code, item.specialty_name].filter(Boolean).join(" - ") || "—";
-
       return `
         <tr>
           <td>${escapeHtml(formatDate(item.document_date_iso))}</td>
           <td>${escapeHtml(specialty)}</td>
+          <td>${escapeHtml(item.position_type || "—")}</td>
           <td>
             <strong>${escapeHtml(item.center_name || "—")}</strong>
             ${item.center_full_address ? `<br><span class="muted">${escapeHtml(item.center_full_address)}</span>` : ""}
             ${item.center_phone ? `<br><span class="muted">Tel: ${escapeHtml(item.center_phone)}</span>` : ""}
           </td>
           <td>${escapeHtml(item.locality || "—")}</td>
-          <td>${escapeHtml(item.candidate_count ?? "—")}</td>
-          <td>${escapeHtml(item.selected_candidate_count ?? "—")}</td>
+          <td>${escapeHtml(item.position_code || "—")}</td>
           <td>${escapeHtml(formatDistance(item.distance_km))}</td>
-          <td>
-            <button class="button button--secondary button--xs" type="button" data-position-id="${escapeHtml(item.id)}">Candidatos</button>
-            ${item.center_code ? `<a class="button button--ghost button--xs" href="/centros/${encodeURIComponent(item.center_code)}" target="_blank" rel="noopener noreferrer">Centro</a>` : ""}
-            ${item.center_maps_url ? `<a class="button button--ghost button--xs" href="${escapeHtml(item.center_maps_url)}" target="_blank" rel="noopener noreferrer">Mapa</a>` : ""}
-            ${item.center_directions_url ? `<a class="button button--ghost button--xs" href="${escapeHtml(item.center_directions_url)}" target="_blank" rel="noopener noreferrer">Ruta</a>` : ""}
-          </td>
+          <td>${buildCenterActions(item)}</td>
         </tr>
       `;
     }).join("");
-
-    tableBody.querySelectorAll("button[data-position-id]").forEach((button) => {
-      button.addEventListener("click", () => loadCandidates(button.dataset.positionId));
-    });
-  }
-
-  function renderCandidates(position, items) {
-    candidatesSection.classList.remove("is-hidden");
-
-    const specialty = [position.specialty_code, position.specialty_name].filter(Boolean).join(" - ") || "—";
-    candidatesMetaEl.textContent = `${position.center_name || "Centro"} · ${position.locality || "—"}`;
-
-    positionSummaryEl.innerHTML = `
-      <div class="status-card">
-        <div class="status-grid">
-          <div class="status-grid__item"><span>Fecha</span><strong>${escapeHtml(formatDate(position.document_date_iso))}</strong></div>
-          <div class="status-grid__item"><span>Especialidad</span><strong>${escapeHtml(specialty)}</strong></div>
-          <div class="status-grid__item"><span>Centro</span><strong>${escapeHtml(position.center_name || "—")}</strong></div>
-          <div class="status-grid__item"><span>Distancia</span><strong>${escapeHtml(formatDistance(position.distance_km))}</strong></div>
-        </div>
-        ${position.center_full_address ? `<p><strong>Dirección:</strong> ${escapeHtml(position.center_full_address)}</p>` : ""}
-        ${position.center_phone ? `<p><strong>Teléfono:</strong> ${escapeHtml(position.center_phone)}</p>` : ""}
-      </div>
-    `;
-
-    if (!items.length) {
-      candidatesTableBody.innerHTML = '<tr><td colspan="5" class="muted">No hay candidatos registrados.</td></tr>';
-      return;
-    }
-
-    candidatesTableBody.innerHTML = items.map((row) => `
-      <tr>
-        <td>${escapeHtml(row.row_number ?? "—")}</td>
-        <td>${escapeHtml(row.is_selected ? "Seleccionado" : "Participante")}</td>
-        <td>${escapeHtml(row.full_name || "—")}</td>
-        <td>${escapeHtml(row.petition_text || row.petition_number || "—")}</td>
-        <td>${escapeHtml(row.assigned_position_code || "—")}</td>
-      </tr>
-    `).join("");
-
-    candidatesSection.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function loadPositions() {
@@ -204,13 +195,15 @@
         return;
       }
 
-      const params = appendOriginParams(new URLSearchParams({ limit: "50", order_by: orderBy, order_dir: orderDir }));
+      const params = appendOriginParams(new URLSearchParams({ limit: "100", order_by: orderBy, order_dir: orderDir }));
 
+      if (latestOnlyInput.checked && latestOffersDate) params.set("document_date", latestOffersDate);
       if (localityInput.value.trim()) params.set("locality", localityInput.value.trim());
       if (specialtyCodeInput.value.trim()) params.set("specialty_code", specialtyCodeInput.value.trim());
-      if (selectedOnlyInput.value) params.set("selected_only", selectedOnlyInput.value);
+      if (positionTypeInput.value) params.set("position_type", positionTypeInput.value);
+      if (onlyUnmatchedInput.checked) params.set("only_unmatched", "true");
 
-      const data = await apiGet(`/api/difficult-coverage/positions?${params.toString()}`);
+      const data = await apiGet(`/api/offered-positions?${params.toString()}`);
       renderPositions(data.items || [], data.total || 0);
     } catch (error) {
       resultsMetaEl.textContent = error.message;
@@ -218,24 +211,12 @@
     }
   }
 
-  async function loadCandidates(positionId) {
-    try {
-      const params = appendOriginParams(new URLSearchParams());
-      const qs = params.toString();
-      const data = await apiGet(`/api/difficult-coverage/positions/${encodeURIComponent(positionId)}/candidates${qs ? `?${qs}` : ""}`);
-      renderCandidates(data.position, data.items || []);
-    } catch (error) {
-      candidatesSection.classList.remove("is-hidden");
-      candidatesMetaEl.textContent = error.message;
-      positionSummaryEl.innerHTML = "";
-      candidatesTableBody.innerHTML = "";
-    }
-  }
-
   filtersForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     await loadPositions();
   });
+
+  latestOnlyInput?.addEventListener("change", loadPositions);
 
   useMyLocationButton?.addEventListener("click", async () => {
     const originalText = useMyLocationButton.textContent;
@@ -253,5 +234,5 @@
   });
 
   updateLocationStatus();
-  loadPositions();
+  loadLatestOffersMeta().then(loadPositions);
 })();

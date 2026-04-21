@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Últimas plazas ofertadas</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="/valencia-docentes">Consulta de Plazas y Adjudicaciones Docentes</a>
+    <span>›</span>
+    Plazas ofertadas
+  </div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>Plazas ofertadas</h1>
+        <p>Consulta avanzada de plazas con filtros, distancia y acceso rápido al centro.</p>
+      </div>
+      <div class="stack-actions">
+        <button id="op-use-my-location" class="button button--ghost" type="button">
+          Usar mi ubicación
+        </button>
+        <a class="button button--ghost" href="{{ official_adjudicaciones_url }}" target="_blank" rel="noopener noreferrer">
+          Ver publicación oficial
+        </a>
+      </div>
+    </div>
+
+    <p class="panel-card__meta">
+      Última publicación detectada: <strong id="op-latest-date">Cargando...</strong>
+    </p>
+    <p class="panel-card__meta">
+      Ubicación: <strong id="op-location-status">No activada · sin distancia calculada</strong>
+    </p>
+    <p class="panel-card__hint">
+      Activa tu ubicación para ordenar por distancia y priorizar las plazas más cercanas. Por defecto se muestran las plazas de la última publicación detectada.
+    </p>
+
+    <form id="op-filters-form" class="search-form">
+      <div class="search-form__row">
+        <input id="op-locality" type="text" placeholder="Localidad">
+        <input id="op-specialty-code" type="text" placeholder="Código especialidad">
+        <select id="op-position-type">
+          <option value="">Todos los tipos</option>
+          <option value="VACANTE">Vacante</option>
+          <option value="SUSTITUCIÓN">Sustitución</option>
+          <option value="SUSTITUCIÓN INDETERMINADA">Sustitución indeterminada</option>
+        </select>
+        <select id="op-order">
+          <option value="document_date:desc">Fecha más reciente</option>
+          <option value="document_date:asc">Fecha más antigua</option>
+          <option value="locality:asc">Localidad A-Z</option>
+          <option value="locality:desc">Localidad Z-A</option>
+          <option value="center_name:asc">Centro A-Z</option>
+          <option value="center_name:desc">Centro Z-A</option>
+          <option value="position_code:asc">Código de puesto asc</option>
+          <option value="position_code:desc">Código de puesto desc</option>
+          <option value="distance:asc">Distancia más cercana</option>
+          <option value="distance:desc">Distancia más lejana</option>
+        </select>
+        <button class="button button--accent search-form__button" type="submit">Buscar</button>
+      </div>
+      <div class="search-form__row">
+        <label class="checkbox-inline">
+          <input id="op-latest-only" type="checkbox" checked>
+          <span>Solo última publicación</span>
+        </label>
+        <label class="checkbox-inline">
+          <input id="op-only-unmatched" type="checkbox">
+          <span>Solo sin match</span>
+        </label>
+      </div>
+    </form>
+  </section>
+
+  <section id="op-list-section" class="content-card">
+    <div class="content-card__header">
+      <div>
+        <h2>Plazas encontradas</h2>
+        <p id="op-results-meta">Cargando...</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Especialidad</th>
+            <th>Tipo</th>
+            <th>Centro</th>
+            <th>Localidad</th>
+            <th>Código</th>
+            <th>Distancia</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="op-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/offered_positions.js') }}"></script>
+{% endblock %}

@@ -74,7 +74,6 @@ with sqlite3.connect(DB_PATH) as _bootstrap_conn:
 
 @app.middleware("http")
 async def sqlite_function_middleware(request, call_next):
-    # No muta la request; se limita a validar que la BD existe.
     if not os.path.exists(DB_PATH):
         raise HTTPException(status_code=500, detail=f"SQLite no encontrada en {DB_PATH}")
     return await call_next(request)
@@ -118,6 +117,26 @@ def build_order_by(field: str, direction: str, allowed: dict[str, str], fallback
     return f" ORDER BY {sql_field} {sql_dir} "
 
 
+def build_distance_order_by_sql(
+    *,
+    lat_column: str,
+    lon_column: str,
+    direction: str,
+) -> str:
+    sql_dir = "DESC" if direction.lower() == "desc" else "ASC"
+    return f"""
+        ORDER BY
+            CASE
+                WHEN {lat_column} IS NULL OR {lon_column} IS NULL THEN 1
+                ELSE 0
+            END ASC,
+            (
+                (({lat_column} - ?) * ({lat_column} - ?)) +
+                (({lon_column} - ?) * ({lon_column} - ?))
+            ) {sql_dir}
+    """
+
+
 def make_label(code: str | None, name: str | None) -> str | None:
     if code and name:
         return f"{code} - {name}"
@@ -134,6 +153,7 @@ def map_list_scope_label(list_scope: str | None) -> str | None:
     if not list_scope:
         return None
     return mapping.get(list_scope, list_scope.replace("_", " ").capitalize())
+
 
 def enrich_center_geo_fields(
     item: dict[str, Any],
@@ -534,6 +554,7 @@ def search_persons(
         items = rows_to_dicts(conn.execute(sql, [pattern, pattern, pattern, pattern, limit]).fetchall())
     return {"items": items, "count": len(items), "query": q}
 
+
 @app.get("/api/persons/profile")
 def get_person_profile(
     normalized_name: str = Query(
@@ -731,7 +752,7 @@ def get_person_profile(
 
             for row in assignment_rows:
                 award_result_id = row["award_result_id"]
-                assignments_by_award.setdefault(award_result_id, []).append(row)            
+                assignments_by_award.setdefault(award_result_id, []).append(row)
 
         for award in awards:
             award["assignments"] = assignments_by_award.get(award["id"], [])
@@ -1073,7 +1094,19 @@ def list_offered_positions(
         where.append("EXISTS (SELECT 1 FROM award_assignments aa WHERE aa.matched_offered_position_id = op.id)")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
-    order_sql = build_order_by(order_by, order_dir, ALLOWED_OFFERED_ORDER_FIELDS, "d.document_date_iso")
+    order_params: list[Any] = []
+    if order_by == "distance":
+        if origin_lat is None or origin_lon is None:
+            raise HTTPException(status_code=400, detail="Para ordenar por distancia debes activar tu ubicación.")
+        order_sql = build_distance_order_by_sql(
+            lat_column="c.latitude",
+            lon_column="c.longitude",
+            direction=order_dir,
+        )
+        order_params = [origin_lat, origin_lat, origin_lon, origin_lon]
+    else:
+        order_sql = build_order_by(order_by, order_dir, ALLOWED_OFFERED_ORDER_FIELDS, "d.document_date_iso")
+
     base_sql = f"""
         FROM offered_positions op
         JOIN documents d ON d.id = op.document_id
@@ -1132,7 +1165,7 @@ def list_offered_positions(
     with get_connection() as conn:
         _register_normalize_function(conn)
         total = conn.execute(count_sql, params).fetchone()[0]
-        items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
+        items = rows_to_dicts(conn.execute(items_sql, [*params, *order_params, limit, offset]).fetchall())
     items = [enrich_center_geo_fields(item, origin_lat, origin_lon) for item in items]
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
@@ -1187,7 +1220,18 @@ def list_difficult_positions(
         where.append("NOT EXISTS (SELECT 1 FROM difficult_coverage_candidates dc WHERE dc.position_id = p.id AND dc.is_selected = 1)")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
-    order_sql = build_order_by(order_by, order_dir, ALLOWED_DIFFICULT_ORDER_FIELDS, "d.document_date_iso")
+    order_params: list[Any] = []
+    if order_by == "distance":
+        if origin_lat is None or origin_lon is None:
+            raise HTTPException(status_code=400, detail="Para ordenar por distancia debes activar tu ubicación.")
+        order_sql = build_distance_order_by_sql(
+            lat_column="c.latitude",
+            lon_column="c.longitude",
+            direction=order_dir,
+        )
+        order_params = [origin_lat, origin_lat, origin_lon, origin_lon]
+    else:
+        order_sql = build_order_by(order_by, order_dir, ALLOWED_DIFFICULT_ORDER_FIELDS, "d.document_date_iso")
 
     base_sql = f"""
         FROM difficult_coverage_positions p
@@ -1247,7 +1291,7 @@ def list_difficult_positions(
     with get_connection() as conn:
         _register_normalize_function(conn)
         total = conn.execute(count_sql, params).fetchone()[0]
-        items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
+        items = rows_to_dicts(conn.execute(items_sql, [*params, *order_params, limit, offset]).fetchall())
     items = [enrich_center_geo_fields(item, origin_lat, origin_lon) for item in items]
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}

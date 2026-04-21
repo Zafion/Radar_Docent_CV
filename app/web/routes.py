@@ -47,6 +47,19 @@ def valencia_docentes(request: Request):
     )
 
 
+@router.get("/plazas-ofertadas", response_class=HTMLResponse)
+def offered_positions(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="offered_positions.html",
+        context={
+            "active_page": "valencia-docentes",
+            "page_title": "funkcionario.com | Plazas Ofertadas",
+            "official_adjudicaciones_url": OFFICIAL_ADJUDICACIONES_URL,
+        },
+    )
+
+
 @router.get("/quienes-somos", response_class=HTMLResponse)
 def quienes_somos(request: Request):
     return TEMPLATES.TemplateResponse(
@@ -74,6 +87,7 @@ def contacto(request: Request):
         },
     )
 
+
 @router.get("/centros/{center_code}", response_class=HTMLResponse)
 def center_detail(request: Request, center_code: str):
     return TEMPLATES.TemplateResponse(
@@ -85,6 +99,7 @@ def center_detail(request: Request, center_code: str):
             "center_code": center_code,
         },
     )
+
 
 @router.get("/adjudicaciones/{award_result_id}", response_class=HTMLResponse)
 def award_detail(request: Request, award_result_id: int):

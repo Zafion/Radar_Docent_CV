@@ -51,6 +51,18 @@
           <option value="true">Con seleccionados</option>
           <option value="false">Sin seleccionados</option>
         </select>
+        <select id="dc-order">
+          <option value="document_date:desc">Fecha más reciente</option>
+          <option value="document_date:asc">Fecha más antigua</option>
+          <option value="locality:asc">Localidad A-Z</option>
+          <option value="locality:desc">Localidad Z-A</option>
+          <option value="center_name:asc">Centro A-Z</option>
+          <option value="center_name:desc">Centro Z-A</option>
+          <option value="candidate_count:desc">Más candidatos</option>
+          <option value="candidate_count:asc">Menos candidatos</option>
+          <option value="distance:asc">Distancia más cercana</option>
+          <option value="distance:desc">Distancia más lejana</option>
+        </select>
         <button class="button button--accent search-form__button" type="submit">Buscar</button>
       </div>
     </form>
