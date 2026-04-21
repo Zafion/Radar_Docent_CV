@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
-import re
 from typing import Optional
 
+from app.services.document_classifier import DocumentClassifierService
 from app.storage.document_store import DocumentStore
 
 
@@ -22,6 +21,9 @@ class RegisteredDocument:
 
 
 class DocumentRegistryService:
+    def __init__(self) -> None:
+        self.classifier = DocumentClassifierService()
+
     def register_unclassified_documents(self) -> list[RegisteredDocument]:
         store = DocumentStore()
         registered: list[RegisteredDocument] = []
@@ -37,30 +39,33 @@ class DocumentRegistryService:
                     continue
                 seen_versions.add(document_version_id)
 
-                doc_family, list_scope = self._classify_document(
+                classified = self.classifier.classify(
+                    file_path=row["file_path"],
+                    original_filename=row["original_filename"],
+                    asset_title=row["asset_title"],
                     asset_role=row["asset_role"],
                     source_key=row["source_key"],
-                )
-
-                document_date_text, document_date_iso = self._infer_document_date(
+                    source_label=row["source_label"],
+                    section=row["section"],
+                    publication_label=row["publication_label"],
                     publication_date_text=row["publication_date_text"],
-                    original_filename=row["original_filename"],
                 )
 
-                title = row["asset_title"]
                 notes = (
-                    f"classified_from_asset_role={row['asset_role']};"
-                    f" source_key={row['source_key']}"
+                    f"classifier_version={classified.classifier_version};"
+                    f" source_key={row['source_key']};"
+                    f" asset_role={row['asset_role']};"
+                    f" signals={classified.signals}"
                 )
 
                 document_id = store.create_document(
                     document_version_id=document_version_id,
                     source_id=int(row["source_id"]),
-                    doc_family=doc_family,
-                    title=title,
-                    document_date_text=document_date_text,
-                    document_date_iso=document_date_iso,
-                    list_scope=list_scope,
+                    doc_family=classified.doc_family,
+                    title=classified.title,
+                    document_date_text=classified.document_date_text,
+                    document_date_iso=classified.document_date_iso,
+                    list_scope=classified.list_scope,
                     notes=notes,
                 )
 
@@ -69,11 +74,11 @@ class DocumentRegistryService:
                         document_id=document_id,
                         document_version_id=document_version_id,
                         source_key=row["source_key"],
-                        doc_family=doc_family,
-                        title=title,
-                        document_date_text=document_date_text,
-                        document_date_iso=document_date_iso,
-                        list_scope=list_scope,
+                        doc_family=classified.doc_family,
+                        title=classified.title,
+                        document_date_text=classified.document_date_text,
+                        document_date_iso=classified.document_date_iso,
+                        list_scope=classified.list_scope,
                         original_filename=row["original_filename"],
                     )
                 )
@@ -82,57 +87,3 @@ class DocumentRegistryService:
 
         finally:
             store.close()
-
-    def _classify_document(
-        self,
-        asset_role: str,
-        source_key: str,
-    ) -> tuple[str, Optional[str]]:
-        if asset_role == "resolucion_pdf":
-            return "resolution_text", None
-
-        if asset_role == "listado_maestros_pdf":
-            return "final_award_listing", "maestros"
-
-        if asset_role == "listado_secundaria_pdf":
-            return "final_award_listing", "secundaria_otros"
-
-        if asset_role in {"puestos_pdf", "puestos_definitivos_pdf"}:
-            if source_key == "adjudicacion3":
-                return "offered_positions", "inicio_curso"
-            if source_key == "resolucion":
-                return "offered_positions", "continua"
-            if source_key == "resolucion1":
-                return "offered_positions", "dificil_cobertura"
-            return "offered_positions", None
-
-        if asset_role == "provisional_listado_pdf":
-            return "difficult_coverage_provisional", "dificil_cobertura"
-
-        return "unknown", None
-
-    def _infer_document_date(
-        self,
-        publication_date_text: str | None,
-        original_filename: str,
-    ) -> tuple[Optional[str], Optional[str]]:
-        if publication_date_text:
-            iso_date = self._parse_ddmmyyyy_to_iso(publication_date_text)
-            return publication_date_text, iso_date
-
-        filename_match = re.match(r"^(?P<dd>\d{2})(?P<mm>\d{2})(?P<yy>\d{2})_", original_filename)
-        if filename_match:
-            dd = filename_match.group("dd")
-            mm = filename_match.group("mm")
-            yy = filename_match.group("yy")
-            date_text = f"{dd}/{mm}/20{yy}"
-            iso_date = self._parse_ddmmyyyy_to_iso(date_text)
-            return date_text, iso_date
-
-        return None, None
-
-    def _parse_ddmmyyyy_to_iso(self, value: str) -> Optional[str]:
-        try:
-            return datetime.strptime(value, "%d/%m/%Y").date().isoformat()
-        except ValueError:
-            return None

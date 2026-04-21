@@ -36,7 +36,9 @@ class SyncedAsset:
         "already_known_hash",
         "same_run_duplicate",
         "non_downloadable",
+        "download_error",
     ]
+    error_message: Optional[str] = None
 
 
 class DocumentSyncService:
@@ -45,7 +47,7 @@ class DocumentSyncService:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout
         self.headers = {
-            "User-Agent": "RadarDocentCV/0.3 (+https://ceice.gva.es/)"
+            "User-Agent": "RadarDocentCV/0.6 (+https://ceice.gva.es/)"
         }
 
     def sync_adapter(self, adapter: BaseDiscoveryAdapter) -> dict:
@@ -91,26 +93,26 @@ class DocumentSyncService:
                 )
 
                 if not asset.downloadable:
-                    results.append(
-                        SyncedAsset(
-                            source_key=asset.source_key,
-                            asset_role=asset.asset_role,
-                            title=asset.title,
-                            url=asset.url,
-                            canonical_url=asset.canonical_url,
-                            section=asset.section,
-                            publication_date_text=asset.publication_date_text,
-                            downloadable=False,
-                            document_version_id=None,
-                            original_filename=None,
-                            stored_filename=None,
-                            file_path=None,
-                            content_type=None,
-                            size_bytes=None,
-                            sha256=None,
-                            status="non_downloadable",
-                        )
+                    result = SyncedAsset(
+                        source_key=asset.source_key,
+                        asset_role=asset.asset_role,
+                        title=asset.title,
+                        url=asset.url,
+                        canonical_url=asset.canonical_url,
+                        section=asset.section,
+                        publication_date_text=asset.publication_date_text,
+                        downloadable=False,
+                        document_version_id=None,
+                        original_filename=None,
+                        stored_filename=None,
+                        file_path=None,
+                        content_type=None,
+                        size_bytes=None,
+                        sha256=None,
+                        status="non_downloadable",
                     )
+                    results.append(result)
+                    processed_urls[asset.canonical_url] = result
                     continue
 
                 if asset.canonical_url in processed_urls:
@@ -136,11 +138,32 @@ class DocumentSyncService:
                     )
                     continue
 
-                synced = self._download_and_store_asset(
-                    asset=asset,
-                    files_dir=files_dir,
-                    store=store,
-                )
+                try:
+                    synced = self._download_and_store_asset(
+                        asset=asset,
+                        files_dir=files_dir,
+                        store=store,
+                    )
+                except Exception as exc:
+                    synced = SyncedAsset(
+                        source_key=asset.source_key,
+                        asset_role=asset.asset_role,
+                        title=asset.title,
+                        url=asset.url,
+                        canonical_url=asset.canonical_url,
+                        section=asset.section,
+                        publication_date_text=asset.publication_date_text,
+                        downloadable=True,
+                        document_version_id=None,
+                        original_filename=self._filename_from_url(asset.canonical_url),
+                        stored_filename=None,
+                        file_path=None,
+                        content_type=None,
+                        size_bytes=None,
+                        sha256=None,
+                        status="download_error",
+                        error_message=str(exc),
+                    )
 
                 if synced.document_version_id is not None:
                     store.set_asset_document_version(
@@ -166,7 +189,11 @@ class DocumentSyncService:
                 new_versions_count=sum(1 for item in results if item.status == "new_version_saved"),
                 known_versions_count=sum(1 for item in results if item.status == "already_known_hash"),
                 duplicate_assets_count=sum(1 for item in results if item.status == "same_run_duplicate"),
-                non_downloadable_count=sum(1 for item in results if item.status == "non_downloadable"),
+                non_downloadable_count=sum(
+                    1
+                    for item in results
+                    if item.status in {"non_downloadable", "download_error"}
+                ),
                 error_message=None,
             )
 
@@ -182,6 +209,7 @@ class DocumentSyncService:
                 "known_versions_count": sum(1 for item in results if item.status == "already_known_hash"),
                 "same_run_duplicate_count": sum(1 for item in results if item.status == "same_run_duplicate"),
                 "non_downloadable_count": sum(1 for item in results if item.status == "non_downloadable"),
+                "download_error_count": sum(1 for item in results if item.status == "download_error"),
             }
 
         except Exception as exc:
@@ -201,7 +229,11 @@ class DocumentSyncService:
                 new_versions_count=sum(1 for item in results if item.status == "new_version_saved"),
                 known_versions_count=sum(1 for item in results if item.status == "already_known_hash"),
                 duplicate_assets_count=sum(1 for item in results if item.status == "same_run_duplicate"),
-                non_downloadable_count=sum(1 for item in results if item.status == "non_downloadable"),
+                non_downloadable_count=sum(
+                    1
+                    for item in results
+                    if item.status in {"non_downloadable", "download_error"}
+                ),
                 error_message=str(exc),
             )
             raise

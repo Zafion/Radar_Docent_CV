@@ -64,7 +64,11 @@ class FinalAwardListingMaestrosParserService:
         summaries: list[dict] = []
 
         try:
-            documents = store.list_maestros_final_listing_documents()
+            documents = store.list_final_listing_documents(
+                list_scope="maestros",
+                parser_key=PARSER_KEY,
+                parser_version=PARSER_VERSION,
+            )
 
             for document in documents:
                 started_at = self._utc_now_iso()

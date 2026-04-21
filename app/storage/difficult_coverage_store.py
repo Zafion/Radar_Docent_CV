@@ -12,7 +12,12 @@ class DifficultCoverageStore:
     def close(self) -> None:
         self.connection.close()
 
-    def list_provisional_documents(self) -> list[sqlite3.Row]:
+    def list_provisional_documents(
+        self,
+        *,
+        parser_key: str,
+        parser_version: str,
+    ) -> list[sqlite3.Row]:
         return self.connection.execute(
             """
             SELECT
@@ -34,8 +39,17 @@ class DifficultCoverageStore:
             JOIN sources s
                 ON s.id = d.source_id
             WHERE d.doc_family = 'difficult_coverage_provisional'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM document_parse_runs pr
+                  WHERE pr.document_version_id = d.document_version_id
+                    AND pr.parser_key = ?
+                    AND pr.parser_version = ?
+                    AND pr.status = 'success'
+              )
             ORDER BY d.id
-            """
+            """,
+            (parser_key, parser_version),
         ).fetchall()
 
     def create_parse_run(

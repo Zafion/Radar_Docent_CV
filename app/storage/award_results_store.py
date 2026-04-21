@@ -12,7 +12,13 @@ class AwardResultsStore:
     def close(self) -> None:
         self.connection.close()
 
-    def list_maestros_final_listing_documents(self) -> list[sqlite3.Row]:
+    def list_final_listing_documents(
+        self,
+        *,
+        list_scope: str,
+        parser_key: str,
+        parser_version: str,
+    ) -> list[sqlite3.Row]:
         return self.connection.execute(
             """
             SELECT
@@ -34,9 +40,18 @@ class AwardResultsStore:
             JOIN sources s
                 ON s.id = d.source_id
             WHERE d.doc_family = 'final_award_listing'
-              AND d.list_scope = 'maestros'
+              AND d.list_scope = ?
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM document_parse_runs pr
+                  WHERE pr.document_version_id = d.document_version_id
+                    AND pr.parser_key = ?
+                    AND pr.parser_version = ?
+                    AND pr.status = 'success'
+              )
             ORDER BY d.id
-            """
+            """,
+            (list_scope, parser_key, parser_version),
         ).fetchall()
 
     def create_parse_run(

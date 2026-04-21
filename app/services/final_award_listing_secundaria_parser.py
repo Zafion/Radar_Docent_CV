@@ -93,31 +93,11 @@ class FinalAwardListingSecundariaParserService:
         summaries: list[dict] = []
 
         try:
-            documents = store.connection.execute(
-                """
-                SELECT
-                    d.id AS document_id,
-                    d.document_version_id,
-                    d.title,
-                    d.document_date_text,
-                    d.document_date_iso,
-                    d.list_scope,
-                    d.doc_family,
-                    dv.file_path,
-                    dv.original_filename,
-                    dv.sha256,
-                    s.source_key,
-                    s.label AS source_label
-                FROM documents d
-                JOIN document_versions dv
-                    ON dv.id = d.document_version_id
-                JOIN sources s
-                    ON s.id = d.source_id
-                WHERE d.doc_family = 'final_award_listing'
-                  AND d.list_scope = 'secundaria_otros'
-                ORDER BY d.id
-                """
-            ).fetchall()
+            documents = store.list_final_listing_documents(
+                list_scope="secundaria_otros",
+                parser_key=PARSER_KEY,
+                parser_version=PARSER_VERSION,
+            )
 
             for document in documents:
                 started_at = self._utc_now_iso()
