@@ -3,6 +3,7 @@
   const specialtyCodeInput = document.getElementById("dc-specialty-code");
   const selectedOnlyInput = document.getElementById("dc-selected-only");
   const orderInput = document.getElementById("dc-order");
+  const latestOnlyInput = document.getElementById("dc-latest-only");
   const filtersForm = document.getElementById("dc-filters-form");
 
   const locationStatusEl = document.getElementById("dc-location-status");
@@ -17,6 +18,7 @@
   const candidatesTableBody = document.getElementById("dc-candidates-table-body");
 
   let userOrigin = loadStoredOrigin();
+  let latestPublicationDate = null;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -114,6 +116,16 @@
     return data;
   }
 
+  async function ensureLatestPublicationDate() {
+    if (latestPublicationDate) {
+      return latestPublicationDate;
+    }
+
+    const data = await apiGet("/api/difficult-coverage/positions?limit=1&order_by=document_date&order_dir=desc");
+    latestPublicationDate = data.items?.[0]?.document_date_iso || null;
+    return latestPublicationDate;
+  }
+
   function parseOrderValue() {
     const [orderBy, orderDir] = (orderInput?.value || "document_date:desc").split(":");
     return { orderBy, orderDir };
@@ -205,6 +217,13 @@
       }
 
       const params = appendOriginParams(new URLSearchParams({ limit: "50", order_by: orderBy, order_dir: orderDir }));
+
+      if (latestOnlyInput?.checked) {
+        const latestDate = await ensureLatestPublicationDate();
+        if (latestDate) {
+          params.set("document_date", latestDate);
+        }
+      }
 
       if (localityInput.value.trim()) params.set("locality", localityInput.value.trim());
       if (specialtyCodeInput.value.trim()) params.set("specialty_code", specialtyCodeInput.value.trim());

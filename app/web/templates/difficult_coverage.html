@@ -36,7 +36,7 @@
     </div>
 
     <p class="panel-card__hint">
-      Activa tu ubicación para ver la distancia aproximada hasta cada centro y priorizar mejor los puestos más cercanos.
+      Activa tu ubicación para ver la distancia aproximada hasta cada centro y priorizar mejor los puestos más cercanos. Por defecto se muestran los puestos de la última publicación detectada.
     </p>
     <p class="panel-card__meta">
       Ubicación: <strong id="dc-location-status">No activada · sin distancia calculada</strong>
@@ -64,6 +64,12 @@
           <option value="distance:desc">Distancia más lejana</option>
         </select>
         <button class="button button--accent search-form__button" type="submit">Buscar</button>
+      </div>
+      <div class="search-form__row search-form__row--secondary">
+        <label class="checkbox-inline">
+          <input id="dc-latest-only" type="checkbox" checked>
+          <span>Solo última publicación</span>
+        </label>
       </div>
     </form>
   </section>
