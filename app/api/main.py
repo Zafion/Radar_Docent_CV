@@ -33,6 +33,9 @@ app = FastAPI(
     title="Radar Docent CV API",
     version="0.1.0",
     description="API de solo lectura sobre SQLite para consultar adjudicaciones y puestos docentes.",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 BASE_DIR = Path(__file__).resolve().parents[1]
