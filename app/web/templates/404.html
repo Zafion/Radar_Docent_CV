@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <section class="module-card not-found-card">
+    <a href="/" class="not-found-card__image-link" aria-label="Volver al inicio">
+      <img class="not-found-card__image" src="{{ url_for('static', path='img/404-error.png') }}" alt="Funk not found, error 404">
+    </a>
+
+    <div class="not-found-card__content">
+      <h1>Funk not found</h1>
+      <p>La página que buscas no existe o se ha movido.</p>
+      <div class="stack-actions stack-actions--center">
+        <a class="button button--secondary" href="/">Volver al inicio</a>
+        <a class="button button--ghost" href="/valencia-docentes">Ir a Valencia Docentes</a>
+      </div>
+    </div>
+  </section>
+</section>
+
+<style>
+  .not-found-card {
+    padding: clamp(18px, 3vw, 32px);
+    display: grid;
+    gap: 20px;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .not-found-card__image-link {
+    display: block;
+    width: 100%;
+    max-width: 980px;
+  }
+
+  .not-found-card__image {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 20px;
+    box-shadow: 0 14px 40px rgba(28, 46, 84, 0.15);
+  }
+
+  .not-found-card__content h1 {
+    margin: 0 0 8px;
+    font-size: clamp(1.9rem, 4vw, 3rem);
+  }
+
+  .not-found-card__content p {
+    margin: 0;
+    color: var(--muted);
+    font-size: clamp(1rem, 1.6vw, 1.15rem);
+  }
+
+  .stack-actions--center {
+    justify-content: center;
+    margin-top: 18px;
+  }
+
+  @media (max-width: 640px) {
+    .not-found-card {
+      padding: 16px;
+      border-radius: 18px;
+    }
+
+    .not-found-card__image {
+      border-radius: 16px;
+    }
+  }
+</style>
+{% endblock %}

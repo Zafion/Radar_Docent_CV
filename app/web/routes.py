@@ -128,6 +128,19 @@ def difficult_coverage(request: Request):
     )
 
 
+@router.get("/404", response_class=HTMLResponse)
+def custom_404_preview(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="404.html",
+        context={
+            "active_page": "not-found",
+            "page_title": "funkcionario.com | Funk not found",
+        },
+        status_code=404,
+    )
+
+
 @router.get("/sw.js", include_in_schema=False)
 def service_worker():
     return FileResponse(BASE_DIR / "static" / "js" / "sw.js", media_type="application/javascript")

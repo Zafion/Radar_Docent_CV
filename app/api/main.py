@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
-from app.web.routes import router as web_router
+from app.web.routes import TEMPLATES, router as web_router
 
 import os
 import sqlite3
@@ -10,8 +10,10 @@ import unicodedata
 from contextlib import contextmanager
 from typing import Any, Iterable
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.services.geo import (
     haversine_km,
@@ -19,11 +21,6 @@ from app.services.geo import (
     build_google_maps_directions_url,
 )
 from app.storage.centers_store import get_center_by_code
-from app.storage.push_subscription_store import (
-    upsert_push_subscription,
-    deactivate_push_subscription,
-)
-from app.services.push_notifications import get_vapid_public_key, is_push_configured
 
 DB_PATH = os.getenv("RADAR_DOCENT_DB_PATH", "/mnt/data/radar_docent_cv.db")
 
@@ -42,9 +39,34 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET"],
     allow_headers=["*"],
 )
+
+
+
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code != 404:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+    path = request.url.path
+    accept = request.headers.get("accept", "")
+    wants_html = "text/html" in accept.lower()
+
+    if path.startswith("/api/") or path.startswith("/static/") or not wants_html:
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="404.html",
+        context={
+            "active_page": "not-found",
+            "page_title": "funkcionario.com | Funk not found",
+        },
+        status_code=404,
+    )
 
 
 @contextmanager
@@ -74,6 +96,7 @@ with sqlite3.connect(DB_PATH) as _bootstrap_conn:
 
 @app.middleware("http")
 async def sqlite_function_middleware(request, call_next):
+    # No muta la request; se limita a validar que la BD existe.
     if not os.path.exists(DB_PATH):
         raise HTTPException(status_code=500, detail=f"SQLite no encontrada en {DB_PATH}")
     return await call_next(request)
@@ -117,26 +140,6 @@ def build_order_by(field: str, direction: str, allowed: dict[str, str], fallback
     return f" ORDER BY {sql_field} {sql_dir} "
 
 
-def build_distance_order_by_sql(
-    *,
-    lat_column: str,
-    lon_column: str,
-    direction: str,
-) -> str:
-    sql_dir = "DESC" if direction.lower() == "desc" else "ASC"
-    return f"""
-        ORDER BY
-            CASE
-                WHEN {lat_column} IS NULL OR {lon_column} IS NULL THEN 1
-                ELSE 0
-            END ASC,
-            (
-                (({lat_column} - ?) * ({lat_column} - ?)) +
-                (({lon_column} - ?) * ({lon_column} - ?))
-            ) {sql_dir}
-    """
-
-
 def make_label(code: str | None, name: str | None) -> str | None:
     if code and name:
         return f"{code} - {name}"
@@ -153,7 +156,6 @@ def map_list_scope_label(list_scope: str | None) -> str | None:
     if not list_scope:
         return None
     return mapping.get(list_scope, list_scope.replace("_", " ").capitalize())
-
 
 def enrich_center_geo_fields(
     item: dict[str, Any],
@@ -434,50 +436,6 @@ def health() -> dict[str, Any]:
     }
 
 
-@app.get("/api/push/public-key")
-def get_push_public_key() -> dict[str, Any]:
-    return {
-        "configured": is_push_configured(),
-        "public_key": get_vapid_public_key() if is_push_configured() else None,
-    }
-
-
-@app.post("/api/push/subscribe")
-def subscribe_push(payload: dict[str, Any]) -> dict[str, Any]:
-    endpoint = payload.get("endpoint")
-    keys = payload.get("keys") or {}
-    p256dh_key = keys.get("p256dh")
-    auth_key = keys.get("auth")
-
-    if not endpoint or not p256dh_key or not auth_key:
-        raise HTTPException(status_code=400, detail="Suscripción push incompleta")
-
-    conn = sqlite3.connect(DB_PATH)
-    try:
-        upsert_push_subscription(conn, endpoint, p256dh_key, auth_key)
-        conn.commit()
-    finally:
-        conn.close()
-
-    return {"ok": True}
-
-
-@app.post("/api/push/unsubscribe")
-def unsubscribe_push(payload: dict[str, Any]) -> dict[str, Any]:
-    endpoint = payload.get("endpoint")
-    if not endpoint:
-        raise HTTPException(status_code=400, detail="Falta endpoint")
-
-    conn = sqlite3.connect(DB_PATH)
-    try:
-        deactivate_push_subscription(conn, endpoint)
-        conn.commit()
-    finally:
-        conn.close()
-
-    return {"ok": True}
-
-
 # ---------- center search ----------
 
 @app.get("/api/centers/{center_code}")
@@ -553,7 +511,6 @@ def search_persons(
         """
         items = rows_to_dicts(conn.execute(sql, [pattern, pattern, pattern, pattern, limit]).fetchall())
     return {"items": items, "count": len(items), "query": q}
-
 
 @app.get("/api/persons/profile")
 def get_person_profile(
@@ -750,10 +707,6 @@ def get_person_profile(
                 for row in assignment_rows
             ]
 
-            for row in assignment_rows:
-                award_result_id = row["award_result_id"]
-                assignments_by_award.setdefault(award_result_id, []).append(row)
-
         for award in awards:
             award["assignments"] = assignments_by_award.get(award["id"], [])
 
@@ -935,11 +888,7 @@ def list_awards(
 
 
 @app.get("/api/awards/{award_result_id}")
-def get_award_detail(
-    award_result_id: int,
-    origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
-    origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
-) -> dict[str, Any]:
+def get_award_detail(award_result_id: int) -> dict[str, Any]:
     with get_connection() as conn:
         _register_normalize_function(conn)
         award = conn.execute(
@@ -991,17 +940,6 @@ def get_award_detail(
                     aa.request_type,
                     aa.matched_offered_position_id,
                     aa.raw_assignment_text,
-
-                    c.denomination AS center_catalog_name,
-                    c.regime AS center_regime,
-                    c.full_address AS center_full_address,
-                    c.postal_code AS center_postal_code,
-                    c.comarca AS center_comarca,
-                    c.phone AS center_phone,
-                    c.fax AS center_fax,
-                    c.latitude AS center_latitude,
-                    c.longitude AS center_longitude,
-
                     op.document_id AS matched_document_id,
                     op.source_type AS matched_source_type,
                     op.position_type AS matched_position_type,
@@ -1013,18 +951,12 @@ def get_award_detail(
                     op.observations AS matched_observations
                 FROM award_assignments aa
                 LEFT JOIN offered_positions op ON op.id = aa.matched_offered_position_id
-                LEFT JOIN centers c ON c.center_code = aa.center_code
                 WHERE aa.award_result_id = ?
                 ORDER BY aa.id ASC
                 """,
                 [award_result_id],
             ).fetchall()
         )
-
-        assignments = [
-            enrich_center_geo_fields(item, origin_lat, origin_lon)
-            for item in assignments
-        ]
 
     return {"award": dict(award), "assignments": assignments}
 
@@ -1094,19 +1026,7 @@ def list_offered_positions(
         where.append("EXISTS (SELECT 1 FROM award_assignments aa WHERE aa.matched_offered_position_id = op.id)")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
-    order_params: list[Any] = []
-    if order_by == "distance":
-        if origin_lat is None or origin_lon is None:
-            raise HTTPException(status_code=400, detail="Para ordenar por distancia debes activar tu ubicación.")
-        order_sql = build_distance_order_by_sql(
-            lat_column="c.latitude",
-            lon_column="c.longitude",
-            direction=order_dir,
-        )
-        order_params = [origin_lat, origin_lat, origin_lon, origin_lon]
-    else:
-        order_sql = build_order_by(order_by, order_dir, ALLOWED_OFFERED_ORDER_FIELDS, "d.document_date_iso")
-
+    order_sql = build_order_by(order_by, order_dir, ALLOWED_OFFERED_ORDER_FIELDS, "d.document_date_iso")
     base_sql = f"""
         FROM offered_positions op
         JOIN documents d ON d.id = op.document_id
@@ -1165,7 +1085,7 @@ def list_offered_positions(
     with get_connection() as conn:
         _register_normalize_function(conn)
         total = conn.execute(count_sql, params).fetchone()[0]
-        items = rows_to_dicts(conn.execute(items_sql, [*params, *order_params, limit, offset]).fetchall())
+        items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
     items = [enrich_center_geo_fields(item, origin_lat, origin_lon) for item in items]
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
@@ -1183,8 +1103,6 @@ def list_difficult_positions(
     center_code: str | None = None,
     position_code: str | None = None,
     selected_only: bool | None = Query(None, description="True = solo puestos con al menos una persona seleccionada"),
-    origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
-    origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
     order_by: str = Query("document_date"),
     order_dir: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
@@ -1220,24 +1138,12 @@ def list_difficult_positions(
         where.append("NOT EXISTS (SELECT 1 FROM difficult_coverage_candidates dc WHERE dc.position_id = p.id AND dc.is_selected = 1)")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
-    order_params: list[Any] = []
-    if order_by == "distance":
-        if origin_lat is None or origin_lon is None:
-            raise HTTPException(status_code=400, detail="Para ordenar por distancia debes activar tu ubicación.")
-        order_sql = build_distance_order_by_sql(
-            lat_column="c.latitude",
-            lon_column="c.longitude",
-            direction=order_dir,
-        )
-        order_params = [origin_lat, origin_lat, origin_lon, origin_lon]
-    else:
-        order_sql = build_order_by(order_by, order_dir, ALLOWED_DIFFICULT_ORDER_FIELDS, "d.document_date_iso")
+    order_sql = build_order_by(order_by, order_dir, ALLOWED_DIFFICULT_ORDER_FIELDS, "d.document_date_iso")
 
     base_sql = f"""
         FROM difficult_coverage_positions p
         JOIN documents d ON d.id = p.document_id
         JOIN sources s ON s.id = d.source_id
-        LEFT JOIN centers c ON c.center_code = p.center_code
         {where_sql}
     """
 
@@ -1260,17 +1166,6 @@ def list_difficult_positions(
             p.sorteo_number,
             p.registro_superior,
             p.registro_inferior,
-
-            c.denomination AS center_catalog_name,
-            c.regime AS center_regime,
-            c.full_address AS center_full_address,
-            c.postal_code AS center_postal_code,
-            c.comarca AS center_comarca,
-            c.phone AS center_phone,
-            c.fax AS center_fax,
-            c.latitude AS center_latitude,
-            c.longitude AS center_longitude,
-
             (
                 SELECT COUNT(*)
                 FROM difficult_coverage_candidates dc
@@ -1291,8 +1186,7 @@ def list_difficult_positions(
     with get_connection() as conn:
         _register_normalize_function(conn)
         total = conn.execute(count_sql, params).fetchone()[0]
-        items = rows_to_dicts(conn.execute(items_sql, [*params, *order_params, limit, offset]).fetchall())
-    items = [enrich_center_geo_fields(item, origin_lat, origin_lon) for item in items]
+        items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
@@ -1301,8 +1195,6 @@ def list_difficult_positions(
 def get_difficult_candidates(
     position_id: int,
     selected_only: bool | None = None,
-    origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
-    origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
@@ -1326,21 +1218,10 @@ def get_difficult_candidates(
                 p.num_participants,
                 p.sorteo_number,
                 p.registro_superior,
-                p.registro_inferior,
-
-                c.denomination AS center_catalog_name,
-                c.regime AS center_regime,
-                c.full_address AS center_full_address,
-                c.postal_code AS center_postal_code,
-                c.comarca AS center_comarca,
-                c.phone AS center_phone,
-                c.fax AS center_fax,
-                c.latitude AS center_latitude,
-                c.longitude AS center_longitude
+                p.registro_inferior
             FROM difficult_coverage_positions p
             JOIN documents d ON d.id = p.document_id
             JOIN sources s ON s.id = d.source_id
-            LEFT JOIN centers c ON c.center_code = p.center_code
             WHERE p.id = ?
             """,
             [position_id],
@@ -1384,10 +1265,8 @@ def get_difficult_candidates(
         total = conn.execute(count_sql, params).fetchone()[0]
         items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
 
-    position_payload = enrich_center_geo_fields(dict(position), origin_lat, origin_lon)
-
     return {
-        "position": position_payload,
+        "position": dict(position),
         "items": items,
         "total": total,
         "limit": limit,
