@@ -277,6 +277,31 @@ button { cursor: pointer; }
   color: var(--muted);
   font-size: 0.95rem;
 }
+.search-form__row--secondary {
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 12px 16px;
+  overflow: visible;
+}
+
+.checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.checkbox-inline input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.checkbox-inline span {
+  line-height: 1.2;
+}
 .feedback { min-height: 24px; margin-top: 14px; color: var(--muted); }
 .feedback.is-error { color: #aa2c2c; }
 
@@ -457,6 +482,15 @@ button { cursor: pointer; }
 }
 
 @media (max-width: 960px) {
+  .search-form__row--secondary {
+    padding: 10px 14px;
+  }
+
+  .checkbox-inline {
+    font-size: 0.95rem;
+  }
+
+
   .module-grid,
   .site-footer__inner,
   .contact-grid { grid-template-columns: 1fr; display: grid; }

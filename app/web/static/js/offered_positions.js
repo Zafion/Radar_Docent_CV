@@ -5,7 +5,6 @@
   const positionTypeInput = document.getElementById("op-position-type");
   const orderInput = document.getElementById("op-order");
   const latestOnlyInput = document.getElementById("op-latest-only");
-  const onlyUnmatchedInput = document.getElementById("op-only-unmatched");
   const filtersForm = document.getElementById("op-filters-form");
 
   const locationStatusEl = document.getElementById("op-location-status");
@@ -201,7 +200,6 @@
       if (localityInput.value.trim()) params.set("locality", localityInput.value.trim());
       if (specialtyCodeInput.value.trim()) params.set("specialty_code", specialtyCodeInput.value.trim());
       if (positionTypeInput.value) params.set("position_type", positionTypeInput.value);
-      if (onlyUnmatchedInput.checked) params.set("only_unmatched", "true");
 
       const data = await apiGet(`/api/offered-positions?${params.toString()}`);
       renderPositions(data.items || [], data.total || 0);
