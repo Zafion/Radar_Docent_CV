@@ -14,19 +14,25 @@ def apply_schema(db_path: Path, schema_path: Path) -> None:
         conn.commit()
 
 
+def resolve_default_xlsx_path(repo_root: Path) -> Path:
+    automated = repo_root / "data" / "raw" / "centers_catalog" / "Listado_Centros_Provincias.xlsx"
+    manual = repo_root / "data" / "manual" / "centers" / "Listado_Centros_Provincias.xlsx"
+    return automated if automated.exists() else manual
+
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parent
 
     parser = argparse.ArgumentParser(description="Importa el catálogo de centros desde un Excel a SQLite")
     parser.add_argument(
         "--db-path",
-        default=str(repo_root / "radar_docent_cv.db"),
+        default=str(repo_root / "data" / "radar_docent_cv.db"),
         help="Ruta a la base de datos SQLite",
     )
     parser.add_argument(
         "--xlsx-path",
-        default=str(repo_root / "data" / "manual" / "centers" / "Listado_Centros_Provincias.xlsx"),
-        help="Ruta al Excel de centros",
+        default=None,
+        help="Ruta al Excel de centros. Si no se indica, prioriza data/raw/centers_catalog y después data/manual/centers",
     )
     parser.add_argument(
         "--schema-path",
@@ -41,7 +47,7 @@ def main() -> None:
     args = parser.parse_args()
 
     db_path = Path(args.db_path)
-    xlsx_path = Path(args.xlsx_path)
+    xlsx_path = Path(args.xlsx_path) if args.xlsx_path else resolve_default_xlsx_path(repo_root)
     schema_path = Path(args.schema_path)
 
     if not args.skip_schema:

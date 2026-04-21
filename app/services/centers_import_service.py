@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from openpyxl import load_workbook
+import pandas as pd
 
 from app.storage.centers_store import count_centers, upsert_centers
 
@@ -87,42 +87,13 @@ def _to_float(value: Any) -> float | None:
         return None
 
 
-def _build_full_address(
-    street_type: str | None,
-    street_name: str | None,
-    street_number: str | None,
-    postal_code: str | None,
-    locality: str | None,
-    province: str | None,
-) -> str | None:
+def _build_full_address(street_type: str | None, street_name: str | None, street_number: str | None,
+                        postal_code: str | None, locality: str | None, province: str | None) -> str | None:
     line_1 = " ".join(part for part in [street_type, street_name, street_number] if part)
     line_2 = " ".join(part for part in [postal_code, locality] if part)
-    full = ", ".join(part for part in [line_1, line_2, province] if part)
+    line_3 = province
+    full = ", ".join(part for part in [line_1, line_2, line_3] if part)
     return full or None
-
-
-def _load_excel_rows(xlsx_path: Path) -> list[dict[str, Any]]:
-    wb = load_workbook(filename=xlsx_path, read_only=False, data_only=True)
-    ws = wb.active
-
-    rows_iter = ws.iter_rows(values_only=True)
-    try:
-        header = next(rows_iter)
-    except StopIteration as exc:
-        raise CentersImportError("El Excel está vacío") from exc
-
-    columns = [str(cell).strip() if cell is not None else "" for cell in header]
-    missing = EXPECTED_COLUMNS - set(columns)
-    if missing:
-        missing_text = ", ".join(sorted(missing))
-        raise CentersImportError(f"Faltan columnas obligatorias en el Excel: {missing_text}")
-
-    records: list[dict[str, Any]] = []
-    for row in rows_iter:
-        record = {columns[i]: row[i] if i < len(row) else None for i in range(len(columns))}
-        records.append(record)
-
-    return records
 
 
 def load_centers_from_excel(xlsx_path: str | Path) -> list[dict[str, Any]]:
@@ -130,10 +101,15 @@ def load_centers_from_excel(xlsx_path: str | Path) -> list[dict[str, Any]]:
     if not path.exists():
         raise CentersImportError(f"Excel no encontrado: {path}")
 
-    raw_records = _load_excel_rows(path)
+    df = pd.read_excel(path, dtype=str, keep_default_na=False)
+
+    missing = EXPECTED_COLUMNS - set(df.columns)
+    if missing:
+        missing_text = ", ".join(sorted(missing))
+        raise CentersImportError(f"Faltan columnas obligatorias en el Excel: {missing_text}")
 
     rows: list[dict[str, Any]] = []
-    for record in raw_records:
+    for record in df.to_dict(orient="records"):
         center_code = _normalize_center_code(record.get("Código"))
         denomination = _clean_text(record.get("Denominación"))
 

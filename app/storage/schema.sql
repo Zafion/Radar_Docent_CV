@@ -220,16 +220,32 @@ CREATE TABLE IF NOT EXISTS centers (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-
-CREATE TABLE IF NOT EXISTS push_subscriptions (
+CREATE TABLE IF NOT EXISTS centers_catalog_sync_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    endpoint TEXT NOT NULL UNIQUE,
-    p256dh_key TEXT NOT NULL,
-    auth_key TEXT NOT NULL,
-    is_active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    status TEXT NOT NULL,
+    cod_provincia TEXT,
+    source_url TEXT NOT NULL,
+    endpoint_url TEXT NOT NULL,
+    output_dir TEXT NOT NULL,
+    json_path TEXT,
+    xlsx_path TEXT,
+    sha256_path TEXT,
+    sha256_value TEXT,
+    token_refresh_attempted INTEGER NOT NULL DEFAULT 0,
+    downloaded_file_name TEXT,
+    downloaded_mime_type TEXT,
+    downloaded_size_bytes INTEGER,
+    imported_rows INTEGER,
+    centers_before INTEGER,
+    centers_after INTEGER,
+    changed INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+
 
 
 CREATE INDEX IF NOT EXISTS idx_sources_key
@@ -301,7 +317,10 @@ CREATE INDEX IF NOT EXISTS idx_centers_locality
 CREATE INDEX IF NOT EXISTS idx_centers_province
     ON centers(province);
 
-CREATE INDEX IF NOT EXISTS idx_push_subscriptions_active
-    ON push_subscriptions(is_active);
+CREATE INDEX IF NOT EXISTS idx_centers_catalog_sync_runs_created_at
+ON centers_catalog_sync_runs(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_centers_catalog_sync_runs_status
+ON centers_catalog_sync_runs(status);
 
 COMMIT;

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from typing import Iterable, Mapping, Any, Sequence
+from typing import Iterable, Mapping, Any
 
 UPSERT_SQL = """
 INSERT INTO centers (
@@ -83,64 +83,6 @@ def get_center_by_code(conn: sqlite3.Connection, center_code: str) -> sqlite3.Ro
         "SELECT * FROM centers WHERE center_code = ?",
         (center_code,),
     ).fetchone()
-
-
-def get_centers_by_codes(conn: sqlite3.Connection, center_codes: Sequence[str]) -> list[sqlite3.Row]:
-    conn.row_factory = sqlite3.Row
-
-    codes = [code for code in center_codes if code]
-    if not codes:
-        return []
-
-    placeholders = ",".join("?" for _ in codes)
-    sql = f"""
-        SELECT *
-        FROM centers
-        WHERE center_code IN ({placeholders})
-        ORDER BY province ASC, locality ASC, denomination ASC
-    """
-    return conn.execute(sql, codes).fetchall()
-
-
-def search_centers(conn: sqlite3.Connection, query: str, limit: int = 20) -> list[sqlite3.Row]:
-    conn.row_factory = sqlite3.Row
-
-    text = (query or "").strip()
-    if not text:
-        return []
-
-    pattern = f"%{text}%"
-    return conn.execute(
-        """
-        SELECT
-            center_code,
-            denomination,
-            generic_name_es,
-            generic_name_val,
-            specific_name,
-            regime,
-            full_address,
-            postal_code,
-            locality,
-            province,
-            comarca,
-            phone,
-            fax,
-            latitude,
-            longitude
-        FROM centers
-        WHERE center_code = ?
-           OR normalize_text(denomination) LIKE normalize_text(?)
-           OR normalize_text(COALESCE(generic_name_es, '')) LIKE normalize_text(?)
-           OR normalize_text(COALESCE(generic_name_val, '')) LIKE normalize_text(?)
-           OR normalize_text(COALESCE(specific_name, '')) LIKE normalize_text(?)
-           OR normalize_text(COALESCE(full_address, '')) LIKE normalize_text(?)
-           OR normalize_text(COALESCE(locality, '')) LIKE normalize_text(?)
-        ORDER BY province ASC, locality ASC, denomination ASC
-        LIMIT ?
-        """,
-        [text, pattern, pattern, pattern, pattern, pattern, pattern, limit],
-    ).fetchall()
 
 
 def count_centers(conn: sqlite3.Connection) -> int:
