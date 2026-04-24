@@ -1,34 +1,22 @@
 from __future__ import annotations
 
 import argparse
-import sqlite3
 from pathlib import Path
 
 from app.services.centers_catalog_sync_service import CentersCatalogSyncService
-
-
-def apply_schema(db_path: Path, schema_path: Path) -> None:
-    sql = schema_path.read_text(encoding="utf-8")
-    with sqlite3.connect(db_path) as conn:
-        conn.executescript(sql)
-        conn.commit()
+from app.storage.db import init_db
 
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parent
 
     parser = argparse.ArgumentParser(
-        description="Descarga automáticamente el catálogo de centros y lo importa en SQLite si cambia"
-    )
-    parser.add_argument(
-        "--db-path",
-        default=str(repo_root / "data" / "radar_docent_cv.db"),
-        help="Ruta a la base de datos SQLite",
+        description="Descarga automáticamente el catálogo de centros y lo importa en PostgreSQL si cambia"
     )
     parser.add_argument(
         "--schema-path",
         default=str(repo_root / "app" / "storage" / "schema.sql"),
-        help="Ruta al schema.sql",
+        help="Ruta al schema.sql de PostgreSQL",
     )
     parser.add_argument(
         "--raw-dir",
@@ -52,16 +40,15 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    db_path = Path(args.db_path)
     schema_path = Path(args.schema_path)
     raw_dir = Path(args.raw_dir)
 
     if not args.skip_schema:
-        apply_schema(db_path=db_path, schema_path=schema_path)
+        db_url = init_db(schema_path=str(schema_path))
+        print(f"Esquema PostgreSQL inicializado en: {db_url}")
 
     service = CentersCatalogSyncService()
     summary = service.sync(
-        db_path=db_path,
         raw_dir=raw_dir,
         cod_provincia=args.cod_provincia,
         headless=not args.headful,

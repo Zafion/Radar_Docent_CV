@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 from app.storage.centers_store import count_centers, upsert_centers
+from app.storage.db import get_connection
 
 EXPECTED_COLUMNS = {
     "Código",
@@ -87,8 +87,14 @@ def _to_float(value: Any) -> float | None:
         return None
 
 
-def _build_full_address(street_type: str | None, street_name: str | None, street_number: str | None,
-                        postal_code: str | None, locality: str | None, province: str | None) -> str | None:
+def _build_full_address(
+    street_type: str | None,
+    street_name: str | None,
+    street_number: str | None,
+    postal_code: str | None,
+    locality: str | None,
+    province: str | None,
+) -> str | None:
     line_1 = " ".join(part for part in [street_type, street_name, street_number] if part)
     line_2 = " ".join(part for part in [postal_code, locality] if part)
     line_3 = province
@@ -160,18 +166,22 @@ def load_centers_from_excel(xlsx_path: str | Path) -> list[dict[str, Any]]:
     return rows
 
 
-def import_centers_catalog(db_path: str | Path, xlsx_path: str | Path) -> dict[str, Any]:
-    db_path = Path(db_path)
+def import_centers_catalog(xlsx_path: str | Path) -> dict[str, Any]:
     rows = load_centers_from_excel(xlsx_path)
 
-    with sqlite3.connect(db_path) as conn:
+    conn = get_connection()
+    try:
         before = count_centers(conn)
         processed = upsert_centers(conn, rows)
         after = count_centers(conn)
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn._conn.close()
 
     return {
-        "db_path": str(db_path),
         "xlsx_path": str(Path(xlsx_path)),
         "processed_rows": processed,
         "centers_before": before,

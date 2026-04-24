@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import sqlite3
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -12,25 +11,23 @@ from app.services.centers_catalog_downloader import (
 from app.services.centers_import_service import import_centers_catalog
 from app.services.discovery.centers_catalog_auth import obtain_centers_catalog_token
 from app.storage.centers_catalog_sync_store import insert_centers_catalog_sync_run
+from app.storage.db import get_connection
 
 
 class CentersCatalogSyncService:
     def sync(
         self,
         *,
-        db_path: str | Path,
         raw_dir: str | Path,
         cod_provincia: str = "",
         headless: bool = True,
     ) -> dict[str, Any]:
-        db_path = Path(db_path)
         raw_dir = Path(raw_dir)
 
-        # Importante: separar artefactos por provincia para no pisar hashes
         scope_dir = raw_dir / (cod_provincia or "all")
         scope_dir.mkdir(parents=True, exist_ok=True)
 
-        started_at = datetime.now(UTC).isoformat()
+        started_at = datetime.now(timezone.utc).isoformat()
         summary: dict[str, Any] = {
             "started_at": started_at,
             "finished_at": None,
@@ -92,7 +89,6 @@ class CentersCatalogSyncService:
 
             if summary["changed"]:
                 import_summary = import_centers_catalog(
-                    db_path=db_path,
                     xlsx_path=summary["xlsx_path"],
                 )
                 summary["imported_rows"] = import_summary["processed_rows"]
@@ -107,9 +103,15 @@ class CentersCatalogSyncService:
             summary["status"] = "failed"
 
         finally:
-            summary["finished_at"] = datetime.now(UTC).isoformat()
-            with sqlite3.connect(db_path) as conn:
+            summary["finished_at"] = datetime.now(timezone.utc).isoformat()
+            conn = get_connection()
+            try:
                 insert_centers_catalog_sync_run(conn, summary)
                 conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn._conn.close()
 
         return summary
