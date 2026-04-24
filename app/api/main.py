@@ -11,6 +11,7 @@ from typing import Any, Iterable, Sequence
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
+from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.services.geo import (
@@ -18,8 +19,16 @@ from app.services.geo import (
     build_google_maps_search_url,
     build_google_maps_directions_url,
 )
+from app.services.push_notifications import (
+    get_vapid_public_key,
+    is_push_configured,
+)
 from app.storage.centers_store import get_center_by_code
 from app.storage.db import get_pool, close_pool
+from app.storage.push_subscription_store import (
+    upsert_push_subscription,
+    deactivate_push_subscription,
+)
 
 
 DB_URL = os.getenv("RADAR_DOCENT_DB_URL", "").strip()
@@ -57,11 +66,19 @@ def favicon() -> FileResponse:
     return FileResponse(BASE_DIR / "web" / "static" / "img" / "favicon.ico")
 
 
+@app.get("/sw.js", include_in_schema=False)
+def service_worker() -> FileResponse:
+    return FileResponse(
+        BASE_DIR / "web" / "static" / "js" / "sw.js",
+        media_type="application/javascript",
+    )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -129,6 +146,12 @@ class PgCompatConnection:
         # El cierre real lo controla el pool / context manager.
         return None
 
+    def commit(self) -> None:
+        self._conn.commit()
+
+    def rollback(self) -> None:
+        self._conn.rollback()
+
 
 @contextmanager
 def get_connection() -> Iterable[PgCompatConnection]:
@@ -140,6 +163,20 @@ def _register_normalize_function(conn) -> None:
     # Ya no se registra nada en runtime.
     # PostgreSQL lo resuelve con la función normalize_text() definida en schema.sql
     return None
+
+
+class PushSubscriptionKeysPayload(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class PushSubscriptionPayload(BaseModel):
+    endpoint: str
+    keys: PushSubscriptionKeysPayload
+
+
+class PushUnsubscribePayload(BaseModel):
+    endpoint: str
 
 
 # ---------- helpers ----------
@@ -438,6 +475,55 @@ def build_user_view(
     return base
 
 
+# ---------- push ----------
+
+@app.get("/api/push/public-key")
+def get_push_public_key() -> dict[str, Any]:
+    configured = is_push_configured()
+    return {
+        "configured": configured,
+        "public_key": get_vapid_public_key() if configured else None,
+    }
+
+
+@app.post("/api/push/subscribe")
+def subscribe_push(payload: PushSubscriptionPayload) -> dict[str, Any]:
+    if not is_push_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Push notifications are not configured",
+        )
+
+    with get_connection() as conn:
+        try:
+            upsert_push_subscription(
+                conn,
+                endpoint=payload.endpoint,
+                p256dh_key=payload.keys.p256dh,
+                auth_key=payload.keys.auth,
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+    return {"ok": True, "endpoint": payload.endpoint}
+
+
+@app.post("/api/push/unsubscribe")
+def unsubscribe_push(payload: PushUnsubscribePayload) -> dict[str, Any]:
+    with get_connection() as conn:
+        try:
+            deactivate_push_subscription(conn, payload.endpoint)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+    return {"ok": True, "endpoint": payload.endpoint}
+
+
+
 # ---------- health ----------
 
 @app.get("/health")
@@ -456,6 +542,9 @@ def health() -> dict[str, Any]:
                 "SELECT COUNT(*) FROM difficult_coverage_candidates"
             ).fetchone()[0],
             "centers": conn.execute("SELECT COUNT(*) FROM centers").fetchone()[0],
+            "push_subscriptions": conn.execute(
+                "SELECT COUNT(*) FROM push_subscriptions WHERE is_active = TRUE"
+            ).fetchone()[0],
         }
         latest_docs = rows_to_dicts(
             conn.execute(
@@ -471,6 +560,7 @@ def health() -> dict[str, Any]:
     return {
         "status": "ok",
         "db_engine": DB_PATH,
+        "push_configured": is_push_configured(),
         "counts": counts,
         "latest_documents": latest_docs,
     }
