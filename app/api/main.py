@@ -29,6 +29,7 @@ from app.storage.push_subscription_store import (
     upsert_push_subscription,
     deactivate_push_subscription,
 )
+from app.api.rate_limit import ApiRateLimitMiddleware
 
 
 DB_URL = os.getenv("RADAR_DOCENT_DB_URL", "").strip()
@@ -81,6 +82,8 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+app.add_middleware(ApiRateLimitMiddleware)
 
 
 @app.exception_handler(StarletteHTTPException)
