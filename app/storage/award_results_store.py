@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import sqlite3
+from typing import Any
 
-from app.storage.sqlite import get_connection
+from app.storage.db import get_connection
 
 
 class AwardResultsStore:
-    def __init__(self, connection: sqlite3.Connection | None = None) -> None:
+    def __init__(self, connection: Any | None = None) -> None:
         self.connection = connection or get_connection()
 
     def close(self) -> None:
@@ -18,8 +18,8 @@ class AwardResultsStore:
         list_scope: str,
         parser_key: str,
         parser_version: str,
-    ) -> list[sqlite3.Row]:
-        return self.connection.execute(
+    ) -> list[dict[str, Any]]:
+        rows = self.connection.execute(
             """
             SELECT
                 d.id AS document_id,
@@ -40,19 +40,20 @@ class AwardResultsStore:
             JOIN sources s
                 ON s.id = d.source_id
             WHERE d.doc_family = 'final_award_listing'
-              AND d.list_scope = ?
+              AND d.list_scope = %s
               AND NOT EXISTS (
                   SELECT 1
                   FROM document_parse_runs pr
                   WHERE pr.document_version_id = d.document_version_id
-                    AND pr.parser_key = ?
-                    AND pr.parser_version = ?
+                    AND pr.parser_key = %s
+                    AND pr.parser_version = %s
                     AND pr.status = 'success'
               )
             ORDER BY d.id
             """,
             (list_scope, parser_key, parser_version),
         ).fetchall()
+        return [dict(row) for row in rows]
 
     def create_parse_run(
         self,
@@ -70,7 +71,8 @@ class AwardResultsStore:
                 status,
                 started_at
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
             """,
             (
                 document_version_id,
@@ -80,8 +82,7 @@ class AwardResultsStore:
                 started_at,
             ),
         )
-        self.connection.commit()
-        return int(cursor.lastrowid)
+        return int(cursor.fetchone()[0])
 
     def finish_parse_run(
         self,
@@ -95,11 +96,11 @@ class AwardResultsStore:
             """
             UPDATE document_parse_runs
             SET
-                finished_at = ?,
-                status = ?,
-                rows_extracted = ?,
-                error_message = ?
-            WHERE id = ?
+                finished_at = %s,
+                status = %s,
+                rows_extracted = %s,
+                error_message = %s
+            WHERE id = %s
             """,
             (
                 finished_at,
@@ -109,7 +110,6 @@ class AwardResultsStore:
                 parse_run_id,
             ),
         )
-        self.connection.commit()
 
     def clear_award_results_for_document(self, document_id: int) -> None:
         self.connection.execute(
@@ -118,7 +118,7 @@ class AwardResultsStore:
             WHERE award_result_id IN (
                 SELECT id
                 FROM award_results
-                WHERE document_id = ?
+                WHERE document_id = %s
             )
             """,
             (document_id,),
@@ -126,11 +126,10 @@ class AwardResultsStore:
         self.connection.execute(
             """
             DELETE FROM award_results
-            WHERE document_id = ?
+            WHERE document_id = %s
             """,
             (document_id,),
         )
-        self.connection.commit()
 
     def insert_award_result(
         self,
@@ -162,7 +161,8 @@ class AwardResultsStore:
                 status,
                 raw_block_text
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
             """,
             (
                 document_id,
@@ -178,8 +178,7 @@ class AwardResultsStore:
                 raw_block_text,
             ),
         )
-        self.connection.commit()
-        return int(cursor.lastrowid)
+        return int(cursor.fetchone()[0])
 
     def insert_award_assignment(
         self,
@@ -219,7 +218,8 @@ class AwardResultsStore:
                 matched_offered_position_id,
                 raw_assignment_text
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
             """,
             (
                 award_result_id,
@@ -239,16 +239,14 @@ class AwardResultsStore:
                 raw_assignment_text,
             ),
         )
-        self.connection.commit()
-        return int(cursor.lastrowid)
+        return int(cursor.fetchone()[0])
 
     def mark_document_parsed(self, document_id: int, parsed_at: str) -> None:
         self.connection.execute(
             """
             UPDATE documents
-            SET parsed_at = ?
-            WHERE id = ?
+            SET parsed_at = %s
+            WHERE id = %s
             """,
             (parsed_at, document_id),
         )
-        self.connection.commit()

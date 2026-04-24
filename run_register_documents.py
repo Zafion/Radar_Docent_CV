@@ -1,11 +1,9 @@
-import os
-import sqlite3
-
 from app.services.document_registry import DocumentRegistryService
 from app.services.push_notifications import (
     is_push_configured,
     send_push_notification_to_all,
 )
+from app.storage.db import get_connection
 
 service = DocumentRegistryService()
 registered = service.register_unclassified_documents()
@@ -39,16 +37,15 @@ for item in registered:
     print("-" * 80)
 
 if len(actionable) > 0:
-    db_path = os.getenv("RADAR_DOCENT_DB_PATH", "/mnt/data/radar_docent_cv.db")
     if is_push_configured():
-        with sqlite3.connect(db_path) as conn:
+        with get_connection() as conn:
             result = send_push_notification_to_all(
                 conn,
                 title="Nuevo documento publicado por Conselleria",
                 body="La Conselleria ha publicado nueva información operativa. Pulsa para consultarla.",
                 url="/valencia-docentes",
             )
-            conn.commit()
+            conn._conn.commit()
         print()
         print(f"Notificaciones push enviadas: {result}")
     else:

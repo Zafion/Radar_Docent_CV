@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import sqlite3
+from typing import Any
 
-from app.storage.sqlite import get_connection
+from app.storage.db import get_connection
 
 
 class DifficultCoverageStore:
-    def __init__(self, connection: sqlite3.Connection | None = None) -> None:
+    def __init__(self, connection: Any | None = None) -> None:
         self.connection = connection or get_connection()
 
     def close(self) -> None:
@@ -17,8 +17,8 @@ class DifficultCoverageStore:
         *,
         parser_key: str,
         parser_version: str,
-    ) -> list[sqlite3.Row]:
-        return self.connection.execute(
+    ) -> list[dict[str, Any]]:
+        rows = self.connection.execute(
             """
             SELECT
                 d.id AS document_id,
@@ -43,14 +43,15 @@ class DifficultCoverageStore:
                   SELECT 1
                   FROM document_parse_runs pr
                   WHERE pr.document_version_id = d.document_version_id
-                    AND pr.parser_key = ?
-                    AND pr.parser_version = ?
+                    AND pr.parser_key = %s
+                    AND pr.parser_version = %s
                     AND pr.status = 'success'
               )
             ORDER BY d.id
             """,
             (parser_key, parser_version),
         ).fetchall()
+        return [dict(row) for row in rows]
 
     def create_parse_run(
         self,
@@ -68,7 +69,8 @@ class DifficultCoverageStore:
                 status,
                 started_at
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
             """,
             (
                 document_version_id,
@@ -78,8 +80,7 @@ class DifficultCoverageStore:
                 started_at,
             ),
         )
-        self.connection.commit()
-        return int(cursor.lastrowid)
+        return int(cursor.fetchone()[0])
 
     def finish_parse_run(
         self,
@@ -93,11 +94,11 @@ class DifficultCoverageStore:
             """
             UPDATE document_parse_runs
             SET
-                finished_at = ?,
-                status = ?,
-                rows_extracted = ?,
-                error_message = ?
-            WHERE id = ?
+                finished_at = %s,
+                status = %s,
+                rows_extracted = %s,
+                error_message = %s
+            WHERE id = %s
             """,
             (
                 finished_at,
@@ -107,7 +108,6 @@ class DifficultCoverageStore:
                 parse_run_id,
             ),
         )
-        self.connection.commit()
 
     def clear_for_document(self, document_id: int) -> None:
         self.connection.execute(
@@ -116,7 +116,7 @@ class DifficultCoverageStore:
             WHERE position_id IN (
                 SELECT id
                 FROM difficult_coverage_positions
-                WHERE document_id = ?
+                WHERE document_id = %s
             )
             """,
             (document_id,),
@@ -124,11 +124,10 @@ class DifficultCoverageStore:
         self.connection.execute(
             """
             DELETE FROM difficult_coverage_positions
-            WHERE document_id = ?
+            WHERE document_id = %s
             """,
             (document_id,),
         )
-        self.connection.commit()
 
     def insert_position(
         self,
@@ -166,7 +165,8 @@ class DifficultCoverageStore:
                 registro_inferior,
                 raw_header_text
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
             """,
             (
                 document_id,
@@ -185,15 +185,14 @@ class DifficultCoverageStore:
                 raw_header_text,
             ),
         )
-        self.connection.commit()
-        return int(cursor.lastrowid)
+        return int(cursor.fetchone()[0])
 
     def insert_candidate(
         self,
         *,
         position_id: int,
         row_number: int | None,
-        is_selected: int,
+        is_selected: bool,
         last_name_1: str | None,
         last_name_2: str | None,
         first_name: str | None,
@@ -230,7 +229,8 @@ class DifficultCoverageStore:
                 assigned_position_code,
                 raw_row_text
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
             """,
             (
                 position_id,
@@ -252,16 +252,14 @@ class DifficultCoverageStore:
                 raw_row_text,
             ),
         )
-        self.connection.commit()
-        return int(cursor.lastrowid)
+        return int(cursor.fetchone()[0])
 
     def mark_document_parsed(self, document_id: int, parsed_at: str) -> None:
         self.connection.execute(
             """
             UPDATE documents
-            SET parsed_at = ?
-            WHERE id = ?
+            SET parsed_at = %s
+            WHERE id = %s
             """,
             (parsed_at, document_id),
         )
-        self.connection.commit()

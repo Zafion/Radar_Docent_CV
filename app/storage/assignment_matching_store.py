@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-import sqlite3
+from typing import Any
 
-from app.storage.sqlite import get_connection
+from app.storage.db import get_connection
 
 
 class AssignmentMatchingStore:
-    def __init__(self, connection: sqlite3.Connection | None = None) -> None:
+    def __init__(self, connection: Any | None = None) -> None:
         self.connection = connection or get_connection()
 
     def close(self) -> None:
         self.connection.close()
 
-    def list_unmatched_award_assignments(self) -> list[sqlite3.Row]:
-        return self.connection.execute(
+    def list_unmatched_award_assignments(self) -> list[dict[str, Any]]:
+        rows = self.connection.execute(
             """
             SELECT
                 aa.id AS assignment_id,
@@ -41,6 +41,7 @@ class AssignmentMatchingStore:
             ORDER BY aa.id
             """
         ).fetchall()
+        return [dict(row) for row in rows]
 
     def find_candidate_offered_positions(
         self,
@@ -48,9 +49,9 @@ class AssignmentMatchingStore:
         source_id: int,
         document_date_iso: str | None,
         position_code: str,
-    ) -> list[sqlite3.Row]:
+    ) -> list[dict[str, Any]]:
         if document_date_iso:
-            return self.connection.execute(
+            rows = self.connection.execute(
                 """
                 SELECT
                     op.id,
@@ -66,15 +67,16 @@ class AssignmentMatchingStore:
                 FROM offered_positions op
                 JOIN documents d
                     ON d.id = op.document_id
-                WHERE d.source_id = ?
-                  AND d.document_date_iso = ?
-                  AND op.position_code = ?
+                WHERE d.source_id = %s
+                  AND d.document_date_iso = %s
+                  AND op.position_code = %s
                 ORDER BY op.id
                 """,
                 (source_id, document_date_iso, position_code),
             ).fetchall()
+            return [dict(row) for row in rows]
 
-        return self.connection.execute(
+        rows = self.connection.execute(
             """
             SELECT
                 op.id,
@@ -90,12 +92,13 @@ class AssignmentMatchingStore:
             FROM offered_positions op
             JOIN documents d
                 ON d.id = op.document_id
-            WHERE d.source_id = ?
-              AND op.position_code = ?
+            WHERE d.source_id = %s
+              AND op.position_code = %s
             ORDER BY op.id
             """,
             (source_id, position_code),
         ).fetchall()
+        return [dict(row) for row in rows]
 
     def set_assignment_match(
         self,
@@ -106,9 +109,8 @@ class AssignmentMatchingStore:
         self.connection.execute(
             """
             UPDATE award_assignments
-            SET matched_offered_position_id = ?
-            WHERE id = ?
+            SET matched_offered_position_id = %s
+            WHERE id = %s
             """,
             (offered_position_id, assignment_id),
         )
-        self.connection.commit()

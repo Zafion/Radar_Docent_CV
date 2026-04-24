@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import sqlite3
 from typing import Any
 
 
 def upsert_push_subscription(
-    conn: sqlite3.Connection,
+    conn: Any,
     endpoint: str,
     p256dh_key: str,
     auth_key: str,
@@ -14,43 +13,42 @@ def upsert_push_subscription(
         """
         INSERT INTO push_subscriptions (
             endpoint, p256dh_key, auth_key, is_active
-        ) VALUES (?, ?, ?, 1)
+        ) VALUES (%s, %s, %s, TRUE)
         ON CONFLICT(endpoint) DO UPDATE SET
-            p256dh_key = excluded.p256dh_key,
-            auth_key = excluded.auth_key,
-            is_active = 1,
-            updated_at = CURRENT_TIMESTAMP
+            p256dh_key = EXCLUDED.p256dh_key,
+            auth_key = EXCLUDED.auth_key,
+            is_active = TRUE,
+            updated_at = NOW()
         """,
         (endpoint, p256dh_key, auth_key),
     )
 
 
-def deactivate_push_subscription(conn: sqlite3.Connection, endpoint: str) -> None:
+def deactivate_push_subscription(conn: Any, endpoint: str) -> None:
     conn.execute(
         """
         UPDATE push_subscriptions
-        SET is_active = 0,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE endpoint = ?
+        SET is_active = FALSE,
+            updated_at = NOW()
+        WHERE endpoint = %s
         """,
         (endpoint,),
     )
 
 
-def delete_push_subscription(conn: sqlite3.Connection, endpoint: str) -> None:
+def delete_push_subscription(conn: Any, endpoint: str) -> None:
     conn.execute(
-        "DELETE FROM push_subscriptions WHERE endpoint = ?",
+        "DELETE FROM push_subscriptions WHERE endpoint = %s",
         (endpoint,),
     )
 
 
-def list_active_push_subscriptions(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    conn.row_factory = sqlite3.Row
+def list_active_push_subscriptions(conn: Any) -> list[dict[str, Any]]:
     rows = conn.execute(
         """
         SELECT endpoint, p256dh_key, auth_key
         FROM push_subscriptions
-        WHERE is_active = 1
+        WHERE is_active = TRUE
         ORDER BY id ASC
         """
     ).fetchall()

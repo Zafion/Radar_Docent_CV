@@ -5,14 +5,12 @@ from fastapi.staticfiles import StaticFiles
 from app.web.routes import TEMPLATES, router as web_router
 
 import os
-import sqlite3
-import unicodedata
 from contextlib import contextmanager
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.services.geo import (
@@ -21,18 +19,17 @@ from app.services.geo import (
     build_google_maps_directions_url,
 )
 from app.storage.centers_store import get_center_by_code
-
-from fastapi.responses import FileResponse
-
+from app.storage.db import get_pool, close_pool
 
 
-DB_PATH = os.getenv("RADAR_DOCENT_DB_PATH", "/mnt/data/radar_docent_cv.db")
+DB_URL = os.getenv("RADAR_DOCENT_DB_URL", "").strip()
+DB_PATH = "postgresql"
 
 
 app = FastAPI(
     title="Radar Docent CV API",
     version="0.1.0",
-    description="API de solo lectura sobre SQLite para consultar adjudicaciones y puestos docentes.",
+    description="API de solo lectura sobre PostgreSQL para consultar adjudicaciones y puestos docentes.",
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
@@ -42,9 +39,23 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "web" / "static")), name="static")
 app.include_router(web_router)
 
+
+@app.on_event("startup")
+def startup_event() -> None:
+    if not DB_URL:
+        raise RuntimeError("RADAR_DOCENT_DB_URL is not configured")
+    get_pool()
+
+
+@app.on_event("shutdown")
+def shutdown_event() -> None:
+    close_pool()
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon() -> FileResponse:
     return FileResponse(BASE_DIR / "web" / "static" / "img" / "favicon.ico")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,8 +64,6 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["*"],
 )
-
-
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -80,42 +89,62 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
     )
 
 
+class PgCompatRow(dict):
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return list(self.values())[key]
+        return super().__getitem__(key)
+
+
+class PgCompatCursor:
+    def __init__(self, cursor) -> None:
+        self._cursor = cursor
+
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        if row is None:
+            return None
+        return PgCompatRow(row)
+
+    def fetchall(self):
+        return [PgCompatRow(row) for row in self._cursor.fetchall()]
+
+    @property
+    def rowcount(self) -> int:
+        return self._cursor.rowcount
+
+
+class PgCompatConnection:
+    def __init__(self, conn) -> None:
+        self._conn = conn
+
+    def execute(self, sql: str, params: Sequence[Any] | None = None) -> PgCompatCursor:
+        # Compatibilidad práctica para reutilizar el SQL actual.
+        sql_pg = sql.replace("?", "%s")
+        cur = self._conn.cursor()
+        cur.execute(sql_pg, params or [])
+        return PgCompatCursor(cur)
+
+    def close(self) -> None:
+        # El cierre real lo controla el pool / context manager.
+        return None
+
+
 @contextmanager
-def get_connection() -> Iterable[sqlite3.Connection]:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA query_only = ON")
-    yield conn
-    conn.close()
+def get_connection() -> Iterable[PgCompatConnection]:
+    with get_pool().connection() as conn:
+        yield PgCompatConnection(conn)
 
 
-# Registrar función SQLite para búsquedas tolerantes a acentos.
-def _register_normalize_function(conn: sqlite3.Connection) -> None:
-    def normalize_text(value: str | None) -> str:
-        if not value:
-            return ""
-        value = value.strip().lower()
-        value = unicodedata.normalize("NFKD", value)
-        return "".join(ch for ch in value if not unicodedata.combining(ch))
-
-    conn.create_function("normalize_text", 1, normalize_text)
-
-
-with sqlite3.connect(DB_PATH) as _bootstrap_conn:
-    _register_normalize_function(_bootstrap_conn)
-
-
-@app.middleware("http")
-async def sqlite_function_middleware(request, call_next):
-    # No muta la request; se limita a validar que la BD existe.
-    if not os.path.exists(DB_PATH):
-        raise HTTPException(status_code=500, detail=f"SQLite no encontrada en {DB_PATH}")
-    return await call_next(request)
+def _register_normalize_function(conn) -> None:
+    # Ya no se registra nada en runtime.
+    # PostgreSQL lo resuelve con la función normalize_text() definida en schema.sql
+    return None
 
 
 # ---------- helpers ----------
 
-def rows_to_dicts(rows: Iterable[sqlite3.Row]) -> list[dict[str, Any]]:
+def rows_to_dicts(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
@@ -204,7 +233,7 @@ def enrich_center_geo_fields(
 
 
 def center_row_to_payload(
-    row: sqlite3.Row,
+    row: dict[str, Any],
     origin_lat: float | None = None,
     origin_lon: float | None = None,
 ) -> dict[str, Any]:
@@ -255,7 +284,7 @@ def build_user_view(
     )
 
     selected_difficult = next(
-        (row for row in difficult_coverage if row.get("is_selected") == 1),
+        (row for row in difficult_coverage if row.get("is_selected") is True),
         None,
     )
 
@@ -441,7 +470,7 @@ def health() -> dict[str, Any]:
         )
     return {
         "status": "ok",
-        "db_path": DB_PATH,
+        "db_engine": DB_PATH,
         "counts": counts,
         "latest_documents": latest_docs,
     }
@@ -475,7 +504,6 @@ def search_persons(
 ) -> dict[str, Any]:
     pattern = f"%{q}%"
     with get_connection() as conn:
-        _register_normalize_function(conn)
         sql = """
         WITH award_people AS (
             SELECT
@@ -484,7 +512,7 @@ def search_persons(
                 'award_results' AS source_kind,
                 COUNT(*) AS total_records,
                 SUM(CASE WHEN ar.status = 'Adjudicat' THEN 1 ELSE 0 END) AS total_awarded,
-                NULL AS total_difficult_positions
+                NULL::bigint AS total_difficult_positions
             FROM award_results ar
             WHERE normalize_text(ar.person_display_name) LIKE normalize_text(?)
                OR ar.person_name_normalized LIKE normalize_text(?)
@@ -496,7 +524,7 @@ def search_persons(
                 dc.full_name AS display_name,
                 'difficult_coverage_candidates' AS source_kind,
                 COUNT(*) AS total_records,
-                SUM(CASE WHEN dc.is_selected = 1 THEN 1 ELSE 0 END) AS total_awarded,
+                SUM(CASE WHEN dc.is_selected IS TRUE THEN 1 ELSE 0 END) AS total_awarded,
                 COUNT(DISTINCT dc.position_id) AS total_difficult_positions
             FROM difficult_coverage_candidates dc
             WHERE normalize_text(dc.full_name) LIKE normalize_text(?)
@@ -514,13 +542,15 @@ def search_persons(
             SUM(total_records) AS total_records,
             SUM(total_awarded) AS total_awarded,
             SUM(COALESCE(total_difficult_positions, 0)) AS total_difficult_positions,
-            GROUP_CONCAT(source_kind, ',') AS source_kinds
+            string_agg(source_kind, ',' ORDER BY source_kind) AS source_kinds
         FROM unioned
         GROUP BY normalized_name, display_name
         ORDER BY total_records DESC, display_name ASC
         LIMIT ?
         """
-        items = rows_to_dicts(conn.execute(sql, [pattern, pattern, pattern, pattern, limit]).fetchall())
+        items = rows_to_dicts(
+            conn.execute(sql, [pattern, pattern, pattern, pattern, limit]).fetchall()
+        )
     return {"items": items, "count": len(items), "query": q}
 
 @app.get("/api/persons/profile")
@@ -591,7 +621,7 @@ def get_person_profile(
             difficult_summary AS (
                 SELECT
                     COUNT(*) AS total_difficult_coverage_candidates,
-                    SUM(CASE WHEN dc.is_selected = 1 THEN 1 ELSE 0 END) AS total_difficult_selected,
+                    SUM(CASE WHEN dc.is_selected IS TRUE THEN 1 ELSE 0 END) AS total_difficult_selected,
                     COUNT(DISTINCT dc.position_id) AS total_difficult_positions,
                     MAX(d.document_date_iso) AS last_difficult_date
                 FROM difficult_coverage_candidates dc
@@ -717,6 +747,10 @@ def get_person_profile(
                 enrich_center_geo_fields(row, origin_lat, origin_lon)
                 for row in assignment_rows
             ]
+
+            for row in assignment_rows:
+                award_result_id = row["award_result_id"]
+                assignments_by_award.setdefault(award_result_id, []).append(row)
 
         for award in awards:
             award["assignments"] = assignments_by_award.get(award["id"], [])
@@ -1144,9 +1178,9 @@ def list_difficult_positions(
         where.append("p.position_code = ?")
         params.append(position_code)
     if selected_only is True:
-        where.append("EXISTS (SELECT 1 FROM difficult_coverage_candidates dc WHERE dc.position_id = p.id AND dc.is_selected = 1)")
+        where.append("EXISTS (SELECT 1 FROM difficult_coverage_candidates dc WHERE dc.position_id = p.id AND dc.is_selected IS TRUE)")
     elif selected_only is False:
-        where.append("NOT EXISTS (SELECT 1 FROM difficult_coverage_candidates dc WHERE dc.position_id = p.id AND dc.is_selected = 1)")
+        where.append("NOT EXISTS (SELECT 1 FROM difficult_coverage_candidates dc WHERE dc.position_id = p.id AND dc.is_selected IS TRUE)")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     order_sql = build_order_by(order_by, order_dir, ALLOWED_DIFFICULT_ORDER_FIELDS, "d.document_date_iso")
@@ -1185,7 +1219,7 @@ def list_difficult_positions(
             (
                 SELECT COUNT(*)
                 FROM difficult_coverage_candidates dc
-                WHERE dc.position_id = p.id AND dc.is_selected = 1
+                WHERE dc.position_id = p.id AND dc.is_selected IS TRUE
             ) AS selected_candidate_count
         """
         + base_sql
@@ -1243,9 +1277,9 @@ def get_difficult_candidates(
         where = ["dc.position_id = ?"]
         params: list[Any] = [position_id]
         if selected_only is True:
-            where.append("dc.is_selected = 1")
+            where.append("dc.is_selected IS TRUE")
         elif selected_only is False:
-            where.append("dc.is_selected = 0")
+            where.append("dc.is_selected IS FALSE")
         where_sql = f"WHERE {' AND '.join(where)}"
 
         count_sql = f"SELECT COUNT(*) FROM difficult_coverage_candidates dc {where_sql}"

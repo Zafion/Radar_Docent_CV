@@ -1,4 +1,4 @@
-from app.storage.sqlite import init_db
+from app.storage.db import init_db
 
-db_path = init_db()
-print(f"Base de datos inicializada en: {db_path}")
+db_url = init_db()
+print(f"Base de datos PostgreSQL inicializada en: {db_url}")

@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-import sqlite3
+from typing import Any
 
-from app.storage.sqlite import get_connection
+from app.storage.db import get_connection
 
 
 class DocumentStore:
-    def __init__(self, connection: sqlite3.Connection | None = None) -> None:
+    def __init__(self, connection: Any | None = None) -> None:
         self.connection = connection or get_connection()
 
     def close(self) -> None:
         self.connection.close()
 
-    def list_unregistered_document_candidates(self) -> list[sqlite3.Row]:
-        return self.connection.execute(
+    def list_unregistered_document_candidates(self) -> list[dict[str, Any]]:
+        rows = self.connection.execute(
             """
             SELECT
                 a.id AS asset_id,
@@ -44,6 +44,7 @@ class DocumentStore:
             ORDER BY dv.id, a.id
             """
         ).fetchall()
+        return [dict(row) for row in rows]
 
     def create_document(
         self,
@@ -69,7 +70,8 @@ class DocumentStore:
                 notes,
                 parsed_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NULL)
+            RETURNING id
             """,
             (
                 document_version_id,
@@ -82,5 +84,4 @@ class DocumentStore:
                 notes,
             ),
         )
-        self.connection.commit()
-        return int(cursor.lastrowid)
+        return int(cursor.fetchone()[0])

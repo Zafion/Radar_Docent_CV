@@ -1,22 +1,37 @@
-PRAGMA foreign_keys = ON;
+CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-BEGIN;
+CREATE OR REPLACE FUNCTION normalize_text(value text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+AS $$
+    SELECT btrim(
+        regexp_replace(
+            lower(unaccent(coalesce(value, ''))),
+            '\s+',
+            ' ',
+            'g'
+        )
+    );
+$$;
 
 CREATE TABLE IF NOT EXISTS sources (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id BIGSERIAL PRIMARY KEY,
     source_key TEXT NOT NULL UNIQUE,
     source_url TEXT NOT NULL,
     label TEXT NOT NULL,
-    is_active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS sync_runs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source_id INTEGER NOT NULL,
-    started_at TEXT NOT NULL,
-    finished_at TEXT,
-    status TEXT NOT NULL, -- success, partial, failed
+    id BIGSERIAL PRIMARY KEY,
+    source_id BIGINT NOT NULL REFERENCES sources(id),
+    started_at TIMESTAMPTZ NOT NULL,
+    finished_at TIMESTAMPTZ,
+    status TEXT NOT NULL,
     discovered_assets_count INTEGER NOT NULL DEFAULT 0,
     downloadable_assets_count INTEGER NOT NULL DEFAULT 0,
     new_versions_count INTEGER NOT NULL DEFAULT 0,
@@ -24,14 +39,25 @@ CREATE TABLE IF NOT EXISTS sync_runs (
     duplicate_assets_count INTEGER NOT NULL DEFAULT 0,
     non_downloadable_count INTEGER NOT NULL DEFAULT 0,
     error_message TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (source_id) REFERENCES sources(id)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS document_versions (
+    id BIGSERIAL PRIMARY KEY,
+    sha256 TEXT NOT NULL UNIQUE,
+    original_filename TEXT NOT NULL,
+    stored_filename TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    content_type TEXT,
+    size_bytes BIGINT NOT NULL,
+    downloaded_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS assets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source_id INTEGER NOT NULL,
-    sync_run_id INTEGER NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    source_id BIGINT NOT NULL REFERENCES sources(id),
+    sync_run_id BIGINT NOT NULL REFERENCES sync_runs(id),
     asset_role TEXT NOT NULL,
     title TEXT NOT NULL,
     section TEXT,
@@ -39,60 +65,42 @@ CREATE TABLE IF NOT EXISTS assets (
     publication_date_text TEXT,
     url TEXT NOT NULL,
     canonical_url TEXT NOT NULL,
-    is_downloadable INTEGER NOT NULL DEFAULT 1,
-    document_version_id INTEGER,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (source_id) REFERENCES sources(id),
-    FOREIGN KEY (sync_run_id) REFERENCES sync_runs(id),
-    FOREIGN KEY (document_version_id) REFERENCES document_versions(id)
-);
-
-CREATE TABLE IF NOT EXISTS document_versions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sha256 TEXT NOT NULL UNIQUE,
-    original_filename TEXT NOT NULL,
-    stored_filename TEXT NOT NULL,
-    file_path TEXT NOT NULL,
-    content_type TEXT,
-    size_bytes INTEGER NOT NULL,
-    downloaded_at TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    is_downloadable BOOLEAN NOT NULL DEFAULT TRUE,
+    document_version_id BIGINT REFERENCES document_versions(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS document_parse_runs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    document_version_id INTEGER NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    document_version_id BIGINT NOT NULL REFERENCES document_versions(id),
     parser_key TEXT NOT NULL,
     parser_version TEXT NOT NULL,
-    status TEXT NOT NULL, -- success, failed
-    started_at TEXT NOT NULL,
-    finished_at TEXT,
+    status TEXT NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL,
+    finished_at TIMESTAMPTZ,
     rows_extracted INTEGER NOT NULL DEFAULT 0,
     error_message TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (document_version_id) REFERENCES document_versions(id)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS documents (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    document_version_id INTEGER NOT NULL UNIQUE,
-    source_id INTEGER NOT NULL,
-    doc_family TEXT NOT NULL,              -- final_award_listing, offered_positions, difficult_coverage_provisional, resolution_text
+    id BIGSERIAL PRIMARY KEY,
+    document_version_id BIGINT NOT NULL UNIQUE REFERENCES document_versions(id),
+    source_id BIGINT NOT NULL REFERENCES sources(id),
+    doc_family TEXT NOT NULL,
     title TEXT,
     document_date_text TEXT,
-    document_date_iso TEXT,                -- nullable hasta que normalicemos fecha
-    list_scope TEXT,                       -- maestros, secundaria_otros, dificil_cobertura...
+    document_date_iso TEXT,
+    list_scope TEXT,
     notes TEXT,
-    parsed_at TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (document_version_id) REFERENCES document_versions(id),
-    FOREIGN KEY (source_id) REFERENCES sources(id)
+    parsed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS offered_positions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    document_id INTEGER NOT NULL,
-    source_type TEXT NOT NULL,             -- inicio_curso, continua, dificil_cobertura
+    id BIGSERIAL PRIMARY KEY,
+    document_id BIGINT NOT NULL REFERENCES documents(id),
+    source_type TEXT NOT NULL,
     body_code TEXT,
     body_name TEXT,
     specialty_code TEXT,
@@ -103,21 +111,20 @@ CREATE TABLE IF NOT EXISTS offered_positions (
     center_name TEXT,
     position_code TEXT,
     hours_text TEXT,
-    hours_value REAL,
-    is_itinerant INTEGER,                  -- 0/1/null
-    valenciano_required_text TEXT,         -- SI / NO / null
-    position_type TEXT,                    -- VACANTE, Sust. Ind., Sust. Det., etc.
+    hours_value DOUBLE PRECISION,
+    is_itinerant BOOLEAN,
+    valenciano_required_text TEXT,
+    position_type TEXT,
     composition TEXT,
     observations TEXT,
     raw_row_text TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (document_id) REFERENCES documents(id)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS award_results (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    document_id INTEGER NOT NULL,
-    list_scope TEXT NOT NULL,              -- maestros / secundaria_otros
+    id BIGSERIAL PRIMARY KEY,
+    document_id BIGINT NOT NULL REFERENCES documents(id),
+    list_scope TEXT NOT NULL,
     body_code TEXT,
     body_name TEXT,
     specialty_code TEXT,
@@ -125,16 +132,15 @@ CREATE TABLE IF NOT EXISTS award_results (
     order_number INTEGER,
     person_display_name TEXT NOT NULL,
     person_name_normalized TEXT NOT NULL,
-    status TEXT NOT NULL,                  -- Desactivat, Ha participat, No ha participat, No adjudicat, Adjudicat
+    status TEXT NOT NULL,
     raw_block_text TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (document_id) REFERENCES documents(id)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS award_assignments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    award_result_id INTEGER NOT NULL,
-    assignment_kind TEXT,                  -- VACANT, SUBSTITUCIÓ DETERMINADA, SUBSTITUCIÓ INDETERMINADA
+    id BIGSERIAL PRIMARY KEY,
+    award_result_id BIGINT NOT NULL REFERENCES award_results(id),
+    assignment_kind TEXT,
     locality TEXT,
     center_code TEXT,
     center_name TEXT,
@@ -142,20 +148,18 @@ CREATE TABLE IF NOT EXISTS award_assignments (
     position_specialty_name TEXT,
     position_code TEXT,
     hours_text TEXT,
-    hours_value REAL,
+    hours_value DOUBLE PRECISION,
     petition_text TEXT,
     petition_number INTEGER,
     request_type TEXT,
-    matched_offered_position_id INTEGER,
+    matched_offered_position_id BIGINT REFERENCES offered_positions(id),
     raw_assignment_text TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (award_result_id) REFERENCES award_results(id),
-    FOREIGN KEY (matched_offered_position_id) REFERENCES offered_positions(id)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS difficult_coverage_positions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    document_id INTEGER NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    document_id BIGINT NOT NULL REFERENCES documents(id),
     body_code TEXT,
     body_name TEXT,
     specialty_code TEXT,
@@ -169,15 +173,14 @@ CREATE TABLE IF NOT EXISTS difficult_coverage_positions (
     registro_superior TEXT,
     registro_inferior TEXT,
     raw_header_text TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (document_id) REFERENCES documents(id)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS difficult_coverage_candidates (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    position_id INTEGER NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    position_id BIGINT NOT NULL REFERENCES difficult_coverage_positions(id),
     row_number INTEGER,
-    is_selected INTEGER NOT NULL DEFAULT 0,  -- 1 cuando aparece con -->
+    is_selected BOOLEAN NOT NULL DEFAULT FALSE,
     last_name_1 TEXT,
     last_name_2 TEXT,
     first_name TEXT,
@@ -187,13 +190,12 @@ CREATE TABLE IF NOT EXISTS difficult_coverage_candidates (
     registration_code_or_bag_order TEXT,
     petition_text TEXT,
     petition_number INTEGER,
-    has_master_text TEXT,                   -- S / N
-    valenciano_requirement_text TEXT,       -- según columna REQ. VAL
-    adjudication_group_text TEXT,           -- G. ADJ.
-    assigned_position_code TEXT,            -- P. Adj.
+    has_master_text TEXT,
+    valenciano_requirement_text TEXT,
+    adjudication_group_text TEXT,
+    assigned_position_code TEXT,
     raw_row_text TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (position_id) REFERENCES difficult_coverage_positions(id)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS centers (
@@ -209,21 +211,21 @@ CREATE TABLE IF NOT EXISTS centers (
     comarca TEXT,
     phone TEXT,
     fax TEXT,
-    latitude REAL,
-    longitude REAL,
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
     full_address TEXT,
     source_filename TEXT,
     generic_name_es TEXT,
     generic_name_val TEXT,
     specific_name TEXT,
-    imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS centers_catalog_sync_runs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    started_at TEXT NOT NULL,
-    finished_at TEXT NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    started_at TIMESTAMPTZ NOT NULL,
+    finished_at TIMESTAMPTZ NOT NULL,
     status TEXT NOT NULL,
     cod_provincia TEXT,
     source_url TEXT NOT NULL,
@@ -233,20 +235,27 @@ CREATE TABLE IF NOT EXISTS centers_catalog_sync_runs (
     xlsx_path TEXT,
     sha256_path TEXT,
     sha256_value TEXT,
-    token_refresh_attempted INTEGER NOT NULL DEFAULT 0,
+    token_refresh_attempted BOOLEAN NOT NULL DEFAULT FALSE,
     downloaded_file_name TEXT,
     downloaded_mime_type TEXT,
-    downloaded_size_bytes INTEGER,
+    downloaded_size_bytes BIGINT,
     imported_rows INTEGER,
     centers_before INTEGER,
     centers_after INTEGER,
-    changed INTEGER NOT NULL DEFAULT 0,
+    changed BOOLEAN NOT NULL DEFAULT FALSE,
     error_message TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-
-
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id BIGSERIAL PRIMARY KEY,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh_key TEXT NOT NULL,
+    auth_key TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 CREATE INDEX IF NOT EXISTS idx_sources_key
     ON sources(source_key);
@@ -318,9 +327,18 @@ CREATE INDEX IF NOT EXISTS idx_centers_province
     ON centers(province);
 
 CREATE INDEX IF NOT EXISTS idx_centers_catalog_sync_runs_created_at
-ON centers_catalog_sync_runs(created_at);
+    ON centers_catalog_sync_runs(created_at);
 
 CREATE INDEX IF NOT EXISTS idx_centers_catalog_sync_runs_status
-ON centers_catalog_sync_runs(status);
+    ON centers_catalog_sync_runs(status);
 
-COMMIT;
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_active
+    ON push_subscriptions(is_active);
+
+CREATE INDEX IF NOT EXISTS idx_award_results_person_display_name_norm_trgm
+    ON award_results
+    USING gin (normalize_text(person_display_name) gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_difficult_candidates_full_name_norm_trgm
+    ON difficult_coverage_candidates
+    USING gin (normalize_text(full_name) gin_trgm_ops);

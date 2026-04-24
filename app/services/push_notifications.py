@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
 from typing import Any
 
 from app.storage.push_subscription_store import (
@@ -24,7 +23,7 @@ def is_push_configured() -> bool:
 
 
 def send_push_notification_to_all(
-    conn: sqlite3.Connection,
+    conn: Any,
     *,
     title: str,
     body: str,

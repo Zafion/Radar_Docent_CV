@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -10,7 +9,7 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def insert_centers_catalog_sync_run(conn: sqlite3.Connection, payload: dict[str, Any]) -> int:
+def insert_centers_catalog_sync_run(conn: Any, payload: dict[str, Any]) -> int:
     xlsx_path = payload.get("xlsx_path")
     output_dir = payload.get("output_dir")
     if output_dir is None and xlsx_path:
@@ -42,7 +41,8 @@ def insert_centers_catalog_sync_run(conn: sqlite3.Connection, payload: dict[str,
             centers_after,
             changed,
             error_message
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
         """,
         (
             started_at,
@@ -56,15 +56,15 @@ def insert_centers_catalog_sync_run(conn: sqlite3.Connection, payload: dict[str,
             payload.get("xlsx_path"),
             payload.get("sha256_path"),
             payload.get("sha256_value"),
-            int(bool(payload.get("token_refresh_attempted"))),
+            bool(payload.get("token_refresh_attempted")),
             payload.get("downloaded_file_name"),
             payload.get("downloaded_mime_type"),
             payload.get("downloaded_size_bytes"),
             payload.get("imported_rows"),
             payload.get("centers_before"),
             payload.get("centers_after"),
-            int(bool(payload.get("changed"))),
+            bool(payload.get("changed")),
             payload.get("error_message"),
         ),
     )
-    return int(cursor.lastrowid)
+    return int(cursor.fetchone()[0])

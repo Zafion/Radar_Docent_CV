@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import sqlite3
+from typing import Any
 
 from app.services.discovery.base import DiscoveredAsset
-from app.storage.sqlite import get_connection
+from app.storage.db import get_connection
 
 
 class SyncStore:
-    def __init__(self, connection: sqlite3.Connection | None = None) -> None:
+    def __init__(self, connection: Any | None = None) -> None:
         self.connection = connection or get_connection()
 
     def close(self) -> None:
@@ -23,7 +23,7 @@ class SyncStore:
             """
             SELECT id
             FROM sources
-            WHERE source_key = ?
+            WHERE source_key = %s
             """,
             (source_key,),
         ).fetchone()
@@ -32,23 +32,22 @@ class SyncStore:
             self.connection.execute(
                 """
                 UPDATE sources
-                SET source_url = ?, label = ?, is_active = 1
-                WHERE id = ?
+                SET source_url = %s, label = %s, is_active = TRUE
+                WHERE id = %s
                 """,
                 (source_url, label, row["id"]),
             )
-            self.connection.commit()
             return int(row["id"])
 
         cursor = self.connection.execute(
             """
             INSERT INTO sources (source_key, source_url, label, is_active)
-            VALUES (?, ?, ?, 1)
+            VALUES (%s, %s, %s, TRUE)
+            RETURNING id
             """,
             (source_key, source_url, label),
         )
-        self.connection.commit()
-        return int(cursor.lastrowid)
+        return int(cursor.fetchone()[0])
 
     def create_sync_run(
         self,
@@ -62,12 +61,12 @@ class SyncStore:
                 started_at,
                 status
             )
-            VALUES (?, ?, ?)
+            VALUES (%s, %s, %s)
+            RETURNING id
             """,
             (source_id, started_at, "running"),
         )
-        self.connection.commit()
-        return int(cursor.lastrowid)
+        return int(cursor.fetchone()[0])
 
     def finish_sync_run(
         self,
@@ -86,16 +85,16 @@ class SyncStore:
             """
             UPDATE sync_runs
             SET
-                finished_at = ?,
-                status = ?,
-                discovered_assets_count = ?,
-                downloadable_assets_count = ?,
-                new_versions_count = ?,
-                known_versions_count = ?,
-                duplicate_assets_count = ?,
-                non_downloadable_count = ?,
-                error_message = ?
-            WHERE id = ?
+                finished_at = %s,
+                status = %s,
+                discovered_assets_count = %s,
+                downloadable_assets_count = %s,
+                new_versions_count = %s,
+                known_versions_count = %s,
+                duplicate_assets_count = %s,
+                non_downloadable_count = %s,
+                error_message = %s
+            WHERE id = %s
             """,
             (
                 finished_at,
@@ -110,7 +109,6 @@ class SyncStore:
                 run_id,
             ),
         )
-        self.connection.commit()
 
     def create_asset(
         self,
@@ -132,7 +130,8 @@ class SyncStore:
                 canonical_url,
                 is_downloadable
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
             """,
             (
                 source_id,
@@ -144,11 +143,10 @@ class SyncStore:
                 asset.publication_date_text,
                 asset.url,
                 asset.canonical_url,
-                1 if asset.downloadable else 0,
+                bool(asset.downloadable),
             ),
         )
-        self.connection.commit()
-        return int(cursor.lastrowid)
+        return int(cursor.fetchone()[0])
 
     def set_asset_document_version(
         self,
@@ -158,22 +156,21 @@ class SyncStore:
         self.connection.execute(
             """
             UPDATE assets
-            SET document_version_id = ?
-            WHERE id = ?
+            SET document_version_id = %s
+            WHERE id = %s
             """,
             (document_version_id, asset_id),
         )
-        self.connection.commit()
 
     def get_document_version_by_sha256(
         self,
         sha256: str,
-    ) -> sqlite3.Row | None:
+    ) -> dict[str, Any] | None:
         return self.connection.execute(
             """
             SELECT *
             FROM document_versions
-            WHERE sha256 = ?
+            WHERE sha256 = %s
             """,
             (sha256,),
         ).fetchone()
@@ -199,7 +196,8 @@ class SyncStore:
                 size_bytes,
                 downloaded_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
             """,
             (
                 sha256,
@@ -211,5 +209,4 @@ class SyncStore:
                 downloaded_at,
             ),
         )
-        self.connection.commit()
-        return int(cursor.lastrowid)
+        return int(cursor.fetchone()[0])
