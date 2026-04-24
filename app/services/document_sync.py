@@ -67,17 +67,17 @@ class DocumentSyncService:
         results: list[SyncedAsset] = []
         processed_urls: dict[str, SyncedAsset] = {}
 
-        source_id = store.ensure_source(
-            source_key=adapter.source_key,
-            source_url=adapter.source_url,
-            label=adapter.source_label or adapter.source_key,
-        )
-        run_id = store.create_sync_run(
-            source_id=source_id,
-            started_at=started_at,
-        )
-
         try:
+            source_id = store.ensure_source(
+                source_key=adapter.source_key,
+                source_url=adapter.source_url,
+                label=adapter.source_label or adapter.source_key,
+            )
+            run_id = store.create_sync_run(
+                source_id=source_id,
+                started_at=started_at,
+            )
+
             assets = adapter.discover_assets()
 
             self._write_json(
@@ -196,6 +196,7 @@ class DocumentSyncService:
                 ),
                 error_message=None,
             )
+            store.connection.commit()
 
             return {
                 "source_key": adapter.source_key,
@@ -213,29 +214,45 @@ class DocumentSyncService:
             }
 
         except Exception as exc:
-            finished_at = self._utc_now_iso()
+            store.connection.rollback()
 
-            self._write_json(
-                report_path,
-                [asdict(item) for item in results],
-            )
+            try:
+                finished_at = self._utc_now_iso()
 
-            store.finish_sync_run(
-                run_id=run_id,
-                finished_at=finished_at,
-                status="failed",
-                discovered_assets_count=len(assets),
-                downloadable_assets_count=sum(1 for item in assets if item.downloadable),
-                new_versions_count=sum(1 for item in results if item.status == "new_version_saved"),
-                known_versions_count=sum(1 for item in results if item.status == "already_known_hash"),
-                duplicate_assets_count=sum(1 for item in results if item.status == "same_run_duplicate"),
-                non_downloadable_count=sum(
-                    1
-                    for item in results
-                    if item.status in {"non_downloadable", "download_error"}
-                ),
-                error_message=str(exc),
-            )
+                self._write_json(
+                    report_path,
+                    [asdict(item) for item in results],
+                )
+
+                source_id = store.ensure_source(
+                    source_key=adapter.source_key,
+                    source_url=adapter.source_url,
+                    label=adapter.source_label or adapter.source_key,
+                )
+                run_id = store.create_sync_run(
+                    source_id=source_id,
+                    started_at=started_at,
+                )
+                store.finish_sync_run(
+                    run_id=run_id,
+                    finished_at=finished_at,
+                    status="failed",
+                    discovered_assets_count=len(assets),
+                    downloadable_assets_count=sum(1 for item in assets if item.downloadable),
+                    new_versions_count=sum(1 for item in results if item.status == "new_version_saved"),
+                    known_versions_count=sum(1 for item in results if item.status == "already_known_hash"),
+                    duplicate_assets_count=sum(1 for item in results if item.status == "same_run_duplicate"),
+                    non_downloadable_count=sum(
+                        1
+                        for item in results
+                        if item.status in {"non_downloadable", "download_error"}
+                    ),
+                    error_message=str(exc),
+                )
+                store.connection.commit()
+            except Exception:
+                store.connection.rollback()
+
             raise
 
         finally:

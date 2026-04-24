@@ -38,7 +38,7 @@ class ParsedOfferedPosition:
     position_code: Optional[str]
     hours_text: Optional[str]
     hours_value: Optional[float]
-    is_itinerant: Optional[int]
+    is_itinerant: Optional[bool]
     valenciano_required_text: Optional[str]
     position_type: Optional[str]
     composition: Optional[str]
@@ -107,6 +107,7 @@ class OfferedPositionsParserService:
                         document_id=int(document["document_id"]),
                         parsed_at=finished_at,
                     )
+                    store.connection.commit()
 
                     summaries.append(
                         {
@@ -118,14 +119,21 @@ class OfferedPositionsParserService:
                     )
 
                 except Exception as exc:
+                    store.connection.rollback()
                     finished_at = self._utc_now_iso()
-                    store.finish_parse_run(
-                        parse_run_id=parse_run_id,
-                        finished_at=finished_at,
-                        status="failed",
-                        rows_extracted=0,
-                        error_message=str(exc),
-                    )
+
+                    try:
+                        store.finish_parse_run(
+                            parse_run_id=parse_run_id,
+                            finished_at=finished_at,
+                            status="failed",
+                            rows_extracted=0,
+                            error_message=str(exc),
+                        )
+                        store.connection.commit()
+                    except Exception:
+                        store.connection.rollback()
+
                     summaries.append(
                         {
                             "document_id": int(document["document_id"]),

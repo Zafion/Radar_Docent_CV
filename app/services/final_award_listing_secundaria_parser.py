@@ -27,9 +27,6 @@ ASSIGNMENT_SPECIALTY_RE = re.compile(
 POSITION_CODE_RE = re.compile(r"^\d{6}$")
 NUMERIC_HOURS_RE = re.compile(r"^(?P<hours>\d{1,2}(?:,\d+)?)\s+hores?$", re.IGNORECASE)
 
-# Encabezado de especialidad tipo:
-# CUINA I PASTISSERIA 3A1
-# MATEMÀTIQUES 206
 HEADING_SPECIALTY_RE = re.compile(
     r"^(?P<name>.+?)\s+(?P<code>[0-9A-Z]{2,5})$"
 )
@@ -158,6 +155,7 @@ class FinalAwardListingSecundariaParserService:
                         document_id=int(document["document_id"]),
                         parsed_at=finished_at,
                     )
+                    store.connection.commit()
 
                     summaries.append(
                         {
@@ -169,14 +167,21 @@ class FinalAwardListingSecundariaParserService:
                     )
 
                 except Exception as exc:
+                    store.connection.rollback()
                     finished_at = self._utc_now_iso()
-                    store.finish_parse_run(
-                        parse_run_id=parse_run_id,
-                        finished_at=finished_at,
-                        status="failed",
-                        rows_extracted=0,
-                        error_message=str(exc),
-                    )
+
+                    try:
+                        store.finish_parse_run(
+                            parse_run_id=parse_run_id,
+                            finished_at=finished_at,
+                            status="failed",
+                            rows_extracted=0,
+                            error_message=str(exc),
+                        )
+                        store.connection.commit()
+                    except Exception:
+                        store.connection.rollback()
+
                     summaries.append(
                         {
                             "document_id": int(document["document_id"]),

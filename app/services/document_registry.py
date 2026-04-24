@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from app.services.document_classifier import DocumentClassifierService
 from app.storage.document_store import DocumentStore
@@ -83,7 +82,12 @@ class DocumentRegistryService:
                     )
                 )
 
+            store.connection.commit()
             return registered
+
+        except Exception:
+            store.connection.rollback()
+            raise
 
         finally:
             store.close()

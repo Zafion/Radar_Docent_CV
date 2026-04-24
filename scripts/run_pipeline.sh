@@ -17,7 +17,7 @@ flock -n 9 || {
 cd "$PROJECT_DIR"
 source "$VENV"
 
-export RADAR_DOCENT_DB_URL="postgresql://radar_docent:TU_PASSWORD@localhost:5432/radar_docent_cv"
+export RADAR_DOCENT_DB_URL="postgresql://radar_docent:2107@localhost:5432/radar_docent_cv"
 export PYTHONUNBUFFERED=1
 
 echo "============================================================"

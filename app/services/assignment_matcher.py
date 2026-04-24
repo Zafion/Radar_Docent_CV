@@ -59,7 +59,12 @@ class AssignmentMatcherService:
                     )
                 )
 
+            store.connection.commit()
             return results
+
+        except Exception:
+            store.connection.rollback()
+            raise
 
         finally:
             store.close()

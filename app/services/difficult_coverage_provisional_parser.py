@@ -53,7 +53,7 @@ class ParsedPosition:
 @dataclass(slots=True)
 class ParsedCandidate:
     row_number: Optional[int]
-    is_selected: int
+    is_selected: bool
     last_name_1: Optional[str]
     last_name_2: Optional[str]
     first_name: Optional[str]
@@ -151,6 +151,7 @@ class DifficultCoverageProvisionalParserService:
                         document_id=int(document["document_id"]),
                         parsed_at=finished_at,
                     )
+                    store.connection.commit()
 
                     summaries.append(
                         {
@@ -163,14 +164,21 @@ class DifficultCoverageProvisionalParserService:
                     )
 
                 except Exception as exc:
+                    store.connection.rollback()
                     finished_at = self._utc_now_iso()
-                    store.finish_parse_run(
-                        parse_run_id=parse_run_id,
-                        finished_at=finished_at,
-                        status="failed",
-                        rows_extracted=0,
-                        error_message=str(exc),
-                    )
+
+                    try:
+                        store.finish_parse_run(
+                            parse_run_id=parse_run_id,
+                            finished_at=finished_at,
+                            status="failed",
+                            rows_extracted=0,
+                            error_message=str(exc),
+                        )
+                        store.connection.commit()
+                    except Exception:
+                        store.connection.rollback()
+
                     summaries.append(
                         {
                             "document_id": int(document["document_id"]),
@@ -325,7 +333,7 @@ class DifficultCoverageProvisionalParserService:
         if not cleaned:
             return None
 
-        is_selected = 1 if SELECTED_PREFIX_RE.match(cleaned) else 0
+        is_selected = bool(SELECTED_PREFIX_RE.match(cleaned))
         cleaned = SELECTED_PREFIX_RE.sub("", cleaned).strip()
 
         dt_match = DATE_TIME_RE.search(cleaned)
@@ -378,8 +386,6 @@ class DifficultCoverageProvisionalParserService:
         has_master_text = None
 
         if remaining:
-            # Caso especial real del PDF:
-            # reg, X, petición, S, grupo, p.adj
             if len(remaining) >= 2 and remaining[0].upper() == "X" and remaining[1].isdigit():
                 has_master_text = "X"
                 petition_text = remaining[1]
