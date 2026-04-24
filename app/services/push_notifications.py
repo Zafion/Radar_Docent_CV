@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any
 
 from app.storage.push_subscription_store import (
@@ -9,9 +10,25 @@ from app.storage.push_subscription_store import (
     list_active_push_subscriptions,
 )
 
-VAPID_PUBLIC_KEY = os.getenv("RADAR_PUSH_VAPID_PUBLIC_KEY", "").strip()
-VAPID_PRIVATE_KEY = os.getenv("RADAR_PUSH_VAPID_PRIVATE_KEY", "").strip()
-VAPID_SUBJECT = os.getenv("RADAR_PUSH_VAPID_SUBJECT", "mailto:funkcionarios@gmail.com").strip()
+
+def _read_env(name: str, default: str = "") -> str:
+    return os.getenv(name, default).strip()
+
+
+def _resolve_vapid_private_key(value: str) -> str:
+    if not value:
+        return ""
+
+    candidate = Path(value).expanduser()
+    if candidate.exists() and candidate.is_file():
+        return candidate.read_text(encoding="utf-8").strip()
+
+    return value
+
+
+VAPID_PUBLIC_KEY = _read_env("RADAR_PUSH_VAPID_PUBLIC_KEY")
+VAPID_PRIVATE_KEY = _resolve_vapid_private_key(_read_env("RADAR_PUSH_VAPID_PRIVATE_KEY"))
+VAPID_SUBJECT = _read_env("RADAR_PUSH_VAPID_SUBJECT", "mailto:funkcionarios@gmail.com")
 
 
 def get_vapid_public_key() -> str:
