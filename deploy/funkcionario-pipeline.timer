@@ -1,9 +1,12 @@
 [Unit]
-Description=Run funkcionario pipeline periodically
+Description=Run Funkcionario pipeline on publication windows
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=10min
+OnCalendar=Mon *-*-* 14..18:00:00
+OnCalendar=Tue *-*-* 12..18:00:00
+OnCalendar=Wed *-*-* 14..18:00:00
+OnCalendar=Thu *-*-* 12..18:00:00
+OnCalendar=Fri *-*-* 12..18:00:00
 Unit=funkcionario-pipeline.service
 Persistent=true
 

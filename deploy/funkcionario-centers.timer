@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Funkcionario centers catalog monthly
+
+[Timer]
+OnCalendar=Sat *-*-01..07 00:00:00
+Persistent=true
+Unit=funkcionario-centers.service
+
+[Install]
+WantedBy=timers.target

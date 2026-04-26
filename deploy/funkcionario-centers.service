@@ -1,5 +1,5 @@
 [Unit]
-Description=Funkcionario data pipeline
+Description=Funkcionario sync catálogo de centros
 After=network-online.target postgresql.service
 Wants=network-online.target postgresql.service
 
@@ -9,7 +9,7 @@ User=funkcionario
 Group=funkcionario
 WorkingDirectory=/srv/funkcionario/app
 EnvironmentFile=/etc/funkcionario/funkcionario.env
-ExecStart=/srv/funkcionario/app/scripts/run_pipeline.sh
+ExecStart=/srv/funkcionario/app/.venv/bin/python run_sync_centers_catalog.py
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
