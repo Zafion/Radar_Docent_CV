@@ -142,6 +142,20 @@ def difficult_coverage(request: Request):
     )
 
 
+
+
+@router.get("/resultado-dificil-cobertura", response_class=HTMLResponse)
+def difficult_coverage_candidates_result(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="difficult_coverage_candidates.html",
+        context={
+            "active_page": "valencia-docentes",
+            "page_title": "funkcionario.com | Candidatos de difícil cobertura",
+            "official_adjudicaciones_continuas_url": OFFICIAL_ADJUDICACIONES_CONTINUAS_URL,
+        },
+    )
+
 @router.get("/404", response_class=HTMLResponse)
 def custom_404_preview(request: Request):
     return TEMPLATES.TemplateResponse(

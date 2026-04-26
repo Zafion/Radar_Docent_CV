@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Candidatos de difícil cobertura</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="/valencia-docentes">Consulta de Plazas y Adjudicaciones Docentes</a>
+    <span>›</span>
+    <a href="/dificil-cobertura">Difícil cobertura</a>
+    <span>›</span>
+    Candidatos
+  </div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1 id="dc-candidates-title">Candidatos del puesto</h1>
+        <p id="dc-candidates-subtitle">Cargando información...</p>
+      </div>
+      <div class="stack-actions">
+        <button id="dc-candidates-use-my-location" class="button button--ghost" type="button">
+          Usar mi ubicación
+        </button>
+        <a class="button button--ghost" href="/dificil-cobertura">
+          Volver a difícil cobertura
+        </a>
+        <a class="button button--ghost" href="{{ official_adjudicaciones_continuas_url }}" target="_blank" rel="noopener noreferrer">
+          Ver publicación oficial
+        </a>
+      </div>
+    </div>
+
+    <p class="panel-card__hint">
+      Esta página muestra el detalle de candidatos del puesto seleccionado en la consulta de difícil cobertura.
+    </p>
+    <p class="panel-card__meta">
+      Ubicación: <strong id="dc-candidates-location-status">No activada · sin distancia calculada</strong>
+    </p>
+
+    <div id="dc-candidates-empty" class="content-card is-hidden">
+      <h2>No hay puesto seleccionado</h2>
+      <p>Para ver candidatos, primero entra en difícil cobertura, localiza un puesto y pulsa “Candidatos”.</p>
+      <p class="stack-actions">
+        <a class="button button--secondary" href="/dificil-cobertura">Ir a difícil cobertura</a>
+      </p>
+    </div>
+
+    <div id="dc-candidates-position-summary" class="content-card">
+      <p>Cargando resumen del puesto...</p>
+    </div>
+  </section>
+
+  <section id="dc-candidates-list-section" class="content-card section-space--sm">
+    <div class="content-card__header">
+      <div>
+        <h2>Candidatos registrados</h2>
+        <p id="dc-candidates-meta">Cargando...</p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Fila</th>
+            <th>Resultado</th>
+            <th>Nombre</th>
+            <th>Petición</th>
+            <th>Puesto asignado</th>
+          </tr>
+        </thead>
+        <tbody id="dc-candidates-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/difficult_coverage_candidates.js') }}"></script>
+{% endblock %}

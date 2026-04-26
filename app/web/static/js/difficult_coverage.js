@@ -12,10 +12,7 @@
   const resultsMetaEl = document.getElementById("dc-results-meta");
   const tableBody = document.getElementById("dc-table-body");
 
-  const candidatesSection = document.getElementById("dc-candidates-section");
-  const candidatesMetaEl = document.getElementById("dc-candidates-meta");
-  const positionSummaryEl = document.getElementById("dc-position-summary");
-  const candidatesTableBody = document.getElementById("dc-candidates-table-body");
+  const SELECTED_POSITION_KEY = "radar_docent_selected_difficult_coverage_position";
 
   let userOrigin = loadStoredOrigin();
   let latestPublicationDate = null;
@@ -131,6 +128,20 @@
     return { orderBy, orderDir };
   }
 
+  function selectPositionAndOpenCandidates(positionId) {
+    if (!positionId) return;
+
+    sessionStorage.setItem(
+      SELECTED_POSITION_KEY,
+      JSON.stringify({
+        positionId: Number(positionId),
+        selectedAt: new Date().toISOString(),
+      })
+    );
+
+    window.location.href = "/resultado-dificil-cobertura";
+  }
+
   function renderPositions(items, total) {
     resultsMetaEl.textContent = `${total} puestos encontrados`;
 
@@ -166,45 +177,8 @@
     }).join("");
 
     tableBody.querySelectorAll("button[data-position-id]").forEach((button) => {
-      button.addEventListener("click", () => loadCandidates(button.dataset.positionId));
+      button.addEventListener("click", () => selectPositionAndOpenCandidates(button.dataset.positionId));
     });
-  }
-
-  function renderCandidates(position, items) {
-    candidatesSection.classList.remove("is-hidden");
-
-    const specialty = [position.specialty_code, position.specialty_name].filter(Boolean).join(" - ") || "—";
-    candidatesMetaEl.textContent = `${position.center_name || "Centro"} · ${position.locality || "—"}`;
-
-    positionSummaryEl.innerHTML = `
-      <div class="status-card">
-        <div class="status-grid">
-          <div class="status-grid__item"><span>Fecha</span><strong>${escapeHtml(formatDate(position.document_date_iso))}</strong></div>
-          <div class="status-grid__item"><span>Especialidad</span><strong>${escapeHtml(specialty)}</strong></div>
-          <div class="status-grid__item"><span>Centro</span><strong>${escapeHtml(position.center_name || "—")}</strong></div>
-          <div class="status-grid__item"><span>Distancia</span><strong>${escapeHtml(formatDistance(position.distance_km))}</strong></div>
-        </div>
-        ${position.center_full_address ? `<p><strong>Dirección:</strong> ${escapeHtml(position.center_full_address)}</p>` : ""}
-        ${position.center_phone ? `<p><strong>Teléfono:</strong> ${escapeHtml(position.center_phone)}</p>` : ""}
-      </div>
-    `;
-
-    if (!items.length) {
-      candidatesTableBody.innerHTML = '<tr><td colspan="5" class="muted">No hay candidatos registrados.</td></tr>';
-      return;
-    }
-
-    candidatesTableBody.innerHTML = items.map((row) => `
-      <tr>
-        <td>${escapeHtml(row.row_number ?? "—")}</td>
-        <td>${escapeHtml(row.is_selected ? "Seleccionado" : "Participante")}</td>
-        <td>${escapeHtml(row.full_name || "—")}</td>
-        <td>${escapeHtml(row.petition_text || row.petition_number || "—")}</td>
-        <td>${escapeHtml(row.assigned_position_code || "—")}</td>
-      </tr>
-    `).join("");
-
-    candidatesSection.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function loadPositions() {
@@ -234,20 +208,6 @@
     } catch (error) {
       resultsMetaEl.textContent = error.message;
       tableBody.innerHTML = '<tr><td colspan="8" class="muted">No se pudo cargar el listado.</td></tr>';
-    }
-  }
-
-  async function loadCandidates(positionId) {
-    try {
-      const params = appendOriginParams(new URLSearchParams());
-      const qs = params.toString();
-      const data = await apiGet(`/api/difficult-coverage/positions/${encodeURIComponent(positionId)}/candidates${qs ? `?${qs}` : ""}`);
-      renderCandidates(data.position, data.items || []);
-    } catch (error) {
-      candidatesSection.classList.remove("is-hidden");
-      candidatesMetaEl.textContent = error.message;
-      positionSummaryEl.innerHTML = "";
-      candidatesTableBody.innerHTML = "";
     }
   }
 
