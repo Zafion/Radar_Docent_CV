@@ -15,7 +15,7 @@ OFFICIAL_SECTION_URL = "https://ceice.gva.es/es/web/rrhh-educacion"
 OFFICIAL_RESOLUCION_URL = "https://ceice.gva.es/es/web/rrhh-educacion/resolucion"
 OFFICIAL_ADJUDICACIONES_URL = "https://ceice.gva.es/es/web/rrhh-educacion/adjudicaciones"
 OFFICIAL_ADJUDICACIONES_CONTINUAS_URL = "https://ceice.gva.es/es/web/rrhh-educacion/adjudicaciones-continuas"
-PROJECT_EMAIL = "funkcionarios@gmail.com"
+PROJECT_EMAIL = "zafion+funkcionario@gmail.com"
 PROJECT_OWNER = "Jose Luis Montañana Llopis"
 PROJECT_LINKEDIN = "https://www.linkedin.com/in/jose-luis-monta%C3%B1ana-llopis-116941172/?lipi=urn%3Ali%3Apage%3Ad_flagship3_feed%3BtjegxX7vR4msI4sRX5YxCQ%3D%3D"
 

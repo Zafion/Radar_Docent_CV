@@ -1,10 +1,10 @@
 [Unit]
-Description=Run funckcionario pipeline periodically
+Description=Run funkcionario pipeline periodically
 
 [Timer]
 OnBootSec=2min
 OnUnitActiveSec=10min
-Unit=funckcionario-pipeline.service
+Unit=funkcionario-pipeline.service
 Persistent=true
 
 [Install]

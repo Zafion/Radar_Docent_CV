@@ -5,7 +5,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="$PROJECT_DIR/.venv/bin/activate"
 LOG_DIR="$PROJECT_DIR/logs"
 LOCK_FILE="/tmp/radar_docent_cv_pipeline.lock"
-ENV_FILE="${RADAR_ENV_FILE:-/etc/funckcionario/funckcionario.env}"
+ENV_FILE="${RADAR_ENV_FILE:-/etc/funkcionario/funkcionario.env}"
 LOCAL_ENV_FILE="$PROJECT_DIR/env.local.sh"
 
 mkdir -p "$LOG_DIR"

@@ -23,7 +23,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--subject",
-        default="mailto:funkcionarios@gmail.com",
+        default="mailto:zafion+funkcionario@gmail.com",
         help="Valor sub para VAPID.",
     )
     parser.add_argument(

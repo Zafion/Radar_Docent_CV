@@ -28,7 +28,7 @@ def _resolve_vapid_private_key(value: str) -> str:
 
 VAPID_PUBLIC_KEY = _read_env("RADAR_PUSH_VAPID_PUBLIC_KEY")
 VAPID_PRIVATE_KEY = _resolve_vapid_private_key(_read_env("RADAR_PUSH_VAPID_PRIVATE_KEY"))
-VAPID_SUBJECT = _read_env("RADAR_PUSH_VAPID_SUBJECT", "mailto:funkcionarios@gmail.com")
+VAPID_SUBJECT = _read_env("RADAR_PUSH_VAPID_SUBJECT", "mailto:zafion+funkcionario@gmail.com")
 
 
 def get_vapid_public_key() -> str:

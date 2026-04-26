@@ -1,5 +1,5 @@
 [Unit]
-Description=funckcionario data pipeline
+Description=funkcionario data pipeline
 After=network.target postgresql.service
 Wants=postgresql.service
 
@@ -8,5 +8,5 @@ Type=oneshot
 User=zafion
 Group=zafion
 WorkingDirectory=/home/zafion/Proyects/Radar_Docent_CV
-EnvironmentFile=/etc/funckcionario/funckcionario.env
+EnvironmentFile=/etc/funkcionario/funkcionario.env
 ExecStart=/home/zafion/Proyects/Radar_Docent_CV/scripts/run_pipeline.sh

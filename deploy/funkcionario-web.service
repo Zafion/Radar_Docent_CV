@@ -1,5 +1,5 @@
 [Unit]
-Description=funckcionario FastAPI web
+Description=funkcionario FastAPI web
 After=network.target postgresql.service
 Wants=postgresql.service
 
@@ -8,7 +8,7 @@ Type=simple
 User=zafion
 Group=zafion
 WorkingDirectory=/home/zafion/Proyects/Radar_Docent_CV
-EnvironmentFile=/etc/funckcionario/funckcionario.env
+EnvironmentFile=/etc/funkcionario/funkcionario.env
 ExecStart=/home/zafion/Proyects/Radar_Docent_CV/scripts/start_web.sh
 Restart=always
 RestartSec=5

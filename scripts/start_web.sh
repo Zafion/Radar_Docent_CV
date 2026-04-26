@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="$PROJECT_DIR/.venv/bin/activate"
-ENV_FILE="${RADAR_ENV_FILE:-/etc/funckcionario/funckcionario.env}"
+ENV_FILE="${RADAR_ENV_FILE:-/etc/funkcionario/funkcionario.env}"
 LOCAL_ENV_FILE="$PROJECT_DIR/env.local.sh"
 
 cd "$PROJECT_DIR"
