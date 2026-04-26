@@ -414,7 +414,8 @@ button { cursor: pointer; }
 
 .site-footer {
   border-top: 1px solid rgba(34, 49, 79, 0.08);
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 -10px 30px rgba(28, 46, 84, 0.05);
   margin-top: 18px;
 }
 .site-footer__inner {

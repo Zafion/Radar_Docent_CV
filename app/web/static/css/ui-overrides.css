@@ -1,0 +1,62 @@
+/* Ajustes visuales globales: cabecera sobre fondo hero y eliminación del naranja. */
+:root {
+  --accent: #225cb4;
+  --accent-dark: #163e7a;
+}
+
+/*
+  La cabecera se superpone al hero para que la transparencia muestre
+  el fondo visual de la página, no el fondo blanco del body.
+*/
+.site-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.hero {
+  margin-top: 0;
+}
+
+.hero__content--landing {
+  padding-top: 106px;
+}
+
+.hero__content--module {
+  padding-top: 104px;
+}
+
+.page-inner .hero__content--module {
+  padding-top: 86px;
+}
+
+.brand__accent {
+  color: #204a99;
+}
+
+.button--primary {
+  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%);
+  box-shadow: 0 8px 24px rgba(34, 92, 180, 0.24);
+}
+
+.button--accent {
+  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%);
+}
+
+@media (max-width: 720px) {
+  .hero__content--landing {
+    padding-top: 96px;
+  }
+
+  .hero__content--module {
+    padding-top: 88px;
+  }
+
+  .page-inner .hero__content--module {
+    padding-top: 76px;
+  }
+}
