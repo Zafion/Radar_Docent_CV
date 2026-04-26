@@ -3,7 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <title>{{ page_title or 'funkcionario.com' }}</title>
+  <meta name="description" content="{{ page_description or 'Consulta de plazas, adjudicaciones y puestos de difícil cobertura docente en la Comunitat Valenciana.' }}">
+  <meta name="robots" content="{{ robots_meta or 'index,follow' }}">
+
+  {% if canonical_url %}
+  <link rel="canonical" href="{{ canonical_url }}">
+  {% endif %}
+
+  <meta property="og:site_name" content="{{ site_name or 'Funkcionario.com' }}">
+  <meta property="og:title" content="{{ page_title or 'funkcionario.com' }}">
+  <meta property="og:description" content="{{ page_description or 'Consulta de plazas, adjudicaciones y puestos de difícil cobertura docente en la Comunitat Valenciana.' }}">
+  <meta property="og:type" content="{{ og_type or 'website' }}">
+  {% if canonical_url %}
+  <meta property="og:url" content="{{ canonical_url }}">
+  {% endif %}
+  {% if og_image_url %}
+  <meta property="og:image" content="{{ og_image_url }}">
+  {% endif %}
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ page_title or 'funkcionario.com' }}">
+  <meta name="twitter:description" content="{{ page_description or 'Consulta de plazas, adjudicaciones y puestos de difícil cobertura docente en la Comunitat Valenciana.' }}">
+  {% if og_image_url %}
+  <meta name="twitter:image" content="{{ og_image_url }}">
+  {% endif %}
+
   <link rel="icon" href="{{ url_for('static', path='img/favicon.ico') }}" sizes="any">
   <link rel="shortcut icon" href="{{ url_for('static', path='img/favicon.ico') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -11,6 +37,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='css/ui-overrides.css') }}">
+
+  {% if seo_json_ld %}
+  <script type="application/ld+json">
+    {{ seo_json_ld | tojson }}
+  </script>
+  {% endif %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
   <header class="site-header">
