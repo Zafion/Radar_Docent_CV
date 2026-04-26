@@ -60,6 +60,21 @@ def offered_positions(request: Request):
     )
 
 
+@router.get("/consulta-persona", response_class=HTMLResponse)
+def person_search(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="person_search.html",
+        context={
+            "active_page": "valencia-docentes",
+            "page_title": "funkcionario.com | Consulta por persona",
+            "official_resolucion_url": OFFICIAL_RESOLUCION_URL,
+            "official_adjudicaciones_url": OFFICIAL_ADJUDICACIONES_URL,
+            "official_adjudicaciones_continuas_url": OFFICIAL_ADJUDICACIONES_CONTINUAS_URL,
+        },
+    )
+
+
 @router.get("/resultado-persona", response_class=HTMLResponse)
 def person_detail(request: Request):
     return TEMPLATES.TemplateResponse(
@@ -73,6 +88,7 @@ def person_detail(request: Request):
             "official_adjudicaciones_continuas_url": OFFICIAL_ADJUDICACIONES_CONTINUAS_URL,
         },
     )
+
 
 @router.get("/quienes-somos", response_class=HTMLResponse)
 def quienes_somos(request: Request):
@@ -142,8 +158,6 @@ def difficult_coverage(request: Request):
     )
 
 
-
-
 @router.get("/resultado-dificil-cobertura", response_class=HTMLResponse)
 def difficult_coverage_candidates_result(request: Request):
     return TEMPLATES.TemplateResponse(
@@ -155,6 +169,7 @@ def difficult_coverage_candidates_result(request: Request):
             "official_adjudicaciones_continuas_url": OFFICIAL_ADJUDICACIONES_CONTINUAS_URL,
         },
     )
+
 
 @router.get("/404", response_class=HTMLResponse)
 def custom_404_preview(request: Request):

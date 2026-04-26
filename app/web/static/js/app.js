@@ -1,26 +1,27 @@
 (function () {
   const latestOffersDateEl = document.getElementById("latest-offers-date");
-  const offersSection = document.getElementById("offers-section");
-  const offersMetaEl = document.getElementById("offers-publication-meta");
-  const offersTableBody = document.getElementById("offers-table-body");
-  const loadLatestOffersButton = document.getElementById("load-latest-offers");
 
   const personSearchForm = document.getElementById("person-search-form");
   const personQueryInput = document.getElementById("person-query");
   const personSearchFeedback = document.getElementById("person-search-feedback");
   const personSearchResults = document.getElementById("person-search-results");
+  const pageFeedback = document.getElementById("page-feedback");
 
   const locationStatusEl = document.getElementById("location-status");
   const useMyLocationButton = document.getElementById("use-my-location");
   const pushToggleButton = document.getElementById("push-toggle-button");
 
   let userOrigin = loadStoredOrigin();
-  let latestOffersDate = null;
+
+  function feedbackTarget() {
+    return personSearchFeedback || pageFeedback;
+  }
 
   function setFeedback(message, isError = false) {
-    if (!personSearchFeedback) return;
-    personSearchFeedback.textContent = message || "";
-    personSearchFeedback.classList.toggle("is-error", Boolean(isError));
+    const target = feedbackTarget();
+    if (!target) return;
+    target.textContent = message || "";
+    target.classList.toggle("is-error", Boolean(isError));
   }
 
   function escapeHtml(value) {
@@ -37,15 +38,6 @@
     const [year, month, day] = dateIso.split("-");
     if (!year || !month || !day) return dateIso;
     return `${day}/${month}/${year}`;
-  }
-
-  function formatDistance(distanceKm) {
-    if (distanceKm === null || distanceKm === undefined || Number.isNaN(Number(distanceKm))) {
-      return (userOrigin.lat === null || userOrigin.lon === null)
-        ? "Activa ubicación"
-        : "—";
-    }
-    return `${Number(distanceKm).toFixed(2)} km`;
   }
 
   function loadStoredOrigin() {
@@ -105,38 +97,6 @@
     });
   }
 
-  function appendOriginParams(params) {
-    if (userOrigin.lat !== null && userOrigin.lon !== null) {
-      params.set("origin_lat", String(userOrigin.lat));
-      params.set("origin_lon", String(userOrigin.lon));
-    }
-    return params;
-  }
-
-  function buildCenterActions(item) {
-    const actions = [];
-
-    if (item.center_code) {
-      actions.push(
-        `<a class="button button--ghost button--xs" href="/centros/${encodeURIComponent(item.center_code)}" target="_blank" rel="noopener noreferrer">Centro</a>`
-      );
-    }
-
-    if (item.center_maps_url) {
-      actions.push(
-        `<a class="button button--ghost button--xs" href="${escapeHtml(item.center_maps_url)}" target="_blank" rel="noopener noreferrer">Mapa</a>`
-      );
-    }
-
-    if (item.center_directions_url) {
-      actions.push(
-        `<a class="button button--ghost button--xs" href="${escapeHtml(item.center_directions_url)}" target="_blank" rel="noopener noreferrer">Ruta</a>`
-      );
-    }
-
-    return actions.join(" ");
-  }
-
   async function apiGet(url) {
     const response = await fetch(url, { headers: { Accept: "application/json" } });
     const data = await response.json().catch(() => ({}));
@@ -152,9 +112,9 @@
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Accept: "application/json"
+        Accept: "application/json",
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -217,7 +177,7 @@
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(keyData.public_key)
+        applicationServerKey: urlBase64ToUint8Array(keyData.public_key),
       });
     }
 
@@ -245,77 +205,10 @@
     try {
       const data = await apiGet("/api/offered-positions?limit=1&order_by=document_date&order_dir=desc");
       const latestItem = data.items?.[0];
-      latestOffersDate = latestItem?.document_date_iso || null;
+      const latestOffersDate = latestItem?.document_date_iso || null;
       latestOffersDateEl.textContent = latestOffersDate ? formatDate(latestOffersDate) : "Sin datos";
-    } catch (error) {
+    } catch (_) {
       latestOffersDateEl.textContent = "No disponible";
-    }
-  }
-
-  function renderOffers(items, documentDate) {
-    if (!offersSection || !offersTableBody || !offersMetaEl) return;
-
-    offersSection.classList.remove("is-hidden");
-    offersMetaEl.textContent = documentDate
-      ? `Publicación más reciente detectada: ${formatDate(documentDate)}`
-      : "No se ha podido determinar la fecha de publicación.";
-
-    if (!items.length) {
-      offersTableBody.innerHTML = '<tr><td colspan="8" class="muted">No hay plazas ofertadas disponibles para la última fecha publicada.</td></tr>';
-      return;
-    }
-
-    offersTableBody.innerHTML = items.map((item) => {
-      const specialty = [item.specialty_code, item.specialty_name].filter(Boolean).join(" - ") || "—";
-      return `
-        <tr>
-          <td>${escapeHtml(formatDate(item.document_date_iso))}</td>
-          <td>${escapeHtml(specialty)}</td>
-          <td>${escapeHtml(item.position_type || "—")}</td>
-          <td>
-            <strong>${escapeHtml(item.center_name || "—")}</strong>
-            ${item.center_full_address ? `<br><span class="muted">${escapeHtml(item.center_full_address)}</span>` : ""}
-            ${item.center_phone ? `<br><span class="muted">Tel: ${escapeHtml(item.center_phone)}</span>` : ""}
-          </td>
-          <td>${escapeHtml(item.locality || "—")}</td>
-          <td>${escapeHtml(item.position_code || "—")}</td>
-          <td>${escapeHtml(formatDistance(item.distance_km))}</td>
-          <td>${buildCenterActions(item)}</td>
-        </tr>
-      `;
-    }).join("");
-  }
-
-  async function loadLatestOffers() {
-    if (!loadLatestOffersButton) return;
-    loadLatestOffersButton.disabled = true;
-    loadLatestOffersButton.textContent = "Cargando...";
-
-    try {
-      if (!latestOffersDate) {
-        const meta = await apiGet("/api/offered-positions?limit=1&order_by=document_date&order_dir=desc");
-        latestOffersDate = meta.items?.[0]?.document_date_iso || null;
-      }
-
-      const params = appendOriginParams(
-        new URLSearchParams({ limit: "50", order_by: "locality", order_dir: "asc" })
-      );
-
-      if (latestOffersDate) {
-        params.set("document_date", latestOffersDate);
-      }
-
-      const data = await apiGet(`/api/offered-positions?${params.toString()}`);
-      renderOffers(data.items || [], latestOffersDate);
-      offersSection?.scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (error) {
-      if (offersTableBody) {
-        offersTableBody.innerHTML = `<tr><td colspan="8" class="muted">${escapeHtml(error.message)}</td></tr>`;
-      }
-      offersSection?.classList.remove("is-hidden");
-    } finally {
-      loadLatestOffersButton.disabled = false;
-      loadLatestOffersButton.textContent = "Ver últimas plazas ofertadas";
     }
   }
 
@@ -345,7 +238,7 @@
         sessionStorage.setItem("radar_docent_selected_person", JSON.stringify({
           normalizedName,
           displayName: button.dataset.displayName || "",
-          selectedAt: new Date().toISOString()
+          selectedAt: new Date().toISOString(),
         }));
 
         window.location.href = "/resultado-persona";
@@ -355,7 +248,7 @@
 
   async function handleSearchSubmit(event) {
     event.preventDefault();
-    if (!personQueryInput) return;
+    if (!personQueryInput || !personSearchResults) return;
 
     const query = personQueryInput.value.trim();
     if (query.length < 2) {
@@ -391,8 +284,6 @@
     }
   });
 
-  updatePushToggleLabel();
-
   pushToggleButton?.addEventListener("click", async () => {
     const originalText = pushToggleButton.textContent;
     pushToggleButton.disabled = true;
@@ -421,7 +312,7 @@
   });
 
   updateLocationStatus();
+  updatePushToggleLabel();
   loadLatestOffersMeta();
-  loadLatestOffersButton?.addEventListener("click", loadLatestOffers);
   personSearchForm?.addEventListener("submit", handleSearchSubmit);
 })();

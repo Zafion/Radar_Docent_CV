@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Consulta por persona · adjudicaciones y difícil cobertura</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">Inicio <span>›</span> Consulta de Plazas y Adjudicaciones Docentes <span>›</span> Consulta por persona</div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>Consulta por persona</h1>
+        <p>Busca coincidencias y abre una ficha completa del resultado seleccionado</p>
+      </div>
+    </div>
+
+    <div class="module-grid">
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🔎</span>
+          <h2>Buscar persona</h2>
+        </div>
+
+        <form id="person-search-form" class="search-form">
+          <label class="sr-only" for="person-query">Nombre y apellidos</label>
+          <div class="search-form__row">
+            <input
+              id="person-query"
+              name="q"
+              type="text"
+              placeholder="Apellido1 Apellido2, Nombre"
+              minlength="2"
+              autocomplete="off"
+            >
+            <button class="button button--accent search-form__button" type="submit">Buscar</button>
+          </div>
+          <p class="search-form__help">Ejemplo: Gómez Valencia, Cristina Lucia</p>
+        </form>
+
+        <div id="person-search-feedback" class="feedback"></div>
+        <div id="person-search-results" class="result-list"></div>
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🧭</span>
+          <h2>Cómo usar esta consulta</h2>
+        </div>
+
+        <p class="panel-card__hint">
+          Introduce al menos dos caracteres del nombre o apellidos. La búsqueda mostrará coincidencias encontradas en adjudicaciones y procedimientos de difícil cobertura.
+        </p>
+        <p class="panel-card__hint">
+          Al pulsar <strong>Ver ficha</strong>, se abrirá una página de resultado con el resumen, histórico disponible y enlaces relacionados. La persona seleccionada se guarda temporalmente en la sesión del navegador.
+        </p>
+        <p class="panel-card__hint">
+          Si necesitas calcular distancias a centros, activa primero tu ubicación desde la página principal de consulta.
+        </p>
+
+        <div class="stack-actions">
+          <a class="button button--ghost button--full" href="/valencia-docentes">
+            Volver a consulta principal
+          </a>
+          <a class="button button--secondary button--full" href="/plazas-ofertadas">
+            Ver últimas plazas ofertadas
+          </a>
+          <a class="button button--secondary button--full" href="/dificil-cobertura">
+            Ver difícil cobertura
+          </a>
+        </div>
+      </article>
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.RADAR_DOCENT_CONFIG = {
+    officialResUrl: {{ official_resolucion_url | tojson }},
+    officialAdjUrl: {{ official_adjudicaciones_url | tojson }}
+  };
+</script>
+<script src="{{ url_for('static', path='js/app.js') }}"></script>
+{% endblock %}

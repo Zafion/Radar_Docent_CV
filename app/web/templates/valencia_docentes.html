@@ -27,11 +27,11 @@
       <article class="panel-card">
         <div class="panel-card__title">
           <span class="panel-card__emoji">📋</span>
-          <h2>Consultar Plazas Ofertadas</h2>
+          <h2>Información y avisos</h2>
         </div>
 
         <p class="panel-card__meta">
-          Última actualización: <strong id="latest-offers-date">Cargando...</strong>
+          Última actualización detectada: <strong id="latest-offers-date">Cargando...</strong>
         </p>
 
         <div class="panel-card__meta">
@@ -39,32 +39,34 @@
         </div>
 
         <div class="stack-actions">
-          <button id="use-my-location" class="button button--ghost button--full" type="button">
-            Usar mi ubicación
-          </button>
-          <p id="location-help" class="panel-card__hint">
-            Activa tu ubicación para ver la distancia aproximada hasta cada centro y abrir rutas directas en Maps. Sin ella, seguirás viendo las plazas y adjudicaciones, pero sin cálculo de cercanía.
+          <p class="panel-card__hint">
+            Activa las alertas para recibir avisos cuando se detecten nuevas publicaciones relevantes: plazas ofertadas, procedimientos de difícil cobertura o nuevas adjudicaciones.
           </p>
-        </div>
-
-        <div class="stack-actions">
-          <a id="view-offered-positions" class="button button--secondary button--full" href="/plazas-ofertadas">
-            Ver últimas plazas ofertadas
-          </a>
-          <a class="button button--ghost button--full" href="/dificil-cobertura">
-            Ver difícil cobertura
-          </a>
           <button id="push-toggle-button" class="button button--ghost button--full" type="button">
             Activar alertas de novedades
           </button>
+        </div>
+
+        <div class="stack-actions">
+          <p id="location-help" class="panel-card__hint">
+            Activa tu ubicación para calcular la distancia aproximada hasta cada centro y abrir rutas directas en Maps. La ubicación se guarda solo en tu navegador.
+          </p>
+          <button id="use-my-location" class="button button--ghost button--full" type="button">
+            Usar mi ubicación
+          </button>
+        </div>
+
+        <div class="stack-actions">
+          <p class="panel-card__hint">
+            La web resume y facilita la consulta, pero la fuente oficial sigue siendo la Conselleria. Usa el enlace oficial para contrastar publicaciones, resoluciones y trámites.
+          </p>
           <a class="button button--ghost button--full" href="{{ official_adjudicaciones_url }}" target="_blank" rel="noopener noreferrer">
             Visitar Conselleria
           </a>
         </div>
 
-        <p class="panel-card__hint">
-          Consulta las últimas plazas ofertadas en una vista completa con filtros y ordenación, o accede a difícil cobertura con opciones de búsqueda y distancia.
-        </p>
+        <div id="page-feedback" class="feedback"></div>
+
         <p class="panel-card__hint">
           La ubicación y las alertas requieren permisos del navegador. Esta web puede utilizar almacenamiento técnico del navegador para funciones como las notificaciones. Consulta la
           <a href="/politica-privacidad">Política de Privacidad</a>
@@ -76,30 +78,27 @@
       <article class="panel-card">
         <div class="panel-card__title">
           <span class="panel-card__emoji">🔎</span>
-          <h2>Consultar por Persona</h2>
+          <h2>Consulta</h2>
         </div>
 
-        <form id="person-search-form" class="search-form">
-          <label class="sr-only" for="person-query">Nombre y apellidos</label>
-          <div class="search-form__row">
-            <input
-              id="person-query"
-              name="q"
-              type="text"
-              placeholder="Apellido1 Apellido2, Nombre"
-              minlength="2"
-              autocomplete="off"
-            >
-            <button class="button button--accent search-form__button" type="submit">Buscar</button>
-          </div>
-          <p class="search-form__help">Ejemplo: Gómez Valencia, Cristina Lucia</p>
-        </form>
+        <p class="panel-card__hint">
+          Elige qué quieres consultar. Cada opción abre una página específica con filtros, resultados y detalle ampliado.
+        </p>
 
-        <div id="person-search-feedback" class="feedback"></div>
-        <div id="person-search-results" class="result-list"></div>
+        <div class="stack-actions">
+          <a id="view-offered-positions" class="button button--secondary button--full" href="/plazas-ofertadas">
+            Ver últimas plazas ofertadas
+          </a>
+          <a class="button button--secondary button--full" href="/consulta-persona">
+            Consulta por persona
+          </a>
+          <a class="button button--secondary button--full" href="/dificil-cobertura">
+            Ver difícil cobertura
+          </a>
+        </div>
 
         <p class="panel-card__hint">
-          Al abrir una coincidencia se mostrará una ficha completa con resumen, histórico de adjudicaciones y registros de difícil cobertura.
+          Las plazas ofertadas muestran puestos publicados. La consulta por persona permite localizar coincidencias y abrir una ficha completa. Difícil cobertura muestra puestos y candidatos del procedimiento específico.
         </p>
       </article>
     </div>
