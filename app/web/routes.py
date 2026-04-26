@@ -128,7 +128,7 @@ def seo_context(
         "canonical_url": absolute_url(request, path),
         "robots_meta": robots_meta,
         "og_type": page_type,
-        "og_image_url": absolute_url(request, "/static/img/logo.png"),
+        "og_image_url": absolute_url(request, "/static/img/og-image.png"),
         "site_name": "Funkcionario.com",
         "seo_json_ld": json_ld,
     }
