@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Ficha de candidato</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="/valencia-docentes">Consulta de Plazas y Adjudicaciones Docentes</a>
+    <span>›</span>
+    Perfil por persona
+  </div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1 id="person-title">Perfil por persona</h1>
+        <p id="person-subtitle">Cargando información...</p>
+      </div>
+      <div class="stack-actions">
+        <button id="person-use-my-location" class="button button--ghost" type="button">
+          Usar mi ubicación
+        </button>
+        <a class="button button--ghost" href="{{ official_adjudicaciones_url }}" target="_blank" rel="noopener noreferrer">
+          Ver adjudicaciones oficiales
+        </a>
+        <a class="button button--ghost" href="{{ official_adjudicaciones_continuas_url }}" target="_blank" rel="noopener noreferrer">
+          Ver difícil cobertura oficial
+        </a>
+      </div>
+    </div>
+
+    <p class="panel-card__hint">
+      Esta ficha reúne el resumen principal, el histórico de adjudicaciones y los registros de difícil cobertura de la persona seleccionada.
+    </p>
+    <p class="panel-card__meta">
+      Ubicación: <strong id="person-location-status">No activada · sin distancia calculada</strong>
+    </p>
+
+    <div id="person-profile-summary" class="content-card">
+      <p>Cargando resumen...</p>
+    </div>
+
+    <div id="person-profile-history" class="content-card section-space--sm">
+      <p>Cargando historial...</p>
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/person_detail.js') }}"></script>
+{% endblock %}

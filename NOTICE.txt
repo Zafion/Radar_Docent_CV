@@ -1,0 +1,4 @@
+Este proyecto consulta y procesa información publicada por fuentes oficiales de
+la Generalitat Valenciana. Dichas fuentes no forman parte de la propiedad
+intelectual del proyecto. Funkcionario.com no es una web oficial ni representa
+a la Generalitat Valenciana.

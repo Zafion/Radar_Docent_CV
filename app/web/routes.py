@@ -60,6 +60,20 @@ def offered_positions(request: Request):
     )
 
 
+@router.get("/resultado-persona", response_class=HTMLResponse)
+def person_detail(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="person_detail.html",
+        context={
+            "active_page": "valencia-docentes",
+            "page_title": "funkcionario.com | Resultado por persona",
+            "official_resolucion_url": OFFICIAL_RESOLUCION_URL,
+            "official_adjudicaciones_url": OFFICIAL_ADJUDICACIONES_URL,
+            "official_adjudicaciones_continuas_url": OFFICIAL_ADJUDICACIONES_CONTINUAS_URL,
+        },
+    )
+
 @router.get("/quienes-somos", response_class=HTMLResponse)
 def quienes_somos(request: Request):
     return TEMPLATES.TemplateResponse(

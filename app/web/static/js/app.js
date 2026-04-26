@@ -9,19 +9,12 @@
   const personQueryInput = document.getElementById("person-query");
   const personSearchFeedback = document.getElementById("person-search-feedback");
   const personSearchResults = document.getElementById("person-search-results");
-  const personProfileSection = document.getElementById("person-profile-section");
-  const personProfileSummary = document.getElementById("person-profile-summary");
-  const personProfileHistory = document.getElementById("person-profile-history");
 
   const locationStatusEl = document.getElementById("location-status");
   const useMyLocationButton = document.getElementById("use-my-location");
   const pushToggleButton = document.getElementById("push-toggle-button");
 
-  let userOrigin = {
-    lat: null,
-    lon: null,
-  };
-
+  let userOrigin = loadStoredOrigin();
   let latestOffersDate = null;
 
   function setFeedback(message, isError = false) {
@@ -55,6 +48,24 @@
     return `${Number(distanceKm).toFixed(2)} km`;
   }
 
+  function loadStoredOrigin() {
+    try {
+      const raw = localStorage.getItem("radar_docent_user_origin");
+      if (!raw) return { lat: null, lon: null };
+      const parsed = JSON.parse(raw);
+      return {
+        lat: typeof parsed.lat === "number" ? parsed.lat : null,
+        lon: typeof parsed.lon === "number" ? parsed.lon : null,
+      };
+    } catch {
+      return { lat: null, lon: null };
+    }
+  }
+
+  function saveStoredOrigin(origin) {
+    localStorage.setItem("radar_docent_user_origin", JSON.stringify(origin));
+  }
+
   function updateLocationStatus() {
     if (!locationStatusEl) return;
 
@@ -74,8 +85,11 @@
     return new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          userOrigin.lat = position.coords.latitude;
-          userOrigin.lon = position.coords.longitude;
+          userOrigin = {
+            lat: position.coords.latitude,
+            lon: position.coords.longitude,
+          };
+          saveStoredOrigin(userOrigin);
           updateLocationStatus();
           resolve(userOrigin);
         },
@@ -123,60 +137,6 @@
     return actions.join(" ");
   }
 
-  function buildStatusPillClass(resultKey) {
-    switch (resultKey) {
-      case "awarded":
-      case "selected_difficult_coverage":
-        return "status-pill status-pill--awarded";
-      case "not_awarded":
-        return "status-pill status-pill--not-awarded";
-      case "deactivated":
-      case "not_participated":
-        return "status-pill status-pill--deactivated";
-      case "participated_without_award":
-        return "status-pill status-pill--participated";
-      case "difficult_coverage_candidate":
-        return "status-pill status-pill--candidate";
-      default:
-        return "status-pill status-pill--info";
-    }
-  }
-
-  function fallbackUserView(profile) {
-    const firstAward = profile.awards?.[0] ?? null;
-    const firstAssignment = firstAward?.assignments?.[0] ?? null;
-
-    if (firstAward?.status === "Adjudicat" && firstAssignment) {
-      return {
-        display_name: profile.person.display_name,
-        current_result: "awarded",
-        current_result_label: "Adjudicado",
-        current_result_message: "Sí tienes una plaza adjudicada en los datos cargados.",
-        latest_scope_label: firstAward.list_scope,
-        latest_specialty_label: [firstAward.specialty_code, firstAward.specialty_name].filter(Boolean).join(" - "),
-        latest_date: firstAward.document_date_iso,
-        assigned_position: firstAssignment.position_code,
-        assigned_center: firstAssignment.center_name,
-        assigned_locality: firstAssignment.locality,
-        recommended_action: "Consulta la resolución oficial y el centro adjudicado para los siguientes pasos administrativos."
-      };
-    }
-
-    return {
-      display_name: profile.person.display_name,
-      current_result: "info",
-      current_result_label: firstAward?.status || "Sin resumen",
-      current_result_message: "Consulta el detalle histórico disponible en la tabla inferior.",
-      latest_scope_label: firstAward?.list_scope || null,
-      latest_specialty_label: [firstAward?.specialty_code, firstAward?.specialty_name].filter(Boolean).join(" - ") || null,
-      latest_date: firstAward?.document_date_iso || null,
-      assigned_position: null,
-      assigned_center: null,
-      assigned_locality: null,
-      recommended_action: null,
-    };
-  }
-
   async function apiGet(url) {
     const response = await fetch(url, { headers: { Accept: "application/json" } });
     const data = await response.json().catch(() => ({}));
@@ -186,7 +146,6 @@
     }
     return data;
   }
-
 
   async function apiJson(url, payload) {
     const response = await fetch(url, {
@@ -302,7 +261,7 @@
       : "No se ha podido determinar la fecha de publicación.";
 
     if (!items.length) {
-            offersTableBody.innerHTML = '<tr><td colspan="8" class="muted">No hay plazas ofertadas disponibles para la última fecha publicada.</td></tr>';
+      offersTableBody.innerHTML = '<tr><td colspan="8" class="muted">No hay plazas ofertadas disponibles para la última fecha publicada.</td></tr>';
       return;
     }
 
@@ -374,156 +333,24 @@
           <h3>${escapeHtml(item.display_name)}</h3>
           <p>${escapeHtml(item.total_records)} registros · ${escapeHtml(item.total_awarded)} adjudicaciones · ${escapeHtml(item.total_difficult_positions)} difícil cobertura</p>
         </div>
-        <button class="button button--secondary" type="button" data-normalized-name="${escapeHtml(item.normalized_name)}">Seleccionar</button>
+        <button class="button button--secondary" type="button" data-person-detail="true" data-normalized-name="${escapeHtml(item.normalized_name)}" data-display-name="${escapeHtml(item.display_name)}">Ver ficha</button>
       </div>
     `).join("");
 
-    personSearchResults.querySelectorAll("button[data-normalized-name]").forEach((button) => {
+    personSearchResults.querySelectorAll("button[data-person-detail]").forEach((button) => {
       button.addEventListener("click", () => {
-        loadPersonProfile(button.dataset.normalizedName);
+        const normalizedName = button.dataset.normalizedName;
+        if (!normalizedName) return;
+
+        sessionStorage.setItem("radar_docent_selected_person", JSON.stringify({
+          normalizedName,
+          displayName: button.dataset.displayName || "",
+          selectedAt: new Date().toISOString()
+        }));
+
+        window.location.href = "/resultado-persona";
       });
     });
-  }
-
-  function renderProfile(profile) {
-    if (!personProfileSection || !personProfileSummary || !personProfileHistory) return;
-
-    const userView = profile.user_view || fallbackUserView(profile);
-    const latestAwardWithId = (profile.awards || []).find((award) => award?.id);
-
-    personProfileSection.classList.remove("is-hidden");
-
-    personProfileSummary.innerHTML = `
-      <div class="status-card">
-        <span class="${buildStatusPillClass(userView.current_result)}">${escapeHtml(userView.current_result_label || 'Estado')}</span>
-        <div>
-          <h3>${escapeHtml(userView.display_name || profile.person.display_name)}</h3>
-          <p>${escapeHtml(userView.current_result_message || '')}</p>
-        </div>
-        <div class="status-grid">
-          <div class="status-grid__item"><span>Última fecha</span><strong>${escapeHtml(formatDate(userView.latest_date))}</strong></div>
-          <div class="status-grid__item"><span>Ámbito</span><strong>${escapeHtml(userView.latest_scope_label || '—')}</strong></div>
-          <div class="status-grid__item"><span>Especialidad</span><strong>${escapeHtml(userView.latest_specialty_label || '—')}</strong></div>
-          <div class="status-grid__item"><span>Centro / localidad</span><strong>${escapeHtml([userView.assigned_center, userView.assigned_locality].filter(Boolean).join(' · ') || '—')}</strong></div>
-          <div class="status-grid__item"><span>Distancia</span><strong>${escapeHtml(formatDistance(userView.assigned_distance_km))}</strong></div>        </div>
-                  ${userView.assigned_center_address ? `<p><strong>Dirección:</strong> ${escapeHtml(userView.assigned_center_address)}</p>` : ''}
-        ${userView.assigned_center_phone ? `<p><strong>Teléfono:</strong> ${escapeHtml(userView.assigned_center_phone)}</p>` : ''}
-        ${(userView.assigned_center_maps_url || userView.assigned_center_directions_url || userView.assigned_center_code) ? `
-          <p class="stack-actions">
-            ${userView.assigned_center_code ? `<a class="button button--ghost button--xs" href="/centros/${encodeURIComponent(userView.assigned_center_code)}" target="_blank" rel="noopener noreferrer">Centro</a>` : ''}
-            ${userView.assigned_center_maps_url ? `<a class="button button--ghost button--xs" href="${escapeHtml(userView.assigned_center_maps_url)}" target="_blank" rel="noopener noreferrer">Mapa</a>` : ''}
-            ${userView.assigned_center_directions_url ? `<a class="button button--ghost button--xs" href="${escapeHtml(userView.assigned_center_directions_url)}" target="_blank" rel="noopener noreferrer">Ruta</a>` : ''}
-          </p>
-        ` : ''}
-                ${latestAwardWithId ? `
-          <p class="stack-actions">
-            <a class="button button--ghost button--xs" href="/adjudicaciones/${encodeURIComponent(latestAwardWithId.id)}" target="_blank" rel="noopener noreferrer">
-              Ver detalle de adjudicación
-            </a>
-          </p>
-        ` : ''}
-        ${userView.recommended_action ? `<p><strong>Siguiente paso orientativo:</strong> ${escapeHtml(userView.recommended_action)}</p>` : ''}
-      </div>
-    `;
-
-    const awardsRows = (profile.awards || []).map((award) => {
-      const firstAssignment = award.assignments?.[0] || null;
-      return `
-        <tr>
-          <td>${escapeHtml(formatDate(award.document_date_iso))}</td>
-          <td>${escapeHtml(award.status || '—')}</td>
-          <td>${escapeHtml([award.specialty_code, award.specialty_name].filter(Boolean).join(' - ') || '—')}</td>
-          <td>${escapeHtml(firstAssignment?.center_name || '—')}</td>
-          <td>${escapeHtml(firstAssignment?.locality || '—')}</td>
-          <td>${escapeHtml(firstAssignment?.position_code || '—')}</td>
-          <td>
-            <a class="button button--ghost button--xs" href="/adjudicaciones/${encodeURIComponent(award.id)}" target="_blank" rel="noopener noreferrer">
-              Detalle
-            </a>
-          </td>
-        </tr>
-      `;
-    }).join("") || '<tr><td colspan="7" class="muted">No hay adjudicaciones registradas.</td></tr>';
-
-    const difficultRows = (profile.difficult_coverage || []).map((row) => `
-      <tr>
-        <td>${escapeHtml(formatDate(row.document_date_iso))}</td>
-        <td>${escapeHtml(row.is_selected ? 'Seleccionado' : 'Participante')}</td>
-        <td>${escapeHtml([row.specialty_code, row.specialty_name].filter(Boolean).join(' - ') || '—')}</td>
-        <td>${escapeHtml(row.center_name || '—')}</td>
-        <td>${escapeHtml(row.locality || '—')}</td>
-        <td>${escapeHtml(row.assigned_position_code || row.position_code || '—')}</td>
-      </tr>
-    `).join("") || '<tr><td colspan="7" class="muted">No hay registros de difícil cobertura.</td></tr>';
-
-    personProfileHistory.innerHTML = `
-      <div class="content-card section-space--sm">
-        <div class="content-card__header">
-          <div>
-            <h3>Histórico de adjudicaciones</h3>
-            <p>Detalle técnico de las adjudicaciones registradas.</p>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Estado</th>
-                <th>Especialidad</th>
-                <th>Centro</th>
-                <th>Localidad</th>
-                <th>Código puesto</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>${awardsRows}</tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="content-card section-space--sm">
-        <div class="content-card__header">
-          <div>
-            <h3>Difícil cobertura</h3>
-            <p>Participaciones y selecciones registradas.</p>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Resultado</th>
-                <th>Especialidad</th>
-                <th>Centro</th>
-                <th>Localidad</th>
-                <th>Puesto</th>
-              </tr>
-            </thead>
-            <tbody>${difficultRows}</tbody>
-          </table>
-        </div>
-      </div>
-    `;
-
-    personProfileSection.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  updateLocationStatus();
-
-  async function loadPersonProfile(normalizedName) {
-    if (!normalizedName) return;
-
-    setFeedback("Cargando perfil...");
-    try {
-      const params = appendOriginParams(new URLSearchParams({ normalized_name: normalizedName }));
-      const data = await apiGet(`/api/persons/profile?${params.toString()}`);
-      setFeedback("");
-      renderProfile(data);
-    } catch (error) {
-      setFeedback(error.message, true);
-    }
   }
 
   async function handleSearchSubmit(event) {
@@ -541,14 +368,14 @@
 
     try {
       const data = await apiGet(`/api/search/persons?q=${encodeURIComponent(query)}&limit=10`);
-      setFeedback(data.count ? "Selecciona una coincidencia para ver el detalle." : "");
+      setFeedback(data.count ? "Abre la ficha completa de la coincidencia que te interese." : "");
       renderSearchResults(data.items || []);
     } catch (error) {
       setFeedback(error.message, true);
     }
   }
 
-    useMyLocationButton?.addEventListener("click", async () => {
+  useMyLocationButton?.addEventListener("click", async () => {
     const originalText = useMyLocationButton.textContent;
     useMyLocationButton.disabled = true;
     useMyLocationButton.textContent = "Obteniendo ubicación...";
@@ -593,6 +420,7 @@
     }
   });
 
+  updateLocationStatus();
   loadLatestOffersMeta();
   loadLatestOffersButton?.addEventListener("click", loadLatestOffers);
   personSearchForm?.addEventListener("submit", handleSearchSubmit);
