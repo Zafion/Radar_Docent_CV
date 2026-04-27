@@ -9,11 +9,14 @@
 
   const locationStatusEl = document.getElementById("op-location-status");
   const useMyLocationButton = document.getElementById("op-use-my-location");
+  const clearLocationButton = document.getElementById("op-clear-location");
 
   const resultsMetaEl = document.getElementById("op-results-meta");
   const tableBody = document.getElementById("op-table-body");
 
   let latestOffersDate = null;
+  const LOCATION_STORAGE_KEY = "radar_docent_user_origin";
+
   let userOrigin = loadStoredOrigin();
 
   function escapeHtml(value) {
@@ -43,29 +46,84 @@
 
   function loadStoredOrigin() {
     try {
-      const raw = localStorage.getItem("radar_docent_user_origin");
+      const raw = localStorage.getItem(LOCATION_STORAGE_KEY);
       if (!raw) return { lat: null, lon: null };
+
       const parsed = JSON.parse(raw);
-      return {
-        lat: typeof parsed.lat === "number" ? parsed.lat : null,
-        lon: typeof parsed.lon === "number" ? parsed.lon : null,
-      };
+      const lat = Number(parsed.lat);
+      const lon = Number(parsed.lon);
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        localStorage.removeItem(LOCATION_STORAGE_KEY);
+        return { lat: null, lon: null };
+      }
+
+      return { lat, lon };
     } catch {
       return { lat: null, lon: null };
     }
   }
 
+  function hasUserOrigin() {
+    return Number.isFinite(userOrigin.lat) && Number.isFinite(userOrigin.lon);
+  }
+
   function saveStoredOrigin(origin) {
-    localStorage.setItem("radar_docent_user_origin", JSON.stringify(origin));
+    localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(origin));
+  }
+
+  function clearStoredOrigin() {
+    try {
+      localStorage.removeItem(LOCATION_STORAGE_KEY);
+    } catch (_) {
+      // No hay nada que hacer si el navegador impide modificar localStorage.
+    }
+
+    userOrigin = { lat: null, lon: null };
+    updateLocationStatus();
+  }
+
+  function locationButtonText() {
+    return hasUserOrigin() ? "Actualizar ubicación" : "Usar mi ubicación";
+  }
+
+  function updateLocationButtonState() {
+    if (useMyLocationButton) {
+      if (!navigator.geolocation) {
+        useMyLocationButton.textContent = "Ubicación no disponible";
+        useMyLocationButton.disabled = true;
+      } else {
+        useMyLocationButton.textContent = locationButtonText();
+        useMyLocationButton.classList.toggle("is-active", hasUserOrigin());
+      }
+    }
+
+    if (typeof clearLocationButton !== "undefined" && clearLocationButton) {
+      clearLocationButton.disabled = !hasUserOrigin();
+      clearLocationButton.classList.toggle("is-hidden", !hasUserOrigin());
+    }
   }
 
   function updateLocationStatus() {
-    if (!locationStatusEl) return;
-    if (userOrigin.lat !== null && userOrigin.lon !== null) {
-      locationStatusEl.textContent = `Activa (${userOrigin.lat.toFixed(4)}, ${userOrigin.lon.toFixed(4)})`;
-      return;
+    if (locationStatusEl) {
+      locationStatusEl.classList.toggle("location-status--active", hasUserOrigin());
+
+      if (hasUserOrigin()) {
+        locationStatusEl.textContent = `Activa · distancia disponible (${userOrigin.lat.toFixed(4)}, ${userOrigin.lon.toFixed(4)})`;
+      } else {
+        locationStatusEl.textContent = "No activada · sin distancia calculada";
+      }
     }
-    locationStatusEl.textContent = "No activada · sin distancia calculada";
+
+    updateLocationButtonState();
+  }
+
+  function geolocationErrorMessage(error) {
+    if (!error) return "No se pudo obtener tu ubicación.";
+    if (error.code === 1) return "Permiso de ubicación denegado. Revisa los permisos del navegador para funkcionario.com.";
+    if (error.code === 2) return "No se pudo determinar la ubicación del dispositivo.";
+    if (error.code === 3) return "La ubicación ha tardado demasiado. Prueba de nuevo.";
+    return error.message || "No se pudo obtener tu ubicación.";
   }
 
   async function ensureUserLocation() {
@@ -76,26 +134,31 @@
     return new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          userOrigin = {
-            lat: position.coords.latitude,
-            lon: position.coords.longitude,
-          };
+          const lat = Number(position.coords.latitude);
+          const lon = Number(position.coords.longitude);
+
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            reject(new Error("El navegador devolvió una ubicación no válida."));
+            return;
+          }
+
+          userOrigin = { lat, lon };
           saveStoredOrigin(userOrigin);
           updateLocationStatus();
           resolve(userOrigin);
         },
-        () => reject(new Error("No se pudo obtener tu ubicación.")),
+        (error) => reject(new Error(geolocationErrorMessage(error))),
         {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000,
+          enableHighAccuracy: false,
+          timeout: 15000,
+          maximumAge: 600000,
         }
       );
     });
   }
 
   function appendOriginParams(params) {
-    if (userOrigin.lat !== null && userOrigin.lon !== null) {
+    if (hasUserOrigin()) {
       params.set("origin_lat", String(userOrigin.lat));
       params.set("origin_lon", String(userOrigin.lon));
     }
@@ -217,18 +280,35 @@
   latestOnlyInput?.addEventListener("change", loadPositions);
 
   useMyLocationButton?.addEventListener("click", async () => {
-    const originalText = useMyLocationButton.textContent;
     useMyLocationButton.disabled = true;
     useMyLocationButton.textContent = "Obteniendo ubicación...";
+
     try {
       await ensureUserLocation();
+
+      if (orderInput) {
+        orderInput.value = "distance:asc";
+      }
+
+      resultsMetaEl.textContent = "Ubicación activada. Ordenando por distancia...";
       await loadPositions();
     } catch (error) {
       resultsMetaEl.textContent = error.message;
     } finally {
       useMyLocationButton.disabled = false;
-      useMyLocationButton.textContent = originalText;
+      updateLocationStatus();
     }
+  });
+
+  clearLocationButton?.addEventListener("click", async () => {
+    clearStoredOrigin();
+
+    if (orderInput?.value?.startsWith("distance:")) {
+      orderInput.value = "document_date:desc";
+    }
+
+    resultsMetaEl.textContent = "Ubicación borrada. Mostrando resultados sin distancia.";
+    await loadPositions();
   });
 
   updateLocationStatus();

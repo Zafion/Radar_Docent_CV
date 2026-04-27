@@ -804,3 +804,25 @@ button { cursor: pointer; }
     min-width: 0;
   }
 }
+
+
+/* Estado visual de geolocalización */
+.is-hidden {
+  display: none !important;
+}
+
+.button.is-active {
+  color: #19613b;
+  background: rgba(26, 148, 79, 0.12);
+  border-color: rgba(26, 148, 79, 0.22);
+}
+
+.location-status--active {
+  color: #19613b;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+  transform: none;
+}
