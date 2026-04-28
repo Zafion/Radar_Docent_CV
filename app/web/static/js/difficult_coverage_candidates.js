@@ -232,17 +232,17 @@
     if (metaEl) metaEl.textContent = `${total} candidatos registrados`;
 
     if (!items.length) {
-      tableBody.innerHTML = '<tr><td colspan="5" class="muted">No hay candidatos registrados.</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="5" class="muted data-table__empty">No hay candidatos registrados.</td></tr>';
       return;
     }
 
     tableBody.innerHTML = items.map((row) => `
       <tr>
-        <td>${escapeHtml(row.row_number ?? "—")}</td>
-        <td>${escapeHtml(row.is_selected ? "Seleccionado" : "Participante")}</td>
-        <td>${escapeHtml(row.full_name || "—")}</td>
-        <td>${escapeHtml(row.petition_text || row.petition_number || "—")}</td>
-        <td>${escapeHtml(row.assigned_position_code || "—")}</td>
+        <td data-label="Fila">${escapeHtml(row.row_number ?? "—")}</td>
+        <td data-label="Resultado">${escapeHtml(row.is_selected ? "Seleccionado" : "Participante")}</td>
+        <td data-label="Nombre">${escapeHtml(row.full_name || "—")}</td>
+        <td data-label="Petición">${escapeHtml(row.petition_text || row.petition_number || "—")}</td>
+        <td data-label="Puesto asignado">${escapeHtml(row.assigned_position_code || "—")}</td>
       </tr>
     `).join("");
   }

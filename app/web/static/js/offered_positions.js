@@ -223,7 +223,7 @@
     resultsMetaEl.textContent = `${total} plazas encontradas${latestLabel}`;
 
     if (!items.length) {
-      tableBody.innerHTML = '<tr><td colspan="8" class="muted">No hay plazas para los filtros actuales.</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="8" class="muted data-table__empty">No hay plazas para los filtros actuales.</td></tr>';
       return;
     }
 
@@ -231,18 +231,18 @@
       const specialty = [item.specialty_code, item.specialty_name].filter(Boolean).join(" - ") || "—";
       return `
         <tr>
-          <td>${escapeHtml(formatDate(item.document_date_iso))}</td>
-          <td>${escapeHtml(specialty)}</td>
-          <td>${escapeHtml(item.position_type || "—")}</td>
-          <td>
+          <td data-label="Fecha">${escapeHtml(formatDate(item.document_date_iso))}</td>
+          <td data-label="Especialidad">${escapeHtml(specialty)}</td>
+          <td data-label="Tipo">${escapeHtml(item.position_type || "—")}</td>
+          <td data-label="Centro">
             <strong>${escapeHtml(item.center_name || "—")}</strong>
             ${item.center_full_address ? `<br><span class="muted">${escapeHtml(item.center_full_address)}</span>` : ""}
             ${item.center_phone ? `<br><span class="muted">Tel: ${escapeHtml(item.center_phone)}</span>` : ""}
           </td>
-          <td>${escapeHtml(item.locality || "—")}</td>
-          <td>${escapeHtml(item.position_code || "—")}</td>
-          <td>${escapeHtml(formatDistance(item.distance_km))}</td>
-          <td>${buildCenterActions(item)}</td>
+          <td data-label="Localidad">${escapeHtml(item.locality || "—")}</td>
+          <td data-label="Código">${escapeHtml(item.position_code || "—")}</td>
+          <td data-label="Distancia">${escapeHtml(formatDistance(item.distance_km))}</td>
+          <td data-label="Acciones" class="data-table__actions">${buildCenterActions(item)}</td>
         </tr>
       `;
     }).join("");
@@ -253,7 +253,7 @@
       const { orderBy, orderDir } = parseOrderValue();
       if (orderBy === "distance" && (userOrigin.lat === null || userOrigin.lon === null)) {
         resultsMetaEl.textContent = "Activa tu ubicación para ordenar por distancia.";
-        tableBody.innerHTML = '<tr><td colspan="8" class="muted">Activa tu ubicación para ordenar por distancia.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="8" class="muted data-table__empty">Activa tu ubicación para ordenar por distancia.</td></tr>';
         return;
       }
 
@@ -268,7 +268,7 @@
       renderPositions(data.items || [], data.total || 0);
     } catch (error) {
       resultsMetaEl.textContent = error.message;
-      tableBody.innerHTML = '<tr><td colspan="8" class="muted">No se pudo cargar el listado.</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="8" class="muted data-table__empty">No se pudo cargar el listado.</td></tr>';
     }
   }
 

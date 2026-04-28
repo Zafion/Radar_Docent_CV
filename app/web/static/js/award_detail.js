@@ -206,16 +206,16 @@
 
     const rows = assignments.map((item) => `
       <tr>
-        <td>${escapeHtml(item.assignment_kind || "—")}</td>
-        <td>
+        <td data-label="Tipo">${escapeHtml(item.assignment_kind || "—")}</td>
+        <td data-label="Centro">
           <strong>${escapeHtml(item.center_name || "—")}</strong>
           ${item.center_full_address ? `<br><span class="muted">${escapeHtml(item.center_full_address)}</span>` : ""}
           ${item.center_phone ? `<br><span class="muted">Tel: ${escapeHtml(item.center_phone)}</span>` : ""}
         </td>
-        <td>${escapeHtml(item.locality || "—")}</td>
-        <td>${escapeHtml(item.position_code || "—")}</td>
-        <td>${escapeHtml(formatDistance(item.distance_km))}</td>
-        <td>
+        <td data-label="Localidad">${escapeHtml(item.locality || "—")}</td>
+        <td data-label="Puesto">${escapeHtml(item.position_code || "—")}</td>
+        <td data-label="Distancia">${escapeHtml(formatDistance(item.distance_km))}</td>
+        <td data-label="Acciones" class="data-table__actions">
           ${item.center_code ? `<a class="button button--ghost button--xs" href="/centros/${encodeURIComponent(item.center_code)}" target="_blank" rel="noopener noreferrer">Centro</a>` : ""}
           ${item.center_maps_url ? `<a class="button button--ghost button--xs" href="${escapeHtml(item.center_maps_url)}" target="_blank" rel="noopener noreferrer">Mapa</a>` : ""}
           ${item.center_directions_url ? `<a class="button button--ghost button--xs" href="${escapeHtml(item.center_directions_url)}" target="_blank" rel="noopener noreferrer">Ruta</a>` : ""}
@@ -231,7 +231,7 @@
         </div>
       </div>
       <div class="table-wrap">
-        <table class="data-table">
+        <table class="data-table data-table--cards">
           <thead>
             <tr>
               <th>Tipo</th>

@@ -286,31 +286,31 @@
       const firstAssignment = award.assignments?.[0] || null;
       return `
         <tr>
-          <td>${escapeHtml(formatDate(award.document_date_iso))}</td>
-          <td>${escapeHtml(award.status || "—")}</td>
-          <td>${escapeHtml([award.specialty_code, award.specialty_name].filter(Boolean).join(" - ") || "—")}</td>
-          <td>${escapeHtml(firstAssignment?.center_name || "—")}</td>
-          <td>${escapeHtml(firstAssignment?.locality || "—")}</td>
-          <td>${escapeHtml(firstAssignment?.position_code || "—")}</td>
-          <td>
+          <td data-label="Fecha">${escapeHtml(formatDate(award.document_date_iso))}</td>
+          <td data-label="Estado">${escapeHtml(award.status || "—")}</td>
+          <td data-label="Especialidad">${escapeHtml([award.specialty_code, award.specialty_name].filter(Boolean).join(" - ") || "—")}</td>
+          <td data-label="Centro">${escapeHtml(firstAssignment?.center_name || "—")}</td>
+          <td data-label="Localidad">${escapeHtml(firstAssignment?.locality || "—")}</td>
+          <td data-label="Código puesto">${escapeHtml(firstAssignment?.position_code || "—")}</td>
+          <td data-label="Acciones" class="data-table__actions">
             <a class="button button--ghost button--xs" href="/adjudicaciones/${encodeURIComponent(award.id)}" target="_blank" rel="noopener noreferrer">
               Detalle
             </a>
           </td>
         </tr>
       `;
-    }).join("") || '<tr><td colspan="7" class="muted">No hay adjudicaciones registradas.</td></tr>';
+    }).join("") || '<tr><td colspan="7" class="muted data-table__empty">No hay adjudicaciones registradas.</td></tr>';
 
     const difficultRows = (profile.difficult_coverage || []).map((row) => `
       <tr>
-        <td>${escapeHtml(formatDate(row.document_date_iso))}</td>
-        <td>${escapeHtml(row.is_selected ? "Seleccionado" : "Participante")}</td>
-        <td>${escapeHtml([row.specialty_code, row.specialty_name].filter(Boolean).join(" - ") || "—")}</td>
-        <td>${escapeHtml(row.center_name || "—")}</td>
-        <td>${escapeHtml(row.locality || "—")}</td>
-        <td>${escapeHtml(row.assigned_position_code || row.position_code || "—")}</td>
+        <td data-label="Fecha">${escapeHtml(formatDate(row.document_date_iso))}</td>
+        <td data-label="Resultado">${escapeHtml(row.is_selected ? "Seleccionado" : "Participante")}</td>
+        <td data-label="Especialidad">${escapeHtml([row.specialty_code, row.specialty_name].filter(Boolean).join(" - ") || "—")}</td>
+        <td data-label="Centro">${escapeHtml(row.center_name || "—")}</td>
+        <td data-label="Localidad">${escapeHtml(row.locality || "—")}</td>
+        <td data-label="Puesto">${escapeHtml(row.assigned_position_code || row.position_code || "—")}</td>
       </tr>
-    `).join("") || '<tr><td colspan="6" class="muted">No hay registros de difícil cobertura.</td></tr>';
+    `).join("") || '<tr><td colspan="6" class="muted data-table__empty">No hay registros de difícil cobertura.</td></tr>';
 
     historyEl.innerHTML = `
       <div class="content-card section-space--sm">
@@ -321,7 +321,7 @@
           </div>
         </div>
         <div class="table-wrap">
-          <table class="data-table">
+          <table class="data-table data-table--cards">
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -346,7 +346,7 @@
           </div>
         </div>
         <div class="table-wrap">
-          <table class="data-table">
+          <table class="data-table data-table--cards">
             <thead>
               <tr>
                 <th>Fecha</th>
