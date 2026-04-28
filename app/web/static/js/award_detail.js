@@ -104,7 +104,7 @@
       locationStatusEl.classList.toggle("location-status--active", hasUserOrigin());
 
       if (hasUserOrigin()) {
-        locationStatusEl.textContent = `Activa · distancia disponible (${userOrigin.lat.toFixed(4)}, ${userOrigin.lon.toFixed(4)})`;
+        locationStatusEl.textContent = "Activa · distancia disponible";
       } else {
         locationStatusEl.textContent = "No activada · sin distancia calculada";
       }
