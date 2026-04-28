@@ -18,6 +18,8 @@
   const LOCATION_STORAGE_KEY = "radar_docent_user_origin";
 
   let userOrigin = loadStoredOrigin();
+  const FILTER_OPTIONS_PAGE_LIMIT = "100";
+  const FILTER_OPTIONS_MAX_ITEMS = 2000;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -175,6 +177,134 @@
     return data;
   }
 
+
+  function normalizeFilterText(value) {
+    return String(value ?? "").trim();
+  }
+
+  function sortFilterOptions(options) {
+    return options.sort((a, b) => a.label.localeCompare(b.label, "es", { numeric: true, sensitivity: "base" }));
+  }
+
+  function buildUniqueOptions(items, valueGetter, labelGetter) {
+    const optionMap = new Map();
+
+    items.forEach((item) => {
+      const value = normalizeFilterText(valueGetter(item));
+      if (!value) return;
+
+      const label = normalizeFilterText(labelGetter(item)) || value;
+      if (!optionMap.has(value)) {
+        optionMap.set(value, label);
+      }
+    });
+
+    return sortFilterOptions(
+      Array.from(optionMap, ([value, label]) => ({ value, label }))
+    );
+  }
+
+  function setSelectOptions(selectEl, placeholder, options) {
+    if (!selectEl) return;
+
+    const currentValue = selectEl.value;
+    selectEl.innerHTML = [
+      `<option value="">${escapeHtml(placeholder)}</option>`,
+      ...options.map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`),
+    ].join("");
+
+    const stillAvailable = Array.from(selectEl.options).some((option) => option.value === currentValue);
+    selectEl.value = stillAvailable ? currentValue : "";
+  }
+
+  function specialtyOptionValue(item) {
+    const code = normalizeFilterText(item.specialty_code);
+    const name = normalizeFilterText(item.specialty_name);
+
+    if (code) return `code:${code}`;
+    if (name) return `name:${name}`;
+    return "";
+  }
+
+  function specialtyOptionLabel(item) {
+    const code = normalizeFilterText(item.specialty_code);
+    const name = normalizeFilterText(item.specialty_name);
+    return [code, name].filter(Boolean).join(" - ") || name || code;
+  }
+
+  function appendSpecialtyFilter(params, selectedValue) {
+    const value = normalizeFilterText(selectedValue);
+    if (!value) return params;
+
+    if (value.startsWith("name:")) {
+      params.set("specialty_name", value.slice(5));
+      return params;
+    }
+
+    if (value.startsWith("code:")) {
+      params.set("specialty_code", value.slice(5));
+      return params;
+    }
+
+    params.set("specialty_code", value);
+    return params;
+  }
+
+  async function fetchFilterOptionItems(endpoint, params) {
+    const allItems = [];
+    let offset = 0;
+    let total = null;
+
+    while (allItems.length < FILTER_OPTIONS_MAX_ITEMS) {
+      const pageParams = new URLSearchParams(params);
+      pageParams.set("limit", FILTER_OPTIONS_PAGE_LIMIT);
+      pageParams.set("offset", String(offset));
+
+      const data = await apiGet(`${endpoint}?${pageParams.toString()}`);
+      const pageItems = data.items || [];
+      total = Number.isFinite(Number(data.total)) ? Number(data.total) : total;
+
+      allItems.push(...pageItems);
+
+      if (!pageItems.length || pageItems.length < Number(FILTER_OPTIONS_PAGE_LIMIT)) break;
+      offset += Number(FILTER_OPTIONS_PAGE_LIMIT);
+      if (total !== null && offset >= total) break;
+    }
+
+    return allItems;
+  }
+
+  async function loadFilterOptions() {
+    const params = new URLSearchParams({
+      order_by: "document_date",
+      order_dir: "desc",
+    });
+
+    if (latestOnlyInput?.checked && latestOffersDate) {
+      params.set("document_date", latestOffersDate);
+    }
+
+    const items = await fetchFilterOptionItems("/api/offered-positions", params);
+
+    setSelectOptions(
+      localityInput,
+      "Todas las localidades",
+      buildUniqueOptions(items, (item) => item.locality, (item) => item.locality)
+    );
+
+    setSelectOptions(
+      specialtyCodeInput,
+      "Todas las especialidades",
+      buildUniqueOptions(items, specialtyOptionValue, specialtyOptionLabel)
+    );
+
+    setSelectOptions(
+      positionTypeInput,
+      "Todos los tipos",
+      buildUniqueOptions(items, (item) => item.position_type, (item) => item.position_type)
+    );
+  }
+
   function parseOrderValue() {
     const [orderBy, orderDir] = (orderInput?.value || "document_date:desc").split(":");
     return { orderBy, orderDir };
@@ -261,7 +391,7 @@
 
       if (latestOnlyInput.checked && latestOffersDate) params.set("document_date", latestOffersDate);
       if (localityInput.value.trim()) params.set("locality", localityInput.value.trim());
-      if (specialtyCodeInput.value.trim()) params.set("specialty_code", specialtyCodeInput.value.trim());
+      appendSpecialtyFilter(params, specialtyCodeInput.value);
       if (positionTypeInput.value) params.set("position_type", positionTypeInput.value);
 
       const data = await apiGet(`/api/offered-positions?${params.toString()}`);
@@ -277,7 +407,12 @@
     await loadPositions();
   });
 
-  latestOnlyInput?.addEventListener("change", loadPositions);
+  latestOnlyInput?.addEventListener("change", async () => {
+    await loadFilterOptions().catch((error) => {
+      resultsMetaEl.textContent = `No se pudieron actualizar los filtros: ${error.message}`;
+    });
+    await loadPositions();
+  });
 
   useMyLocationButton?.addEventListener("click", async () => {
     useMyLocationButton.disabled = true;
@@ -312,5 +447,10 @@
   });
 
   updateLocationStatus();
-  loadLatestOffersMeta().then(loadPositions);
+  loadLatestOffersMeta().then(async () => {
+    await loadFilterOptions().catch((error) => {
+      resultsMetaEl.textContent = `No se pudieron cargar los filtros: ${error.message}`;
+    });
+    await loadPositions();
+  });
 })();

@@ -272,20 +272,6 @@ def enrich_center_geo_fields(
     return item
 
 
-
-def sort_items_by_distance(items: list[dict[str, Any]], order_dir: str) -> list[dict[str, Any]]:
-    descending = order_dir.lower() == "desc"
-
-    def distance_key(item: dict[str, Any]) -> tuple[int, float]:
-        distance = item.get("distance_km")
-        if distance is None:
-            return (1, 0.0)
-        distance_value = float(distance)
-        return (0, -distance_value if descending else distance_value)
-
-    return sorted(items, key=distance_key)
-
-
 def center_row_to_payload(
     row: dict[str, Any],
     origin_lat: float | None = None,
@@ -1040,11 +1026,7 @@ def list_awards(
 
 
 @app.get("/api/awards/{award_result_id}")
-def get_award_detail(
-    award_result_id: int,
-    origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
-    origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
-) -> dict[str, Any]:
+def get_award_detail(award_result_id: int) -> dict[str, Any]:
     with get_connection() as conn:
         _register_normalize_function(conn)
         award = conn.execute(
@@ -1104,31 +1086,15 @@ def get_award_detail(
                     op.center_name AS matched_center_name,
                     op.specialty_code AS matched_specialty_code,
                     op.specialty_name AS matched_specialty_name,
-                    op.observations AS matched_observations,
-
-                    c.denomination AS center_catalog_name,
-                    c.regime AS center_regime,
-                    c.full_address AS center_full_address,
-                    c.postal_code AS center_postal_code,
-                    c.comarca AS center_comarca,
-                    c.phone AS center_phone,
-                    c.fax AS center_fax,
-                    c.latitude AS center_latitude,
-                    c.longitude AS center_longitude
+                    op.observations AS matched_observations
                 FROM award_assignments aa
                 LEFT JOIN offered_positions op ON op.id = aa.matched_offered_position_id
-                LEFT JOIN centers c ON c.center_code = aa.center_code
                 WHERE aa.award_result_id = ?
                 ORDER BY aa.id ASC
                 """,
                 [award_result_id],
             ).fetchall()
         )
-
-    assignments = [
-        enrich_center_geo_fields(item, origin_lat, origin_lon)
-        for item in assignments
-    ]
 
     return {"award": dict(award), "assignments": assignments}
 
@@ -1143,6 +1109,7 @@ def list_offered_positions(
     document_date: str | None = None,
     body_code: str | None = None,
     specialty_code: str | None = None,
+    specialty_name: str | None = None,
     province: str | None = None,
     locality: str | None = None,
     center_code: str | None = None,
@@ -1177,6 +1144,9 @@ def list_offered_positions(
     if specialty_code:
         where.append("op.specialty_code = ?")
         params.append(specialty_code)
+    if specialty_name:
+        where.append("normalize_text(op.specialty_name) = normalize_text(?)")
+        params.append(specialty_name)
     if province:
         where.append("op.province = ?")
         params.append(province)
@@ -1198,11 +1168,7 @@ def list_offered_positions(
         where.append("EXISTS (SELECT 1 FROM award_assignments aa WHERE aa.matched_offered_position_id = op.id)")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
-    should_sort_by_distance = order_by == "distance" and origin_lat is not None and origin_lon is not None
-    order_sql = "" if should_sort_by_distance else build_order_by(order_by, order_dir, ALLOWED_OFFERED_ORDER_FIELDS, "d.document_date_iso")
-    limit_sql = "" if should_sort_by_distance else " LIMIT ? OFFSET ? "
-    query_params = params if should_sort_by_distance else [*params, limit, offset]
-
+    order_sql = build_order_by(order_by, order_dir, ALLOWED_OFFERED_ORDER_FIELDS, "d.document_date_iso")
     base_sql = f"""
         FROM offered_positions op
         JOIN documents d ON d.id = op.document_id
@@ -1254,19 +1220,15 @@ def list_offered_positions(
         """
         + base_sql
         + order_sql
-        + limit_sql
+        + " LIMIT ? OFFSET ? "
     )
     count_sql = "SELECT COUNT(*) " + base_sql
 
     with get_connection() as conn:
         _register_normalize_function(conn)
         total = conn.execute(count_sql, params).fetchone()[0]
-        items = rows_to_dicts(conn.execute(items_sql, query_params).fetchall())
-
+        items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
     items = [enrich_center_geo_fields(item, origin_lat, origin_lon) for item in items]
-
-    if should_sort_by_distance:
-        items = sort_items_by_distance(items, order_dir)[offset: offset + limit]
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
@@ -1279,12 +1241,11 @@ def list_difficult_positions(
     document_date: str | None = None,
     body_code: str | None = None,
     specialty_code: str | None = None,
+    specialty_name: str | None = None,
     locality: str | None = None,
     center_code: str | None = None,
     position_code: str | None = None,
     selected_only: bool | None = Query(None, description="True = solo puestos con al menos una persona seleccionada"),
-    origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
-    origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
     order_by: str = Query("document_date"),
     order_dir: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
@@ -1305,6 +1266,9 @@ def list_difficult_positions(
     if specialty_code:
         where.append("p.specialty_code = ?")
         params.append(specialty_code)
+    if specialty_name:
+        where.append("normalize_text(p.specialty_name) = normalize_text(?)")
+        params.append(specialty_name)
     if locality:
         where.append("normalize_text(p.locality) LIKE normalize_text(?)")
         params.append(f"%{locality}%")
@@ -1320,16 +1284,12 @@ def list_difficult_positions(
         where.append("NOT EXISTS (SELECT 1 FROM difficult_coverage_candidates dc WHERE dc.position_id = p.id AND dc.is_selected IS TRUE)")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
-    should_sort_by_distance = order_by == "distance" and origin_lat is not None and origin_lon is not None
-    order_sql = "" if should_sort_by_distance else build_order_by(order_by, order_dir, ALLOWED_DIFFICULT_ORDER_FIELDS, "d.document_date_iso")
-    limit_sql = "" if should_sort_by_distance else " LIMIT ? OFFSET ? "
-    query_params = params if should_sort_by_distance else [*params, limit, offset]
+    order_sql = build_order_by(order_by, order_dir, ALLOWED_DIFFICULT_ORDER_FIELDS, "d.document_date_iso")
 
     base_sql = f"""
         FROM difficult_coverage_positions p
         JOIN documents d ON d.id = p.document_id
         JOIN sources s ON s.id = d.source_id
-        LEFT JOIN centers c ON c.center_code = p.center_code
         {where_sql}
     """
 
@@ -1352,17 +1312,6 @@ def list_difficult_positions(
             p.sorteo_number,
             p.registro_superior,
             p.registro_inferior,
-
-            c.denomination AS center_catalog_name,
-            c.regime AS center_regime,
-            c.full_address AS center_full_address,
-            c.postal_code AS center_postal_code,
-            c.comarca AS center_comarca,
-            c.phone AS center_phone,
-            c.fax AS center_fax,
-            c.latitude AS center_latitude,
-            c.longitude AS center_longitude,
-
             (
                 SELECT COUNT(*)
                 FROM difficult_coverage_candidates dc
@@ -1376,19 +1325,14 @@ def list_difficult_positions(
         """
         + base_sql
         + order_sql
-        + limit_sql
+        + " LIMIT ? OFFSET ? "
     )
     count_sql = "SELECT COUNT(*) " + base_sql
 
     with get_connection() as conn:
         _register_normalize_function(conn)
         total = conn.execute(count_sql, params).fetchone()[0]
-        items = rows_to_dicts(conn.execute(items_sql, query_params).fetchall())
-
-    items = [enrich_center_geo_fields(item, origin_lat, origin_lon) for item in items]
-
-    if should_sort_by_distance:
-        items = sort_items_by_distance(items, order_dir)[offset: offset + limit]
+        items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
@@ -1397,8 +1341,6 @@ def list_difficult_positions(
 def get_difficult_candidates(
     position_id: int,
     selected_only: bool | None = None,
-    origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
-    origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
@@ -1422,21 +1364,10 @@ def get_difficult_candidates(
                 p.num_participants,
                 p.sorteo_number,
                 p.registro_superior,
-                p.registro_inferior,
-
-                c.denomination AS center_catalog_name,
-                c.regime AS center_regime,
-                c.full_address AS center_full_address,
-                c.postal_code AS center_postal_code,
-                c.comarca AS center_comarca,
-                c.phone AS center_phone,
-                c.fax AS center_fax,
-                c.latitude AS center_latitude,
-                c.longitude AS center_longitude
+                p.registro_inferior
             FROM difficult_coverage_positions p
             JOIN documents d ON d.id = p.document_id
             JOIN sources s ON s.id = d.source_id
-            LEFT JOIN centers c ON c.center_code = p.center_code
             WHERE p.id = ?
             """,
             [position_id],
@@ -1480,10 +1411,8 @@ def get_difficult_candidates(
         total = conn.execute(count_sql, params).fetchone()[0]
         items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
 
-    position_payload = enrich_center_geo_fields(dict(position), origin_lat, origin_lon)
-
     return {
-        "position": position_payload,
+        "position": dict(position),
         "items": items,
         "total": total,
         "limit": limit,

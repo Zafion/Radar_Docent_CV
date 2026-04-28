@@ -49,28 +49,41 @@
     </p>
 
     <form id="op-filters-form" class="search-form">
-      <div class="search-form__row">
-        <input id="op-locality" type="text" placeholder="Localidad">
-        <input id="op-specialty-code" type="text" placeholder="Código especialidad">
-        <select id="op-position-type">
-          <option value="">Todos los tipos</option>
-          <option value="VACANTE">Vacante</option>
-          <option value="SUSTITUCIÓN">Sustitución</option>
-          <option value="SUSTITUCIÓN INDETERMINADA">Sustitución indeterminada</option>
-        </select>
-        <select id="op-order">
-          <option value="document_date:desc">Fecha más reciente</option>
-          <option value="document_date:asc">Fecha más antigua</option>
-          <option value="locality:asc">Localidad A-Z</option>
-          <option value="locality:desc">Localidad Z-A</option>
-          <option value="center_name:asc">Centro A-Z</option>
-          <option value="center_name:desc">Centro Z-A</option>
-          <option value="position_code:asc">Código de puesto asc</option>
-          <option value="position_code:desc">Código de puesto desc</option>
-          <option value="distance:asc">Distancia más cercana</option>
-          <option value="distance:desc">Distancia más lejana</option>
-        </select>
-        <button class="button button--accent search-form__button" type="submit">Buscar</button>
+      <div class="search-form__row search-form__row--filters">
+        <label class="filter-field" for="op-locality">
+          <span>Localidad</span>
+          <select id="op-locality" class="filter-control">
+            <option value="">Todas las localidades</option>
+          </select>
+        </label>
+        <label class="filter-field" for="op-specialty-code">
+          <span>Especialidad</span>
+          <select id="op-specialty-code" class="filter-control">
+            <option value="">Todas las especialidades</option>
+          </select>
+        </label>
+        <label class="filter-field" for="op-position-type">
+          <span>Tipo de puesto</span>
+          <select id="op-position-type" class="filter-control">
+            <option value="">Todos los tipos</option>
+          </select>
+        </label>
+        <label class="filter-field" for="op-order">
+          <span>Orden</span>
+          <select id="op-order" class="filter-control">
+            <option value="document_date:desc">Fecha más reciente</option>
+            <option value="document_date:asc">Fecha más antigua</option>
+            <option value="locality:asc">Localidad A-Z</option>
+            <option value="locality:desc">Localidad Z-A</option>
+            <option value="center_name:asc">Centro A-Z</option>
+            <option value="center_name:desc">Centro Z-A</option>
+            <option value="position_code:asc">Código de puesto asc</option>
+            <option value="position_code:desc">Código de puesto desc</option>
+            <option value="distance:asc">Distancia más cercana</option>
+            <option value="distance:desc">Distancia más lejana</option>
+          </select>
+        </label>
+        <button class="button button--accent search-form__button filter-submit" type="submit">Buscar</button>
       </div>
       <div class="search-form__row search-form__row--secondary">
         <label class="checkbox-inline" for="op-latest-only">

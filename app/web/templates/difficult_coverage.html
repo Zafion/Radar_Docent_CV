@@ -46,27 +46,43 @@
     </p>
 
     <form id="dc-filters-form" class="search-form">
-      <div class="search-form__row">
-        <input id="dc-locality" type="text" placeholder="Localidad">
-        <input id="dc-specialty-code" type="text" placeholder="Código especialidad">
-        <select id="dc-selected-only">
-          <option value="">Todos</option>
-          <option value="true">Con seleccionados</option>
-          <option value="false">Sin seleccionados</option>
-        </select>
-        <select id="dc-order">
-          <option value="document_date:desc">Fecha más reciente</option>
-          <option value="document_date:asc">Fecha más antigua</option>
-          <option value="locality:asc">Localidad A-Z</option>
-          <option value="locality:desc">Localidad Z-A</option>
-          <option value="center_name:asc">Centro A-Z</option>
-          <option value="center_name:desc">Centro Z-A</option>
-          <option value="candidate_count:desc">Más candidatos</option>
-          <option value="candidate_count:asc">Menos candidatos</option>
-          <option value="distance:asc">Distancia más cercana</option>
-          <option value="distance:desc">Distancia más lejana</option>
-        </select>
-        <button class="button button--accent search-form__button" type="submit">Buscar</button>
+      <div class="search-form__row search-form__row--filters">
+        <label class="filter-field" for="dc-locality">
+          <span>Localidad</span>
+          <select id="dc-locality" class="filter-control">
+            <option value="">Todas las localidades</option>
+          </select>
+        </label>
+        <label class="filter-field" for="dc-specialty-code">
+          <span>Especialidad</span>
+          <select id="dc-specialty-code" class="filter-control">
+            <option value="">Todas las especialidades</option>
+          </select>
+        </label>
+        <label class="filter-field" for="dc-selected-only">
+          <span>Selección</span>
+          <select id="dc-selected-only" class="filter-control">
+            <option value="">Todos</option>
+            <option value="true">Con seleccionados</option>
+            <option value="false">Sin seleccionados</option>
+          </select>
+        </label>
+        <label class="filter-field" for="dc-order">
+          <span>Orden</span>
+          <select id="dc-order" class="filter-control">
+            <option value="document_date:desc">Fecha más reciente</option>
+            <option value="document_date:asc">Fecha más antigua</option>
+            <option value="locality:asc">Localidad A-Z</option>
+            <option value="locality:desc">Localidad Z-A</option>
+            <option value="center_name:asc">Centro A-Z</option>
+            <option value="center_name:desc">Centro Z-A</option>
+            <option value="candidate_count:desc">Más candidatos</option>
+            <option value="candidate_count:asc">Menos candidatos</option>
+            <option value="distance:asc">Distancia más cercana</option>
+            <option value="distance:desc">Distancia más lejana</option>
+          </select>
+        </label>
+        <button class="button button--accent search-form__button filter-submit" type="submit">Buscar</button>
       </div>
       <div class="search-form__row search-form__row--secondary">
         <label class="checkbox-inline">

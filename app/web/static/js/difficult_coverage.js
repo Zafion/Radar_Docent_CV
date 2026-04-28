@@ -19,6 +19,8 @@
 
   let userOrigin = loadStoredOrigin();
   let latestPublicationDate = null;
+  const FILTER_OPTIONS_PAGE_LIMIT = "100";
+  const FILTER_OPTIONS_MAX_ITEMS = 2000;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -186,6 +188,131 @@
     return latestPublicationDate;
   }
 
+
+  function normalizeFilterText(value) {
+    return String(value ?? "").trim();
+  }
+
+  function sortFilterOptions(options) {
+    return options.sort((a, b) => a.label.localeCompare(b.label, "es", { numeric: true, sensitivity: "base" }));
+  }
+
+  function buildUniqueOptions(items, valueGetter, labelGetter) {
+    const optionMap = new Map();
+
+    items.forEach((item) => {
+      const value = normalizeFilterText(valueGetter(item));
+      if (!value) return;
+
+      const label = normalizeFilterText(labelGetter(item)) || value;
+      if (!optionMap.has(value)) {
+        optionMap.set(value, label);
+      }
+    });
+
+    return sortFilterOptions(
+      Array.from(optionMap, ([value, label]) => ({ value, label }))
+    );
+  }
+
+  function setSelectOptions(selectEl, placeholder, options) {
+    if (!selectEl) return;
+
+    const currentValue = selectEl.value;
+    selectEl.innerHTML = [
+      `<option value="">${escapeHtml(placeholder)}</option>`,
+      ...options.map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`),
+    ].join("");
+
+    const stillAvailable = Array.from(selectEl.options).some((option) => option.value === currentValue);
+    selectEl.value = stillAvailable ? currentValue : "";
+  }
+
+  function specialtyOptionValue(item) {
+    const code = normalizeFilterText(item.specialty_code);
+    const name = normalizeFilterText(item.specialty_name);
+
+    if (code) return `code:${code}`;
+    if (name) return `name:${name}`;
+    return "";
+  }
+
+  function specialtyOptionLabel(item) {
+    const code = normalizeFilterText(item.specialty_code);
+    const name = normalizeFilterText(item.specialty_name);
+    return [code, name].filter(Boolean).join(" - ") || name || code;
+  }
+
+  function appendSpecialtyFilter(params, selectedValue) {
+    const value = normalizeFilterText(selectedValue);
+    if (!value) return params;
+
+    if (value.startsWith("name:")) {
+      params.set("specialty_name", value.slice(5));
+      return params;
+    }
+
+    if (value.startsWith("code:")) {
+      params.set("specialty_code", value.slice(5));
+      return params;
+    }
+
+    params.set("specialty_code", value);
+    return params;
+  }
+
+  async function fetchFilterOptionItems(endpoint, params) {
+    const allItems = [];
+    let offset = 0;
+    let total = null;
+
+    while (allItems.length < FILTER_OPTIONS_MAX_ITEMS) {
+      const pageParams = new URLSearchParams(params);
+      pageParams.set("limit", FILTER_OPTIONS_PAGE_LIMIT);
+      pageParams.set("offset", String(offset));
+
+      const data = await apiGet(`${endpoint}?${pageParams.toString()}`);
+      const pageItems = data.items || [];
+      total = Number.isFinite(Number(data.total)) ? Number(data.total) : total;
+
+      allItems.push(...pageItems);
+
+      if (!pageItems.length || pageItems.length < Number(FILTER_OPTIONS_PAGE_LIMIT)) break;
+      offset += Number(FILTER_OPTIONS_PAGE_LIMIT);
+      if (total !== null && offset >= total) break;
+    }
+
+    return allItems;
+  }
+
+  async function loadFilterOptions() {
+    const params = new URLSearchParams({
+      order_by: "document_date",
+      order_dir: "desc",
+    });
+
+    if (latestOnlyInput?.checked) {
+      const latestDate = await ensureLatestPublicationDate();
+      if (latestDate) {
+        params.set("document_date", latestDate);
+      }
+    }
+
+    const items = await fetchFilterOptionItems("/api/difficult-coverage/positions", params);
+
+    setSelectOptions(
+      localityInput,
+      "Todas las localidades",
+      buildUniqueOptions(items, (item) => item.locality, (item) => item.locality)
+    );
+
+    setSelectOptions(
+      specialtyCodeInput,
+      "Todas las especialidades",
+      buildUniqueOptions(items, specialtyOptionValue, specialtyOptionLabel)
+    );
+  }
+
   function parseOrderValue() {
     const [orderBy, orderDir] = (orderInput?.value || "document_date:desc").split(":");
     return { orderBy, orderDir };
@@ -263,7 +390,7 @@
       }
 
       if (localityInput.value.trim()) params.set("locality", localityInput.value.trim());
-      if (specialtyCodeInput.value.trim()) params.set("specialty_code", specialtyCodeInput.value.trim());
+      appendSpecialtyFilter(params, specialtyCodeInput.value);
       if (selectedOnlyInput.value) params.set("selected_only", selectedOnlyInput.value);
 
       const data = await apiGet(`/api/difficult-coverage/positions?${params.toString()}`);
@@ -276,6 +403,13 @@
 
   filtersForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    await loadPositions();
+  });
+
+  latestOnlyInput?.addEventListener("change", async () => {
+    await loadFilterOptions().catch((error) => {
+      resultsMetaEl.textContent = `No se pudieron actualizar los filtros: ${error.message}`;
+    });
     await loadPositions();
   });
 
@@ -312,5 +446,7 @@
   });
 
   updateLocationStatus();
-  loadPositions();
+  loadFilterOptions().catch((error) => {
+    resultsMetaEl.textContent = `No se pudieron cargar los filtros: ${error.message}`;
+  }).then(loadPositions);
 })();
