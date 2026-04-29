@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.services.discovery.base import BaseDiscoveryAdapter
 from app.services.discovery.generic_family import GenericFamilyDiscoveryAdapter
 from app.services.discovery.novedades import NovedadesDiscoveryAdapter
+from app.services.discovery.non_docent import get_non_docent_discovery_adapters
 from app.services.discovery.rrhh_main import RrhhMainDiscoveryAdapter
 
 
@@ -38,6 +39,7 @@ def get_discovery_adapters() -> list[BaseDiscoveryAdapter]:
             max_suffix=9,
             max_depth=2,
         ),
+        *get_non_docent_discovery_adapters(),
         GenericFamilyDiscoveryAdapter(
             source_key="family_plazas",
             base_slug="plazas",

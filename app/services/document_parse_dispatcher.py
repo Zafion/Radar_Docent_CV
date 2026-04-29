@@ -14,6 +14,7 @@ from app.services.final_award_listing_secundaria_parser import (
     FinalAwardListingSecundariaParserService,
 )
 from app.services.offered_positions_parser import OfferedPositionsParserService
+from app.services.non_docent_parser import NonDocentParserService
 
 
 @dataclass(slots=True)
@@ -43,6 +44,7 @@ class DocumentParseDispatcherService:
             ("final_award_listing_maestros", FinalAwardListingMaestrosParserService()),
             ("final_award_listing_secundaria", FinalAwardListingSecundariaParserService()),
             ("difficult_coverage_provisional", DifficultCoverageProvisionalParserService()),
+            ("non_docent", NonDocentParserService()),
         ]
 
         parser_summaries: list[ParserDispatchSummary] = []

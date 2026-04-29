@@ -25,7 +25,7 @@ class ClassifiedDocument:
 
 
 class DocumentClassifierService:
-    classifier_version = "0.5.0"
+    classifier_version = "0.6.0"
 
     def classify(
         self,
@@ -84,6 +84,26 @@ class DocumentClassifierService:
                 document_date_iso=document_date_iso,
                 classifier_version=self.classifier_version,
                 signals=f"legacy_asset_role={asset_role}",
+            )
+
+
+        non_docent = self._classify_non_docent_document(
+            asset_role=asset_role,
+            source_key=source_key,
+            filename=normalized_filename,
+            title=normalized_title,
+            combined_text=combined_text,
+        )
+        if non_docent is not None:
+            doc_family, list_scope, signals = non_docent
+            return ClassifiedDocument(
+                doc_family=doc_family,
+                list_scope=list_scope,
+                title=title,
+                document_date_text=document_date_text,
+                document_date_iso=document_date_iso,
+                classifier_version=self.classifier_version,
+                signals=signals,
             )
 
         if self._looks_like_ignored_document(
@@ -273,6 +293,62 @@ class DocumentClassifierService:
             return "final_award_listing", "secundaria_otros", "title=listado_cuerpos_sec_adj"
 
         return None
+
+
+    def _classify_non_docent_document(
+        self,
+        *,
+        asset_role: str,
+        source_key: str,
+        filename: str,
+        title: str,
+        combined_text: str,
+    ) -> tuple[str, Optional[str], str] | None:
+        source_or_role = f"{source_key} {asset_role}"
+        is_non_docent_source = "non_docent" in source_or_role
+
+        if not is_non_docent_source and not (
+            filename.startswith("adc_edu_")
+            or filename.startswith("listadodefinitivo_adc_edu_")
+            or filename.startswith("listadobolsa_")
+            or "listado_definitivo" in filename
+            or "ldefinitiva" in filename
+            or "listadoaprobados" in filename
+        ):
+            return None
+
+        if asset_role == "non_docent_adc_call_pdf" or filename.startswith("adc_edu_"):
+            return "non_docent_adc_call", "no_docente", "non_docent=adc_call"
+
+        if (
+            asset_role == "non_docent_adc_award_pdf"
+            or filename.startswith("listadodefinitivo_adc_edu_")
+            or "adjudicacion edu-" in combined_text
+            or "adjudicacio edu-" in combined_text
+        ):
+            return "non_docent_adc_award", "no_docente", "non_docent=adc_award"
+
+        if (
+            asset_role == "non_docent_bag_update_pdf"
+            or filename.startswith("listadobolsa_")
+            or "llista d'actualizacio mensual" in combined_text
+            or "llista d'actualitzacio mensual" in combined_text
+        ):
+            return "non_docent_bag_update", "no_docente", "non_docent=bag_update"
+
+        if (
+            asset_role == "non_docent_funcion_publica_bag_pdf"
+            or "llista definitiva de la borsa d'ocupacio temporal" in combined_text
+            or "lista definitiva de la bolsa de ocupacion temporal" in combined_text
+            or "listado definitivo" in filename
+            or "ldefinitiva" in filename
+            or "listadoaprobados" in filename
+            or "listadobolsa_" in filename
+        ):
+            return "non_docent_funcion_publica_bag", "no_docente", "non_docent=funcion_publica_bag"
+
+        return None
+
 
     def _looks_like_ignored_document(
         self,
@@ -517,6 +593,15 @@ class DocumentClassifierService:
         publication_date_text: str | None,
         original_filename: str,
     ) -> tuple[Optional[str], Optional[str]]:
+        bag_month_match = re.search(
+            r"listadobolsa_\d{3}_(?P<mm>\d{2})(?P<yy>\d{2})",
+            original_filename,
+            flags=re.IGNORECASE,
+        )
+        if bag_month_match:
+            date_text = f"01/{bag_month_match.group('mm')}/20{bag_month_match.group('yy')}"
+            return date_text, self._parse_ddmmyyyy_to_iso(date_text)
+
         preview_match = DATE_RE.search(preview_text)
         if preview_match:
             date_text = preview_match.group(1)

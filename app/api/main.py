@@ -544,6 +544,18 @@ def health() -> dict[str, Any]:
             "difficult_coverage_candidates": conn.execute(
                 "SELECT COUNT(*) FROM difficult_coverage_candidates"
             ).fetchone()[0],
+            "non_docent_publications": conn.execute(
+                "SELECT COUNT(*) FROM non_docent_publications"
+            ).fetchone()[0],
+            "non_docent_offered_positions": conn.execute(
+                "SELECT COUNT(*) FROM non_docent_offered_positions"
+            ).fetchone()[0],
+            "non_docent_awards": conn.execute(
+                "SELECT COUNT(*) FROM non_docent_awards"
+            ).fetchone()[0],
+            "non_docent_bag_members": conn.execute(
+                "SELECT COUNT(*) FROM non_docent_bag_members"
+            ).fetchone()[0],
             "centers": conn.execute("SELECT COUNT(*) FROM centers").fetchone()[0],
             "push_subscriptions": conn.execute(
                 "SELECT COUNT(*) FROM push_subscriptions WHERE is_active = TRUE"
@@ -1417,4 +1429,729 @@ def get_difficult_candidates(
         "total": total,
         "limit": limit,
         "offset": offset,
+    }
+
+
+# ---------- non-docent educational support staff ----------
+
+ALLOWED_NON_DOCENT_PUBLICATION_ORDER_FIELDS = {
+    "publication_date": "p.publication_date_iso",
+    "created_at": "p.created_at",
+    "title": "p.title",
+    "id": "p.id",
+}
+
+ALLOWED_NON_DOCENT_POSITION_ORDER_FIELDS = {
+    "publication_date": "p.publication_date_iso",
+    "locality": "pos.locality",
+    "center_name": "pos.center_name",
+    "position_code": "pos.position_code",
+    "id": "pos.id",
+}
+
+ALLOWED_NON_DOCENT_AWARD_ORDER_FIELDS = {
+    "publication_date": "p.publication_date_iso",
+    "person_name": "aw.person_display_name",
+    "score": "aw.score",
+    "id": "aw.id",
+}
+
+ALLOWED_NON_DOCENT_BAG_ORDER_FIELDS = {
+    "snapshot_date": "bs.snapshot_date_iso",
+    "order_number": "bm.order_number",
+    "person_name": "bm.person_display_name",
+    "total_score": "bm.total_score",
+    "id": "bm.id",
+}
+
+
+def _add_non_docent_staff_group_filter(
+    where: list[str],
+    params: list[Any],
+    table_alias: str,
+    staff_group_code: str | None,
+) -> None:
+    if staff_group_code:
+        where.append(f"{table_alias}.code = ?")
+        params.append(staff_group_code.upper())
+
+
+@app.get("/api/non-docent/summary")
+def get_non_docent_summary() -> dict[str, Any]:
+    with get_connection() as conn:
+        _register_normalize_function(conn)
+        totals = dict(
+            conn.execute(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM non_docent_publications) AS publications,
+                    (SELECT COUNT(*) FROM non_docent_offered_positions) AS offered_positions,
+                    (SELECT COUNT(*) FROM non_docent_awards) AS awards,
+                    (SELECT COUNT(*) FROM non_docent_bag_snapshots) AS bag_snapshots,
+                    (SELECT COUNT(*) FROM non_docent_bag_members) AS bag_members
+                """
+            ).fetchone()
+        )
+        by_group = rows_to_dicts(
+            conn.execute(
+                """
+                SELECT
+                    g.code AS staff_group_code,
+                    g.name AS staff_group_name,
+                    g.administration_scope,
+                    COUNT(DISTINCT p.id) AS publications_count,
+                    COUNT(DISTINCT pos.id) AS offered_positions_count,
+                    COUNT(DISTINCT aw.id) AS awards_count,
+                    COUNT(DISTINCT bs.id) AS bag_snapshots_count,
+                    COUNT(DISTINCT bm.id) AS bag_members_count,
+                    MAX(p.publication_date_iso) AS latest_publication_date
+                FROM non_docent_staff_groups g
+                LEFT JOIN non_docent_publications p ON p.staff_group_id = g.id
+                LEFT JOIN non_docent_offered_positions pos ON pos.staff_group_id = g.id
+                LEFT JOIN non_docent_awards aw ON aw.staff_group_id = g.id
+                LEFT JOIN non_docent_bag_snapshots bs ON bs.staff_group_id = g.id
+                LEFT JOIN non_docent_bag_members bm ON bm.snapshot_id = bs.id
+                WHERE g.is_active IS TRUE
+                GROUP BY g.code, g.name, g.administration_scope
+                ORDER BY g.code ASC
+                """
+            ).fetchall()
+        )
+        latest_publications = rows_to_dicts(
+            conn.execute(
+                """
+                SELECT
+                    p.id,
+                    p.document_id,
+                    p.publication_kind,
+                    p.publication_code,
+                    p.title,
+                    p.publication_date_text,
+                    p.publication_date_iso,
+                    p.source_page_url,
+                    p.document_url,
+                    g.code AS staff_group_code,
+                    g.name AS staff_group_name
+                FROM non_docent_publications p
+                LEFT JOIN non_docent_staff_groups g ON g.id = p.staff_group_id
+                ORDER BY COALESCE(p.publication_date_iso, '') DESC, p.id DESC
+                LIMIT 10
+                """
+            ).fetchall()
+        )
+    return {
+        "totals": totals,
+        "by_group": by_group,
+        "latest_publications": latest_publications,
+    }
+
+
+@app.get("/api/non-docent/publications")
+def list_non_docent_publications(
+    staff_group_code: str | None = None,
+    publication_kind: str | None = None,
+    q: str | None = Query(None, description="Texto libre en título, código o URL"),
+    from_date: str | None = Query(None, description="YYYY-MM-DD"),
+    to_date: str | None = Query(None, description="YYYY-MM-DD"),
+    order_by: str = Query("publication_date"),
+    order_dir: str = Query("desc", pattern="^(asc|desc)$"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
+    where: list[str] = []
+    params: list[Any] = []
+
+    _add_non_docent_staff_group_filter(where, params, "g", staff_group_code)
+    if publication_kind:
+        where.append("p.publication_kind = ?")
+        params.append(publication_kind)
+    if q:
+        where.append(
+            "(normalize_text(p.title) LIKE normalize_text(?) OR normalize_text(COALESCE(p.publication_code, '')) LIKE normalize_text(?) OR normalize_text(COALESCE(p.document_url, '')) LIKE normalize_text(?))"
+        )
+        pattern = f"%{q}%"
+        params.extend([pattern, pattern, pattern])
+    if from_date:
+        where.append("p.publication_date_iso >= ?")
+        params.append(from_date)
+    if to_date:
+        where.append("p.publication_date_iso <= ?")
+        params.append(to_date)
+
+    where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+    order_sql = build_order_by(
+        order_by,
+        order_dir,
+        ALLOWED_NON_DOCENT_PUBLICATION_ORDER_FIELDS,
+        "p.publication_date_iso",
+    )
+    base_sql = f"""
+        FROM non_docent_publications p
+        LEFT JOIN non_docent_staff_groups g ON g.id = p.staff_group_id
+        LEFT JOIN documents d ON d.id = p.document_id
+        {where_sql}
+    """
+    items_sql = (
+        """
+        SELECT
+            p.id,
+            p.document_id,
+            d.doc_family,
+            p.publication_kind,
+            p.publication_code,
+            p.title,
+            p.source_page_url,
+            p.document_url,
+            p.publication_date_text,
+            p.publication_date_iso,
+            p.status_text,
+            p.notes,
+            g.code AS staff_group_code,
+            g.name AS staff_group_name,
+            g.administration_scope,
+            (SELECT COUNT(*) FROM non_docent_offered_positions pos WHERE pos.publication_id = p.id) AS positions_count,
+            (SELECT COUNT(*) FROM non_docent_awards aw WHERE aw.publication_id = p.id) AS awards_count,
+            (
+                SELECT COUNT(*)
+                FROM non_docent_bag_members bm
+                JOIN non_docent_bag_snapshots bs ON bs.id = bm.snapshot_id
+                WHERE bs.publication_id = p.id
+            ) AS bag_members_count
+        """
+        + base_sql
+        + order_sql
+        + " LIMIT ? OFFSET ? "
+    )
+    count_sql = "SELECT COUNT(*) " + base_sql
+
+    with get_connection() as conn:
+        _register_normalize_function(conn)
+        total = conn.execute(count_sql, params).fetchone()[0]
+        items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
+
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/non-docent/positions")
+def list_non_docent_positions(
+    staff_group_code: str | None = None,
+    publication_id: int | None = None,
+    publication_code: str | None = None,
+    province: str | None = None,
+    locality: str | None = None,
+    position_code: str | None = None,
+    q: str | None = Query(None, description="Texto libre en denominación, centro o localidad"),
+    order_by: str = Query("publication_date"),
+    order_dir: str = Query("desc", pattern="^(asc|desc)$"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
+    where: list[str] = []
+    params: list[Any] = []
+
+    _add_non_docent_staff_group_filter(where, params, "g", staff_group_code)
+    if publication_id:
+        where.append("pos.publication_id = ?")
+        params.append(publication_id)
+    if publication_code:
+        where.append("p.publication_code = ?")
+        params.append(publication_code)
+    if province:
+        where.append("normalize_text(pos.province) = normalize_text(?)")
+        params.append(province)
+    if locality:
+        where.append("normalize_text(pos.locality) LIKE normalize_text(?)")
+        params.append(f"%{locality}%")
+    if position_code:
+        where.append("pos.position_code = ?")
+        params.append(position_code)
+    if q:
+        where.append(
+            "(normalize_text(COALESCE(pos.denomination, '')) LIKE normalize_text(?) OR normalize_text(COALESCE(pos.center_name, '')) LIKE normalize_text(?) OR normalize_text(COALESCE(pos.locality, '')) LIKE normalize_text(?))"
+        )
+        pattern = f"%{q}%"
+        params.extend([pattern, pattern, pattern])
+
+    where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+    order_sql = build_order_by(
+        order_by,
+        order_dir,
+        ALLOWED_NON_DOCENT_POSITION_ORDER_FIELDS,
+        "p.publication_date_iso",
+    )
+    base_sql = f"""
+        FROM non_docent_offered_positions pos
+        JOIN non_docent_publications p ON p.id = pos.publication_id
+        LEFT JOIN non_docent_staff_groups g ON g.id = pos.staff_group_id
+        {where_sql}
+    """
+    items_sql = (
+        """
+        SELECT
+            pos.id,
+            pos.publication_id,
+            p.document_id,
+            p.publication_kind,
+            p.publication_code,
+            p.publication_date_text,
+            p.publication_date_iso,
+            p.title AS publication_title,
+            p.document_url,
+            g.code AS staff_group_code,
+            g.name AS staff_group_name,
+            pos.position_code,
+            pos.classification,
+            pos.denomination,
+            pos.center_name,
+            pos.center_code,
+            pos.locality,
+            pos.province,
+            pos.occupancy_percent,
+            pos.functional_assignment,
+            pos.reason,
+            pos.raw_row_text
+        """
+        + base_sql
+        + order_sql
+        + " LIMIT ? OFFSET ? "
+    )
+    count_sql = "SELECT COUNT(*) " + base_sql
+
+    with get_connection() as conn:
+        _register_normalize_function(conn)
+        total = conn.execute(count_sql, params).fetchone()[0]
+        items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
+
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/non-docent/awards")
+def list_non_docent_awards(
+    staff_group_code: str | None = None,
+    publication_id: int | None = None,
+    publication_code: str | None = None,
+    q: str | None = Query(None, description="Texto libre sobre nombre de persona"),
+    position_code: str | None = None,
+    bag_code: str | None = None,
+    order_by: str = Query("publication_date"),
+    order_dir: str = Query("desc", pattern="^(asc|desc)$"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
+    where: list[str] = []
+    params: list[Any] = []
+
+    _add_non_docent_staff_group_filter(where, params, "g", staff_group_code)
+    if publication_id:
+        where.append("aw.publication_id = ?")
+        params.append(publication_id)
+    if publication_code:
+        where.append("p.publication_code = ?")
+        params.append(publication_code)
+    if q:
+        where.append("(normalize_text(aw.person_display_name) LIKE normalize_text(?) OR aw.person_name_normalized LIKE normalize_text(?))")
+        pattern = f"%{q}%"
+        params.extend([pattern, pattern])
+    if position_code:
+        where.append("aw.position_code = ?")
+        params.append(position_code)
+    if bag_code:
+        where.append("aw.bag_code = ?")
+        params.append(bag_code)
+
+    where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+    order_sql = build_order_by(
+        order_by,
+        order_dir,
+        ALLOWED_NON_DOCENT_AWARD_ORDER_FIELDS,
+        "p.publication_date_iso",
+    )
+    base_sql = f"""
+        FROM non_docent_awards aw
+        JOIN non_docent_publications p ON p.id = aw.publication_id
+        LEFT JOIN non_docent_staff_groups g ON g.id = aw.staff_group_id
+        {where_sql}
+    """
+    items_sql = (
+        """
+        SELECT
+            aw.id,
+            aw.publication_id,
+            p.document_id,
+            p.publication_kind,
+            p.publication_code,
+            p.publication_date_text,
+            p.publication_date_iso,
+            p.title AS publication_title,
+            p.document_url,
+            g.code AS staff_group_code,
+            g.name AS staff_group_name,
+            aw.bag_code,
+            aw.bag_name,
+            aw.score,
+            aw.scope_text,
+            aw.person_display_name,
+            aw.person_name_normalized,
+            aw.career_official_text,
+            aw.position_code,
+            aw.position_text,
+            aw.locality,
+            aw.center_name,
+            aw.is_deserted,
+            aw.raw_row_text
+        """
+        + base_sql
+        + order_sql
+        + " LIMIT ? OFFSET ? "
+    )
+    count_sql = "SELECT COUNT(*) " + base_sql
+
+    with get_connection() as conn:
+        _register_normalize_function(conn)
+        total = conn.execute(count_sql, params).fetchone()[0]
+        items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
+
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/non-docent/bag-members/search")
+def search_non_docent_bag_members(
+    q: str = Query(..., min_length=2, description="Nombre, apellidos o DNI anonimizado"),
+    staff_group_code: str | None = None,
+    bag_code: str | None = None,
+    source_kind: str | None = None,
+    status: str | None = Query(None, description="Disponible, Actiu, No disponible..., etc."),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    order_by: str = Query("snapshot_date"),
+    order_dir: str = Query("desc", pattern="^(asc|desc)$"),
+) -> dict[str, Any]:
+    where: list[str] = [
+        "(normalize_text(bm.person_display_name) LIKE normalize_text(?) OR bm.person_name_normalized LIKE normalize_text(?) OR bm.masked_dni LIKE ?)"
+    ]
+    pattern = f"%{q}%"
+    params: list[Any] = [pattern, pattern, pattern]
+
+    _add_non_docent_staff_group_filter(where, params, "g", staff_group_code)
+    if bag_code:
+        where.append("bs.bag_code = ?")
+        params.append(bag_code)
+    if source_kind:
+        where.append("bs.source_kind = ?")
+        params.append(source_kind)
+    if status:
+        where.append("normalize_text(COALESCE(bm.status_text, '')) LIKE normalize_text(?)")
+        params.append(f"%{status}%")
+
+    where_sql = f"WHERE {' AND '.join(where)}"
+    order_sql = build_order_by(
+        order_by,
+        order_dir,
+        ALLOWED_NON_DOCENT_BAG_ORDER_FIELDS,
+        "bs.snapshot_date_iso",
+    )
+    base_sql = f"""
+        FROM non_docent_bag_members bm
+        JOIN non_docent_bag_snapshots bs ON bs.id = bm.snapshot_id
+        JOIN non_docent_publications p ON p.id = bs.publication_id
+        LEFT JOIN non_docent_staff_groups g ON g.id = bs.staff_group_id
+        {where_sql}
+    """
+    items_sql = (
+        """
+        SELECT
+            bm.id,
+            bm.snapshot_id,
+            bs.publication_id,
+            p.document_id,
+            p.publication_kind,
+            p.publication_code,
+            p.title AS publication_title,
+            p.document_url,
+            bs.bag_code,
+            bs.bag_name,
+            bs.source_kind,
+            bs.snapshot_date_text,
+            bs.snapshot_date_iso,
+            bs.zone_text,
+            g.code AS staff_group_code,
+            g.name AS staff_group_name,
+            bm.order_number,
+            bm.masked_dni,
+            bm.person_display_name,
+            bm.person_name_normalized,
+            bm.total_score,
+            bm.status_text,
+            bm.annotation_text,
+            bm.start_date_text,
+            bm.end_date_text
+        """
+        + base_sql
+        + order_sql
+        + " LIMIT ? OFFSET ? "
+    )
+    count_sql = "SELECT COUNT(*) " + base_sql
+
+    with get_connection() as conn:
+        _register_normalize_function(conn)
+        total = conn.execute(count_sql, params).fetchone()[0]
+        items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
+
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "query": q}
+
+
+@app.get("/api/non-docent/persons/search")
+def search_non_docent_persons(
+    q: str = Query(..., min_length=2),
+    limit: int = Query(20, ge=1, le=100),
+) -> dict[str, Any]:
+    pattern = f"%{q}%"
+    with get_connection() as conn:
+        _register_normalize_function(conn)
+        items = rows_to_dicts(
+            conn.execute(
+                """
+                WITH award_people AS (
+                    SELECT
+                        aw.person_name_normalized AS normalized_name,
+                        aw.person_display_name AS display_name,
+                        COUNT(*) AS total_awards,
+                        0::bigint AS total_bag_records,
+                        MAX(p.publication_date_iso) AS last_seen_date
+                    FROM non_docent_awards aw
+                    JOIN non_docent_publications p ON p.id = aw.publication_id
+                    WHERE normalize_text(aw.person_display_name) LIKE normalize_text(?)
+                       OR aw.person_name_normalized LIKE normalize_text(?)
+                    GROUP BY aw.person_name_normalized, aw.person_display_name
+                ),
+                bag_people AS (
+                    SELECT
+                        bm.person_name_normalized AS normalized_name,
+                        bm.person_display_name AS display_name,
+                        0::bigint AS total_awards,
+                        COUNT(*) AS total_bag_records,
+                        MAX(bs.snapshot_date_iso) AS last_seen_date
+                    FROM non_docent_bag_members bm
+                    JOIN non_docent_bag_snapshots bs ON bs.id = bm.snapshot_id
+                    WHERE normalize_text(bm.person_display_name) LIKE normalize_text(?)
+                       OR bm.person_name_normalized LIKE normalize_text(?)
+                    GROUP BY bm.person_name_normalized, bm.person_display_name
+                ),
+                unioned AS (
+                    SELECT * FROM award_people
+                    UNION ALL
+                    SELECT * FROM bag_people
+                )
+                SELECT
+                    normalized_name,
+                    display_name,
+                    SUM(total_awards) AS total_awards,
+                    SUM(total_bag_records) AS total_bag_records,
+                    MAX(last_seen_date) AS last_seen_date
+                FROM unioned
+                GROUP BY normalized_name, display_name
+                ORDER BY (SUM(total_awards) + SUM(total_bag_records)) DESC, display_name ASC
+                LIMIT ?
+                """,
+                [pattern, pattern, pattern, pattern, limit],
+            ).fetchall()
+        )
+    return {"items": items, "count": len(items), "query": q}
+
+
+@app.get("/api/non-docent/persons/profile")
+def get_non_docent_person_profile(
+    normalized_name: str = Query(..., min_length=2),
+    limit_bag_records: int = Query(100, ge=1, le=500),
+) -> dict[str, Any]:
+    with get_connection() as conn:
+        _register_normalize_function(conn)
+        person = conn.execute(
+            """
+            WITH candidates AS (
+                SELECT
+                    aw.person_name_normalized AS normalized_name,
+                    aw.person_display_name AS display_name,
+                    COUNT(*) AS total_rows
+                FROM non_docent_awards aw
+                WHERE aw.person_name_normalized = ?
+                GROUP BY aw.person_name_normalized, aw.person_display_name
+
+                UNION ALL
+
+                SELECT
+                    bm.person_name_normalized AS normalized_name,
+                    bm.person_display_name AS display_name,
+                    COUNT(*) AS total_rows
+                FROM non_docent_bag_members bm
+                WHERE bm.person_name_normalized = ?
+                GROUP BY bm.person_name_normalized, bm.person_display_name
+            )
+            SELECT normalized_name, display_name
+            FROM candidates
+            ORDER BY total_rows DESC, display_name ASC
+            LIMIT 1
+            """,
+            [normalized_name, normalized_name],
+        ).fetchone()
+
+        if person is None:
+            raise HTTPException(status_code=404, detail="normalized_name no encontrado")
+
+        summary = dict(
+            conn.execute(
+                """
+                WITH award_summary AS (
+                    SELECT
+                        COUNT(*) AS total_awards,
+                        MAX(p.publication_date_iso) AS last_award_date
+                    FROM non_docent_awards aw
+                    JOIN non_docent_publications p ON p.id = aw.publication_id
+                    WHERE aw.person_name_normalized = ?
+                ),
+                bag_summary AS (
+                    SELECT
+                        COUNT(*) AS total_bag_records,
+                        MAX(bs.snapshot_date_iso) AS last_bag_date
+                    FROM non_docent_bag_members bm
+                    JOIN non_docent_bag_snapshots bs ON bs.id = bm.snapshot_id
+                    WHERE bm.person_name_normalized = ?
+                )
+                SELECT
+                    COALESCE(award_summary.total_awards, 0) AS total_awards,
+                    COALESCE(bag_summary.total_bag_records, 0) AS total_bag_records,
+                    award_summary.last_award_date,
+                    bag_summary.last_bag_date,
+                    CASE
+                        WHEN award_summary.last_award_date IS NULL THEN bag_summary.last_bag_date
+                        WHEN bag_summary.last_bag_date IS NULL THEN award_summary.last_award_date
+                        WHEN award_summary.last_award_date >= bag_summary.last_bag_date THEN award_summary.last_award_date
+                        ELSE bag_summary.last_bag_date
+                    END AS last_seen_date
+                FROM award_summary, bag_summary
+                """,
+                [normalized_name, normalized_name],
+            ).fetchone()
+        )
+
+        awards = rows_to_dicts(
+            conn.execute(
+                """
+                SELECT
+                    aw.id,
+                    aw.publication_id,
+                    p.document_id,
+                    p.publication_kind,
+                    p.publication_code,
+                    p.publication_date_text,
+                    p.publication_date_iso,
+                    p.title AS publication_title,
+                    p.document_url,
+                    g.code AS staff_group_code,
+                    g.name AS staff_group_name,
+                    aw.bag_code,
+                    aw.bag_name,
+                    aw.score,
+                    aw.scope_text,
+                    aw.career_official_text,
+                    aw.position_code,
+                    aw.position_text,
+                    aw.locality,
+                    aw.center_name,
+                    aw.is_deserted
+                FROM non_docent_awards aw
+                JOIN non_docent_publications p ON p.id = aw.publication_id
+                LEFT JOIN non_docent_staff_groups g ON g.id = aw.staff_group_id
+                WHERE aw.person_name_normalized = ?
+                ORDER BY COALESCE(p.publication_date_iso, '') DESC, aw.id DESC
+                """,
+                [normalized_name],
+            ).fetchall()
+        )
+
+        bag_records = rows_to_dicts(
+            conn.execute(
+                """
+                SELECT
+                    bm.id,
+                    bm.snapshot_id,
+                    bs.publication_id,
+                    p.document_id,
+                    p.publication_kind,
+                    p.publication_code,
+                    p.title AS publication_title,
+                    p.document_url,
+                    bs.bag_code,
+                    bs.bag_name,
+                    bs.source_kind,
+                    bs.snapshot_date_text,
+                    bs.snapshot_date_iso,
+                    bs.zone_text,
+                    g.code AS staff_group_code,
+                    g.name AS staff_group_name,
+                    bm.order_number,
+                    bm.masked_dni,
+                    bm.total_score,
+                    bm.status_text,
+                    bm.annotation_text,
+                    bm.start_date_text,
+                    bm.end_date_text
+                FROM non_docent_bag_members bm
+                JOIN non_docent_bag_snapshots bs ON bs.id = bm.snapshot_id
+                JOIN non_docent_publications p ON p.id = bs.publication_id
+                LEFT JOIN non_docent_staff_groups g ON g.id = bs.staff_group_id
+                WHERE bm.person_name_normalized = ?
+                ORDER BY COALESCE(bs.snapshot_date_iso, '') DESC, bs.bag_code ASC, bm.order_number ASC, bm.id ASC
+                LIMIT ?
+                """,
+                [normalized_name, limit_bag_records],
+            ).fetchall()
+        )
+
+    latest_award = awards[0] if awards else None
+    latest_bag_record = bag_records[0] if bag_records else None
+    user_view = {
+        "display_name": person["display_name"],
+        "current_result": "no_data",
+        "current_result_label": "Sin datos interpretables",
+        "current_result_message": "No hay información suficiente para mostrar un resumen claro.",
+        "latest_date": summary.get("last_seen_date"),
+        "latest_staff_group_label": None,
+        "latest_bag_status": None,
+        "latest_awarded_position": None,
+        "recommended_action": "Consulta siempre la publicación oficial enlazada para confirmar tu situación administrativa.",
+    }
+
+    if latest_award:
+        user_view.update(
+            {
+                "current_result": "non_docent_awarded",
+                "current_result_label": "Adjudicación localizada",
+                "current_result_message": "Consta una adjudicación no docente en los datos cargados.",
+                "latest_date": latest_award.get("publication_date_iso"),
+                "latest_staff_group_label": latest_award.get("staff_group_name"),
+                "latest_awarded_position": latest_award.get("position_text"),
+            }
+        )
+    elif latest_bag_record:
+        user_view.update(
+            {
+                "current_result": "non_docent_bag_member",
+                "current_result_label": "Consta en bolsa",
+                "current_result_message": "Consta una posición en bolsa no docente en los datos cargados.",
+                "latest_date": latest_bag_record.get("snapshot_date_iso"),
+                "latest_staff_group_label": latest_bag_record.get("staff_group_name"),
+                "latest_bag_status": latest_bag_record.get("status_text"),
+            }
+        )
+
+    return {
+        "person": {
+            "normalized_name": person["normalized_name"],
+            "display_name": person["display_name"],
+        },
+        "summary": summary,
+        "user_view": user_view,
+        "awards": awards,
+        "bag_records": bag_records,
     }

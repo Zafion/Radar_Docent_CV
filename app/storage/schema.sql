@@ -342,3 +342,145 @@ CREATE INDEX IF NOT EXISTS idx_award_results_person_display_name_norm_trgm
 CREATE INDEX IF NOT EXISTS idx_difficult_candidates_full_name_norm_trgm
     ON difficult_coverage_candidates
     USING gin (normalize_text(full_name) gin_trgm_ops);
+-- ============================================================================
+-- Personal no docente de atención educativa
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS non_docent_staff_groups (
+    id BIGSERIAL PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    source_slug TEXT,
+    administration_scope TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO non_docent_staff_groups (code, name, source_slug, administration_scope)
+VALUES
+    ('EEE', 'Personal educador de educación especial', 'adjudicacions-eee', 'educacion'),
+    ('EEI', 'Personal educador de educación infantil', 'adjudicacions-eei', 'funcion_publica'),
+    ('TGEI', 'Personal técnico de gestión en Educación Infantil', 'adjudicacions-tgei', 'educacion'),
+    ('FIS', 'Personal fisioterapeuta', 'adjudicacions-fis', 'educacion'),
+    ('ILS', 'Personal técnico de gestión en interpretación de la lengua de signos', 'adjudicacions-ils', 'educacion'),
+    ('ES', 'Personal educador social', 'adjudicacions-es', 'educacion_servicios_sociales'),
+    ('TOC', 'Personal terapeuta ocupacional', 'adjudicacions-toc', 'educacion_servicios_sociales'),
+    ('TSOC', 'Personal trabajador social', NULL, 'funcion_publica')
+ON CONFLICT (code) DO UPDATE
+SET
+    name = EXCLUDED.name,
+    source_slug = EXCLUDED.source_slug,
+    administration_scope = EXCLUDED.administration_scope,
+    is_active = TRUE;
+
+CREATE TABLE IF NOT EXISTS non_docent_publications (
+    id BIGSERIAL PRIMARY KEY,
+    staff_group_id BIGINT REFERENCES non_docent_staff_groups(id),
+    document_id BIGINT UNIQUE REFERENCES documents(id) ON DELETE CASCADE,
+    publication_kind TEXT NOT NULL,
+    publication_code TEXT,
+    title TEXT NOT NULL,
+    source_page_url TEXT,
+    document_url TEXT,
+    publication_date_text TEXT,
+    publication_date_iso TEXT,
+    status_text TEXT,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS non_docent_offered_positions (
+    id BIGSERIAL PRIMARY KEY,
+    publication_id BIGINT NOT NULL REFERENCES non_docent_publications(id) ON DELETE CASCADE,
+    staff_group_id BIGINT REFERENCES non_docent_staff_groups(id),
+    position_code TEXT,
+    classification TEXT,
+    denomination TEXT,
+    center_name TEXT,
+    center_code TEXT,
+    locality TEXT,
+    province TEXT,
+    occupancy_percent NUMERIC,
+    functional_assignment TEXT,
+    reason TEXT,
+    raw_row_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS non_docent_awards (
+    id BIGSERIAL PRIMARY KEY,
+    publication_id BIGINT NOT NULL REFERENCES non_docent_publications(id) ON DELETE CASCADE,
+    staff_group_id BIGINT REFERENCES non_docent_staff_groups(id),
+    bag_code TEXT,
+    bag_name TEXT,
+    score NUMERIC,
+    scope_text TEXT,
+    person_display_name TEXT NOT NULL,
+    person_name_normalized TEXT NOT NULL,
+    career_official_text TEXT,
+    position_code TEXT,
+    position_text TEXT,
+    locality TEXT,
+    center_name TEXT,
+    is_deserted BOOLEAN NOT NULL DEFAULT FALSE,
+    raw_row_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS non_docent_bag_snapshots (
+    id BIGSERIAL PRIMARY KEY,
+    publication_id BIGINT NOT NULL REFERENCES non_docent_publications(id) ON DELETE CASCADE,
+    staff_group_id BIGINT REFERENCES non_docent_staff_groups(id),
+    bag_code TEXT NOT NULL,
+    bag_name TEXT,
+    source_kind TEXT NOT NULL,
+    snapshot_date_text TEXT,
+    snapshot_date_iso TEXT,
+    zone_text TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS non_docent_bag_members (
+    id BIGSERIAL PRIMARY KEY,
+    snapshot_id BIGINT NOT NULL REFERENCES non_docent_bag_snapshots(id) ON DELETE CASCADE,
+    order_number INTEGER,
+    masked_dni TEXT,
+    person_display_name TEXT NOT NULL,
+    person_name_normalized TEXT NOT NULL,
+    total_score NUMERIC,
+    status_text TEXT,
+    annotation_text TEXT,
+    start_date_text TEXT,
+    end_date_text TEXT,
+    merit_json JSONB,
+    raw_row_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_non_docent_staff_groups_code ON non_docent_staff_groups(code);
+CREATE INDEX IF NOT EXISTS idx_non_docent_publications_document_id ON non_docent_publications(document_id);
+CREATE INDEX IF NOT EXISTS idx_non_docent_publications_kind ON non_docent_publications(publication_kind);
+CREATE INDEX IF NOT EXISTS idx_non_docent_publications_code ON non_docent_publications(publication_code);
+CREATE INDEX IF NOT EXISTS idx_non_docent_positions_publication_id ON non_docent_offered_positions(publication_id);
+CREATE INDEX IF NOT EXISTS idx_non_docent_positions_staff_group_id ON non_docent_offered_positions(staff_group_id);
+CREATE INDEX IF NOT EXISTS idx_non_docent_positions_position_code ON non_docent_offered_positions(position_code);
+CREATE INDEX IF NOT EXISTS idx_non_docent_positions_locality ON non_docent_offered_positions(locality);
+CREATE INDEX IF NOT EXISTS idx_non_docent_awards_publication_id ON non_docent_awards(publication_id);
+CREATE INDEX IF NOT EXISTS idx_non_docent_awards_staff_group_id ON non_docent_awards(staff_group_id);
+CREATE INDEX IF NOT EXISTS idx_non_docent_awards_position_code ON non_docent_awards(position_code);
+CREATE INDEX IF NOT EXISTS idx_non_docent_awards_name_norm ON non_docent_awards(person_name_normalized);
+CREATE INDEX IF NOT EXISTS idx_non_docent_bag_snapshots_publication_id ON non_docent_bag_snapshots(publication_id);
+CREATE INDEX IF NOT EXISTS idx_non_docent_bag_snapshots_staff_group_id ON non_docent_bag_snapshots(staff_group_id);
+CREATE INDEX IF NOT EXISTS idx_non_docent_bag_snapshots_bag_code ON non_docent_bag_snapshots(bag_code);
+CREATE INDEX IF NOT EXISTS idx_non_docent_bag_members_snapshot_id ON non_docent_bag_members(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_non_docent_bag_members_order_number ON non_docent_bag_members(order_number);
+CREATE INDEX IF NOT EXISTS idx_non_docent_bag_members_name_norm ON non_docent_bag_members(person_name_normalized);
+
+CREATE INDEX IF NOT EXISTS idx_non_docent_awards_person_display_name_norm_trgm
+    ON non_docent_awards
+    USING gin (normalize_text(person_display_name) gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_non_docent_bag_members_person_display_name_norm_trgm
+    ON non_docent_bag_members
+    USING gin (normalize_text(person_display_name) gin_trgm_ops);
