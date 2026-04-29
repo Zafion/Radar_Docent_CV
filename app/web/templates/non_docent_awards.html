@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Adjudicaciones · personal no docente</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs"><a href="/valencia-no-docentes">Consulta no docentes</a> <span>›</span> Adjudicaciones</div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>Adjudicaciones no docentes</h1>
+        <p>Adjudicaciones definitivas ADC localizadas en los PDFs oficiales.</p>
+      </div>
+      <a class="button button--ghost" href="{{ official_non_docent_base_url }}" target="_blank" rel="noopener noreferrer">Fuente oficial</a>
+    </div>
+
+    <form id="nd-awards-form" class="search-form">
+      <div class="search-form__row search-form__row--filters">
+        <label class="filter-field" for="nd-award-group"><span>Colectivo</span><select id="nd-award-group" class="filter-control"><option value="">Todos</option></select></label>
+        <label class="filter-field" for="nd-award-query"><span>Persona</span><input id="nd-award-query" class="filter-control" type="text" placeholder="Nombre o apellidos"></label>
+        <label class="filter-field" for="nd-award-order"><span>Orden</span><select id="nd-award-order" class="filter-control"><option value="publication_date:desc">Fecha más reciente</option><option value="publication_date:asc">Fecha más antigua</option><option value="person_name:asc">Persona A-Z</option><option value="score:desc">Puntuación mayor</option></select></label>
+        <button class="button button--accent search-form__button filter-submit" type="submit">Buscar</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header"><div><h2>Resultados</h2><p id="nd-awards-meta">Cargando...</p></div></div>
+    <div class="table-wrap">
+      <table class="data-table data-table--cards">
+        <thead><tr><th>Fecha</th><th>Persona</th><th>Colectivo</th><th>Puesto</th><th>Bolsa</th><th>Puntuación</th><th>Fuente</th></tr></thead>
+        <tbody id="nd-awards-body"></tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=5"></script>
+<script src="{{ url_for('static', path='js/non_docent_awards.js') }}?v=5"></script>
+{% endblock %}

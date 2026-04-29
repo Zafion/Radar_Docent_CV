@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Plazas ofertadas · personal no docente</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs"><a href="/valencia-no-docentes">Consulta no docentes</a> <span>›</span> Plazas ofertadas</div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>Plazas no docentes ofertadas</h1>
+        <p>Convocatorias ADC con puestos publicados en el anexo.</p>
+      </div>
+      <a class="button button--ghost" href="{{ official_non_docent_base_url }}" target="_blank" rel="noopener noreferrer">Fuente oficial</a>
+    </div>
+
+    <form id="nd-positions-form" class="search-form">
+      <div class="search-form__row search-form__row--filters">
+        <label class="filter-field" for="nd-position-group"><span>Colectivo</span><select id="nd-position-group" class="filter-control"><option value="">Todos</option></select></label>
+        <label class="filter-field" for="nd-position-province"><span>Provincia</span><select id="nd-position-province" class="filter-control"><option value="">Todas</option></select></label>
+        <label class="filter-field" for="nd-position-query"><span>Búsqueda</span><input id="nd-position-query" class="filter-control" type="text" placeholder="Centro, localidad o denominación"></label>
+        <label class="filter-field" for="nd-position-order"><span>Orden</span><select id="nd-position-order" class="filter-control"><option value="publication_date:desc">Fecha más reciente</option><option value="publication_date:asc">Fecha más antigua</option><option value="province:asc">Provincia A-Z</option><option value="locality:asc">Localidad A-Z</option><option value="position_code:asc">Código de puesto</option></select></label>
+        <button class="button button--accent search-form__button filter-submit" type="submit">Buscar</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header"><div><h2>Resultados</h2><p id="nd-positions-meta">Cargando...</p></div></div>
+    <div class="table-wrap">
+      <table class="data-table data-table--cards">
+        <thead><tr><th>Colectivo</th><th>Puesto</th><th>Centro</th><th>Localidad</th><th>Provincia</th><th>Código</th><th>Acciones</th></tr></thead>
+        <tbody id="nd-positions-body"></tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=5"></script>
+<script src="{{ url_for('static', path='js/non_docent_positions.js') }}?v=5"></script>
+{% endblock %}

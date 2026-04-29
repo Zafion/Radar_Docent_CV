@@ -60,3 +60,21 @@
     padding-top: 76px;
   }
 }
+
+/* Non-docent module additions */
+.entry-card__choice--stacked {
+  display: grid;
+  gap: 14px;
+}
+.entry-card__choice--stacked .service-option {
+  align-items: start;
+}
+.entry-card__choice--stacked .service-option .button {
+  margin-top: 12px;
+}
+@media (max-width: 720px) {
+  .entry-card__choice--stacked .service-option {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+}

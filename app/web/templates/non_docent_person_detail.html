@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Resultado por persona · personal no docente</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs"><a href="/no-docente/consulta-persona">Consulta por persona</a> <span>›</span> Resultado</div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1 id="nd-person-title">Resultado por persona</h1>
+        <p id="nd-person-subtitle">Cargando ficha...</p>
+      </div>
+      <a class="button button--ghost" href="/no-docente/consulta-persona">Nueva búsqueda</a>
+    </div>
+    <div id="nd-person-summary" class="content-stack"></div>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header"><div><h2>Adjudicaciones</h2><p id="nd-person-awards-meta">Cargando...</p></div></div>
+    <div class="table-wrap"><table class="data-table data-table--cards"><thead><tr><th>Fecha</th><th>Colectivo</th><th>Puesto</th><th>Bolsa</th><th>Puntuación</th><th>Fuente</th></tr></thead><tbody id="nd-person-awards-body"></tbody></table></div>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header"><div><h2>Registros de bolsa</h2><p id="nd-person-bag-meta">Cargando...</p></div></div>
+    <div class="table-wrap"><table class="data-table data-table--cards"><thead><tr><th>Fecha</th><th>Bolsa</th><th>Zona</th><th>Orden</th><th>Puntuación</th><th>Estado</th><th>Fuente</th></tr></thead><tbody id="nd-person-bag-body"></tbody></table></div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=5"></script>
+<script src="{{ url_for('static', path='js/non_docent_person_detail.js') }}?v=5"></script>
+{% endblock %}

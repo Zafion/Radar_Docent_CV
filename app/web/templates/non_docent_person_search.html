@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Consulta por persona · personal no docente</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs"><a href="/valencia-no-docentes">Consulta no docentes</a> <span>›</span> Consulta por persona</div>
+
+  <section class="module-card">
+    <div class="module-card__header"><div><h1>Consulta no docente por persona</h1><p>Busca coincidencias en adjudicaciones y bolsas.</p></div></div>
+    <div class="module-grid">
+      <article class="panel-card">
+        <div class="panel-card__title"><span class="panel-card__emoji">🔎</span><h2>Buscar persona</h2></div>
+        <form id="nd-person-search-form" class="search-form">
+          <div class="search-form__row">
+            <input id="nd-person-query" name="q" type="text" placeholder="Nombre o apellidos" minlength="2" autocomplete="off">
+            <button class="button button--accent search-form__button" type="submit">Buscar</button>
+          </div>
+          <p class="search-form__help">Ejemplo: García, López, Martínez...</p>
+        </form>
+        <div id="nd-person-feedback" class="feedback"></div>
+        <div id="nd-person-results" class="result-list"></div>
+      </article>
+      <article class="panel-card">
+        <div class="panel-card__title"><span class="panel-card__emoji">🧭</span><h2>Qué muestra</h2></div>
+        <p class="panel-card__hint">La ficha cruza adjudicaciones ADC y registros de bolsa disponibles en los documentos cargados.</p>
+        <p class="panel-card__hint">Los datos deben contrastarse siempre con la publicación oficial enlazada.</p>
+        <div class="stack-actions">
+          <a class="button button--secondary button--full" href="/no-docente/plazas">Ver plazas</a>
+          <a class="button button--secondary button--full" href="/no-docente/adjudicaciones">Ver adjudicaciones</a>
+        </div>
+      </article>
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=5"></script>
+<script src="{{ url_for('static', path='js/non_docent_person_search.js') }}?v=5"></script>
+{% endblock %}

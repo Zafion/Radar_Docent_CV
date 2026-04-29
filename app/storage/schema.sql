@@ -460,6 +460,8 @@ CREATE TABLE IF NOT EXISTS non_docent_bag_members (
 
 CREATE INDEX IF NOT EXISTS idx_non_docent_staff_groups_code ON non_docent_staff_groups(code);
 CREATE INDEX IF NOT EXISTS idx_non_docent_publications_document_id ON non_docent_publications(document_id);
+CREATE INDEX IF NOT EXISTS idx_non_docent_publications_staff_group_id ON non_docent_publications(staff_group_id);
+CREATE INDEX IF NOT EXISTS idx_non_docent_publications_date_id ON non_docent_publications(publication_date_iso, id);
 CREATE INDEX IF NOT EXISTS idx_non_docent_publications_kind ON non_docent_publications(publication_kind);
 CREATE INDEX IF NOT EXISTS idx_non_docent_publications_code ON non_docent_publications(publication_code);
 CREATE INDEX IF NOT EXISTS idx_non_docent_positions_publication_id ON non_docent_offered_positions(publication_id);

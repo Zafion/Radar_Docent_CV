@@ -1492,6 +1492,11 @@ def get_non_docent_summary() -> dict[str, Any]:
                 """
             ).fetchone()
         )
+        # Keep this summary query cheap: do not join all child tables at once.
+        # Joining publications, positions, awards, snapshots and bag members multiplies
+        # rows and forces PostgreSQL to build large temporary DISTINCT sets.
+        # Correlated aggregate subqueries are fast here because staff groups are few
+        # and the related foreign-key columns are indexed.
         by_group = rows_to_dicts(
             conn.execute(
                 """
@@ -1499,20 +1504,39 @@ def get_non_docent_summary() -> dict[str, Any]:
                     g.code AS staff_group_code,
                     g.name AS staff_group_name,
                     g.administration_scope,
-                    COUNT(DISTINCT p.id) AS publications_count,
-                    COUNT(DISTINCT pos.id) AS offered_positions_count,
-                    COUNT(DISTINCT aw.id) AS awards_count,
-                    COUNT(DISTINCT bs.id) AS bag_snapshots_count,
-                    COUNT(DISTINCT bm.id) AS bag_members_count,
-                    MAX(p.publication_date_iso) AS latest_publication_date
+                    (
+                        SELECT COUNT(*)
+                        FROM non_docent_publications p
+                        WHERE p.staff_group_id = g.id
+                    ) AS publications_count,
+                    (
+                        SELECT COUNT(*)
+                        FROM non_docent_offered_positions pos
+                        WHERE pos.staff_group_id = g.id
+                    ) AS offered_positions_count,
+                    (
+                        SELECT COUNT(*)
+                        FROM non_docent_awards aw
+                        WHERE aw.staff_group_id = g.id
+                    ) AS awards_count,
+                    (
+                        SELECT COUNT(*)
+                        FROM non_docent_bag_snapshots bs
+                        WHERE bs.staff_group_id = g.id
+                    ) AS bag_snapshots_count,
+                    (
+                        SELECT COUNT(*)
+                        FROM non_docent_bag_members bm
+                        JOIN non_docent_bag_snapshots bs ON bs.id = bm.snapshot_id
+                        WHERE bs.staff_group_id = g.id
+                    ) AS bag_members_count,
+                    (
+                        SELECT MAX(p.publication_date_iso)
+                        FROM non_docent_publications p
+                        WHERE p.staff_group_id = g.id
+                    ) AS latest_publication_date
                 FROM non_docent_staff_groups g
-                LEFT JOIN non_docent_publications p ON p.staff_group_id = g.id
-                LEFT JOIN non_docent_offered_positions pos ON pos.staff_group_id = g.id
-                LEFT JOIN non_docent_awards aw ON aw.staff_group_id = g.id
-                LEFT JOIN non_docent_bag_snapshots bs ON bs.staff_group_id = g.id
-                LEFT JOIN non_docent_bag_members bm ON bm.snapshot_id = bs.id
                 WHERE g.is_active IS TRUE
-                GROUP BY g.code, g.name, g.administration_scope
                 ORDER BY g.code ASC
                 """
             ).fetchall()

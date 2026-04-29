@@ -17,18 +17,24 @@ OFFICIAL_SECTION_URL = "https://ceice.gva.es/es/web/rrhh-educacion"
 OFFICIAL_RESOLUCION_URL = "https://ceice.gva.es/es/web/rrhh-educacion/resolucion"
 OFFICIAL_ADJUDICACIONES_URL = "https://ceice.gva.es/es/web/rrhh-educacion/adjudicaciones"
 OFFICIAL_ADJUDICACIONES_CONTINUAS_URL = "https://ceice.gva.es/es/web/rrhh-educacion/adjudicaciones-continuas"
+OFFICIAL_NON_DOCENT_BASE_URL = "https://ceice.gva.es/es/web/inclusioeducativa/personal-no-docent"
+OFFICIAL_NON_DOCENT_BAGS_URL = "https://ceice.gva.es/es/web/inclusioeducativa/personal-no-docent/borses-ocupacio-temporal"
 PROJECT_EMAIL = "zafion+funkcionario@gmail.com"
 PROJECT_OWNER = "Jose Luis Montañana Llopis"
 PROJECT_LINKEDIN = "https://www.linkedin.com/in/jose-luis-monta%C3%B1ana-llopis-116941172/?lipi=urn%3Ali%3Apage%3Ad_flagship3_feed%3BtjegxX7vR4msI4sRX5YxCQ%3D%3D"
 
 DEFAULT_DESCRIPTION = (
     "Funkcionario.com ayuda a consultar plazas ofertadas, adjudicaciones docentes "
-    "y puestos de difícil cobertura de personal interino docente en la Comunitat Valenciana."
+    "y seguimiento de personal interino docente y no docente educativo en la Comunitat Valenciana."
 )
 
 SITEMAP_PAGES: tuple[tuple[str, str, str], ...] = (
     ("/", "1.0", "daily"),
     ("/valencia-docentes", "0.9", "daily"),
+    ("/valencia-no-docentes", "0.9", "daily"),
+    ("/no-docente/plazas", "0.8", "daily"),
+    ("/no-docente/adjudicaciones", "0.8", "daily"),
+    ("/no-docente/consulta-persona", "0.8", "daily"),
     ("/plazas-ofertadas", "0.9", "daily"),
     ("/consulta-persona", "0.8", "daily"),
     ("/dificil-cobertura", "0.9", "daily"),
@@ -174,6 +180,92 @@ def valencia_docentes(request: Request):
         }
     )
     return TEMPLATES.TemplateResponse(request=request, name="valencia_docentes.html", context=context)
+
+
+@router.get("/valencia-no-docentes", response_class=HTMLResponse)
+def valencia_no_docentes(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-no-docentes",
+        page_title="funkcionario.com | Personal no docente de atención educativa",
+        page_description=(
+            "Panel de consulta para personal no docente de atención educativa: "
+            "plazas ADC, adjudicaciones y bolsas de empleo temporal publicadas por Conselleria."
+        ),
+        path="/valencia-no-docentes",
+        breadcrumbs=[("Inicio", "/"), ("Consulta no docentes", "/valencia-no-docentes")],
+    )
+    context.update(
+        {
+            "official_non_docent_base_url": OFFICIAL_NON_DOCENT_BASE_URL,
+            "official_non_docent_bags_url": OFFICIAL_NON_DOCENT_BAGS_URL,
+        }
+    )
+    return TEMPLATES.TemplateResponse(request=request, name="valencia_no_docentes.html", context=context)
+
+
+@router.get("/no-docente/plazas", response_class=HTMLResponse)
+def non_docent_positions(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-no-docentes",
+        page_title="funkcionario.com | Plazas no docentes ofertadas",
+        page_description=(
+            "Consulta plazas ADC ofertadas para personal no docente de atención educativa "
+            "en la Comunitat Valenciana."
+        ),
+        path="/no-docente/plazas",
+        breadcrumbs=[("Inicio", "/"), ("Consulta no docentes", "/valencia-no-docentes"), ("Plazas", "/no-docente/plazas")],
+    )
+    context.update({"official_non_docent_base_url": OFFICIAL_NON_DOCENT_BASE_URL})
+    return TEMPLATES.TemplateResponse(request=request, name="non_docent_positions.html", context=context)
+
+
+@router.get("/no-docente/adjudicaciones", response_class=HTMLResponse)
+def non_docent_awards(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-no-docentes",
+        page_title="funkcionario.com | Adjudicaciones no docentes",
+        page_description=(
+            "Consulta adjudicaciones ADC publicadas para personal no docente de atención educativa."
+        ),
+        path="/no-docente/adjudicaciones",
+        breadcrumbs=[("Inicio", "/"), ("Consulta no docentes", "/valencia-no-docentes"), ("Adjudicaciones", "/no-docente/adjudicaciones")],
+    )
+    context.update({"official_non_docent_base_url": OFFICIAL_NON_DOCENT_BASE_URL})
+    return TEMPLATES.TemplateResponse(request=request, name="non_docent_awards.html", context=context)
+
+
+@router.get("/no-docente/consulta-persona", response_class=HTMLResponse)
+def non_docent_person_search(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-no-docentes",
+        page_title="funkcionario.com | Consulta no docente por persona",
+        page_description=(
+            "Busca una persona en adjudicaciones y bolsas no docentes de atención educativa."
+        ),
+        path="/no-docente/consulta-persona",
+        breadcrumbs=[("Inicio", "/"), ("Consulta no docentes", "/valencia-no-docentes"), ("Consulta por persona", "/no-docente/consulta-persona")],
+    )
+    context.update({"official_non_docent_base_url": OFFICIAL_NON_DOCENT_BASE_URL})
+    return TEMPLATES.TemplateResponse(request=request, name="non_docent_person_search.html", context=context)
+
+
+@router.get("/no-docente/resultado-persona", response_class=HTMLResponse)
+def non_docent_person_detail(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-no-docentes",
+        page_title="funkcionario.com | Resultado no docente por persona",
+        page_description="Resultado individual de consulta no docente por persona en Funkcionario.com.",
+        path="/no-docente/resultado-persona",
+        robots_meta="noindex,nofollow",
+        breadcrumbs=[("Inicio", "/"), ("Consulta no docentes", "/valencia-no-docentes"), ("Resultado", "/no-docente/resultado-persona")],
+    )
+    context.update({"official_non_docent_base_url": OFFICIAL_NON_DOCENT_BASE_URL})
+    return TEMPLATES.TemplateResponse(request=request, name="non_docent_person_detail.html", context=context)
 
 
 @router.get("/plazas-ofertadas", response_class=HTMLResponse)
@@ -376,6 +468,7 @@ def robots_txt(request: Request) -> PlainTextResponse:
             "Disallow: /api/",
             "Disallow: /resultado-persona",
             "Disallow: /resultado-dificil-cobertura",
+            "Disallow: /no-docente/resultado-persona",
             "Disallow: /centros/",
             "Disallow: /adjudicaciones/",
             "Disallow: /404",
@@ -423,6 +516,7 @@ URL principal: {base_url}
 - Consulta por persona mediante coincidencias de nombre.
 - Consulta de puestos de difícil cobertura.
 - Consulta de candidatos de difícil cobertura.
+- Consulta de plazas, adjudicaciones y bolsas de personal no docente de atención educativa.
 - Enlaces a fuentes oficiales de la Conselleria cuando corresponde.
 - Cálculo opcional de distancia a centros si el usuario permite ubicación.
 
@@ -434,6 +528,10 @@ Funkcionario.com trabaja a partir de publicaciones oficiales de RRHH Educación 
 
 - {base_url}/
 - {base_url}/valencia-docentes
+- {base_url}/valencia-no-docentes
+- {base_url}/no-docente/plazas
+- {base_url}/no-docente/adjudicaciones
+- {base_url}/no-docente/consulta-persona
 - {base_url}/plazas-ofertadas
 - {base_url}/consulta-persona
 - {base_url}/dificil-cobertura
