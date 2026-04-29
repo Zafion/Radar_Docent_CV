@@ -34,7 +34,9 @@ SITEMAP_PAGES: tuple[tuple[str, str, str], ...] = (
     ("/valencia-no-docentes", "0.9", "daily"),
     ("/no-docente/plazas", "0.8", "daily"),
     ("/no-docente/adjudicaciones", "0.8", "daily"),
+    ("/no-docente/publicaciones", "0.7", "daily"),
     ("/no-docente/consulta-persona", "0.8", "daily"),
+    ("/centros", "0.8", "weekly"),
     ("/plazas-ofertadas", "0.9", "daily"),
     ("/consulta-persona", "0.8", "daily"),
     ("/dificil-cobertura", "0.9", "daily"),
@@ -237,6 +239,23 @@ def non_docent_awards(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="non_docent_awards.html", context=context)
 
 
+@router.get("/no-docente/publicaciones", response_class=HTMLResponse)
+def non_docent_publications(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-no-docentes",
+        page_title="funkcionario.com | Publicaciones no docentes oficiales",
+        page_description=(
+            "Consulta publicaciones oficiales de personal no docente de atención educativa "
+            "detectadas y procesadas desde fuentes de Conselleria."
+        ),
+        path="/no-docente/publicaciones",
+        breadcrumbs=[("Inicio", "/"), ("Consulta no docentes", "/valencia-no-docentes"), ("Publicaciones", "/no-docente/publicaciones")],
+    )
+    context.update({"official_non_docent_base_url": OFFICIAL_NON_DOCENT_BASE_URL})
+    return TEMPLATES.TemplateResponse(request=request, name="non_docent_publications.html", context=context)
+
+
 @router.get("/no-docente/consulta-persona", response_class=HTMLResponse)
 def non_docent_person_search(request: Request):
     context = seo_context(
@@ -364,6 +383,24 @@ def contacto(request: Request):
         }
     )
     return TEMPLATES.TemplateResponse(request=request, name="contacto.html", context=context)
+
+
+@router.get("/centros", response_class=HTMLResponse)
+def center_search(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="center_search.html",
+        context={
+            **seo_context(
+                request,
+                active_page="centros",
+                page_title="funkcionario.com | Buscador de centros educativos",
+                page_description="Busca centros educativos de la Comunitat Valenciana por nombre, localidad, provincia o dirección y consulta mapa, ruta y distancia aproximada.",
+                path="/centros",
+                breadcrumbs=[("Inicio", "/"), ("Centros", "/centros")],
+            ),
+        },
+    )
 
 
 @router.get("/centros/{center_code}", response_class=HTMLResponse)
@@ -531,6 +568,7 @@ Funkcionario.com trabaja a partir de publicaciones oficiales de RRHH Educación 
 - {base_url}/valencia-no-docentes
 - {base_url}/no-docente/plazas
 - {base_url}/no-docente/adjudicaciones
+- {base_url}/no-docente/publicaciones
 - {base_url}/no-docente/consulta-persona
 - {base_url}/plazas-ofertadas
 - {base_url}/consulta-persona

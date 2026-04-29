@@ -38,15 +38,16 @@
     <div class="content-card__header"><div><h2>Resultados</h2><p id="nd-awards-meta">Cargando...</p></div></div>
     <div class="table-wrap">
       <table class="data-table data-table--cards">
-        <thead><tr><th>Fecha</th><th>Persona</th><th>Colectivo</th><th>Puesto</th><th>Bolsa</th><th>Puntuación</th><th>Fuente</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Persona</th><th>Colectivo</th><th>Puesto</th><th>Bolsa</th><th>Puntuación</th><th>Acciones</th></tr></thead>
         <tbody id="nd-awards-body"></tbody>
       </table>
     </div>
+    <div id="nd-awards-pagination" class="pagination-controls"></div>
   </section>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=5"></script>
-<script src="{{ url_for('static', path='js/non_docent_awards.js') }}?v=5"></script>
+<script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=6"></script>
+<script src="{{ url_for('static', path='js/non_docent_awards.js') }}?v=6"></script>
 {% endblock %}

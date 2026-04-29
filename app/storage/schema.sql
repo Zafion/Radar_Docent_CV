@@ -486,3 +486,17 @@ CREATE INDEX IF NOT EXISTS idx_non_docent_awards_person_display_name_norm_trgm
 CREATE INDEX IF NOT EXISTS idx_non_docent_bag_members_person_display_name_norm_trgm
     ON non_docent_bag_members
     USING gin (normalize_text(person_display_name) gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_centers_denomination_norm_trgm
+    ON centers
+    USING gin (normalize_text(denomination) gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_centers_full_address_norm_trgm
+    ON centers
+    USING gin (normalize_text(full_address) gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_centers_locality_norm
+    ON centers(normalize_text(locality));
+
+CREATE INDEX IF NOT EXISTS idx_centers_province_norm
+    ON centers(normalize_text(province));

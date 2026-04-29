@@ -29,13 +29,11 @@
           return data;
         });
       },
-      sourceButton(url) {
-        if (!url) return "—";
-        return `<a class="button button--ghost button--xs" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">PDF</a>`;
-      },
       tableEmpty(colspan, message) {
         return `<tr><td colspan="${colspan}" class="muted data-table__empty">${escapeHtml(message)}</td></tr>`;
       },
+      bindLocationControls() {},
+      bindPushToggle() {},
     };
   }
 
@@ -44,19 +42,17 @@
     const feedbackEl = document.getElementById("non-docent-summary-feedback");
     const groupsMetaEl = document.getElementById("non-docent-groups-meta");
     const groupsBodyEl = document.getElementById("non-docent-groups-body");
-    const latestEl = document.getElementById("non-docent-latest-publications");
     const ui = window.NonDocentUI || fallbackUI();
 
-    if (!summaryEl || !feedbackEl || !groupsMetaEl || !groupsBodyEl || !latestEl) return;
+    ui.bindLocationControls?.({
+      statusId: "nd-location-status",
+      useButtonId: "nd-use-my-location",
+      clearButtonId: "nd-clear-location",
+      feedbackId: "nd-page-feedback",
+    });
+    ui.bindPushToggle?.({ buttonId: "nd-push-toggle-button", feedbackId: "nd-page-feedback" });
 
-    function publicationKindLabel(kind) {
-      return {
-        adc_call: "Convocatoria ADC",
-        adc_award: "Adjudicación ADC",
-        bag_update: "Actualización de bolsa",
-        funcion_publica_bag: "Bolsa Función Pública",
-      }[kind] || kind || "Publicación";
-    }
+    if (!summaryEl || !feedbackEl || !groupsMetaEl || !groupsBodyEl) return;
 
     function renderSummary(data) {
       const totals = data.totals || {};
@@ -79,16 +75,6 @@
           <td data-label="Última fecha">${ui.escapeHtml(ui.formatDate(group.latest_publication_date))}</td>
         </tr>
       `).join("") || ui.tableEmpty(6, "No hay colectivos cargados.");
-
-      latestEl.innerHTML = (data.latest_publications || []).slice(0, 8).map((item) => `
-        <article class="result-item">
-          <div>
-            <h3>${ui.escapeHtml(item.title || "Publicación")}</h3>
-            <p>${ui.escapeHtml(publicationKindLabel(item.publication_kind))} · ${ui.escapeHtml(item.staff_group_name || "Sin colectivo")} · ${ui.escapeHtml(ui.formatDate(item.publication_date_iso))}</p>
-          </div>
-          <div class="data-table__actions">${ui.sourceButton(item.document_url)}</div>
-        </article>
-      `).join("") || '<p class="muted">No hay publicaciones.</p>';
     }
 
     ui.apiGet("/api/non-docent/summary")

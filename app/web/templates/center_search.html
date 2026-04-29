@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Buscador de centros</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="/">Inicio</a>
+    <span>›</span>
+    Centros educativos
+  </div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>Centros educativos</h1>
+        <p>Busca centros por nombre, localidad, provincia, código o dirección. Activa tu ubicación para ordenar por distancia aproximada.</p>
+      </div>
+    </div>
+
+    <div class="panel-card__meta">
+      Ubicación: <strong id="center-location-status">No activada · sin distancia calculada</strong>
+    </div>
+    <div class="stack-actions stack-actions--inline">
+      <button id="center-use-my-location" class="button button--ghost" type="button">Usar mi ubicación</button>
+      <button id="center-clear-location" class="button button--ghost is-hidden" type="button">Borrar ubicación</button>
+    </div>
+    <div id="center-page-feedback" class="feedback"></div>
+
+    <form id="center-search-form" class="search-form">
+      <div class="search-form__row search-form__row--filters">
+        <label class="filter-field filter-field--wide" for="center-query">
+          <span>Búsqueda</span>
+          <input id="center-query" class="filter-control" type="text" placeholder="Nombre, localidad, código o dirección">
+        </label>
+        <label class="filter-field" for="center-province">
+          <span>Provincia</span>
+          <select id="center-province" class="filter-control">
+            <option value="">Todas</option>
+          </select>
+        </label>
+        <label class="filter-field" for="center-locality">
+          <span>Localidad</span>
+          <select id="center-locality" class="filter-control">
+            <option value="">Todas</option>
+          </select>
+        </label>
+        <label class="filter-field" for="center-regime">
+          <span>Régimen</span>
+          <select id="center-regime" class="filter-control">
+            <option value="">Todos</option>
+          </select>
+        </label>
+        <label class="filter-field" for="center-order">
+          <span>Orden</span>
+          <select id="center-order" class="filter-control">
+            <option value="denomination:asc">Nombre A-Z</option>
+            <option value="locality:asc">Localidad A-Z</option>
+            <option value="province:asc">Provincia A-Z</option>
+            <option value="center_code:asc">Código de centro</option>
+            <option value="distance:asc">Distancia más cercana</option>
+          </select>
+        </label>
+        <button class="button button--accent search-form__button filter-submit" type="submit">Buscar</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>Centros encontrados</h2>
+        <p id="center-results-meta">Cargando...</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table data-table--cards">
+        <thead>
+          <tr>
+            <th>Centro</th>
+            <th>Localidad</th>
+            <th>Provincia</th>
+            <th>Régimen</th>
+            <th>Distancia</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="center-results-body"></tbody>
+      </table>
+    </div>
+    <div id="center-results-pagination" class="pagination-controls"></div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=7"></script>
+<script src="{{ url_for('static', path='js/center_search.js') }}?v=1"></script>
+{% endblock %}

@@ -19,7 +19,7 @@
     <div class="module-card__header">
       <div>
         <h1>Personal no docente de atención educativa</h1>
-        <p>Seguimiento de plazas ADC, adjudicaciones y bolsas publicadas por Conselleria.</p>
+        <p>Seguimiento de plazas ADC, adjudicaciones, publicaciones y bolsas publicadas por Conselleria.</p>
       </div>
       <a class="button button--ghost" href="{{ official_non_docent_base_url }}" target="_blank" rel="noopener noreferrer">
         Fuente oficial
@@ -30,7 +30,7 @@
       <article class="panel-card">
         <div class="panel-card__title">
           <span class="panel-card__emoji">📊</span>
-          <h2>Estado de datos</h2>
+          <h2>Información y avisos</h2>
         </div>
         <div id="non-docent-summary" class="status-grid">
           <div class="status-grid__item"><span>Publicaciones</span><strong>—</strong></div>
@@ -39,6 +39,40 @@
           <div class="status-grid__item"><span>Personas en bolsa</span><strong>—</strong></div>
         </div>
         <p id="non-docent-summary-feedback" class="panel-card__hint">Cargando resumen...</p>
+
+        <div class="panel-card__meta">
+          Ubicación: <strong id="nd-location-status">No activada · sin distancia calculada</strong>
+        </div>
+
+        <div class="stack-actions">
+          <p class="panel-card__hint">
+            Activa las alertas para recibir avisos cuando se detecten nuevas publicaciones relevantes. Las alertas son generales de Funkcionario.com.
+          </p>
+          <button id="nd-push-toggle-button" class="button button--ghost button--full" type="button">
+            Activar alertas de novedades
+          </button>
+        </div>
+
+        <div class="stack-actions">
+          <p id="nd-location-help" class="panel-card__hint">
+            Activa tu ubicación para calcular distancias aproximadas hasta centros cuando estén disponibles. La ubicación se guarda solo en tu navegador.
+          </p>
+          <button id="nd-use-my-location" class="button button--ghost button--full" type="button">
+            Usar mi ubicación
+          </button>
+          <button id="nd-clear-location" class="button button--ghost button--full is-hidden" type="button">
+            Borrar ubicación
+          </button>
+        </div>
+
+        <div id="nd-page-feedback" class="feedback"></div>
+
+        <p class="panel-card__hint">
+          La ubicación y las alertas requieren permisos del navegador. Consulta la
+          <a href="/politica-privacidad">Política de Privacidad</a>
+          y la
+          <a href="/politica-cookies">Política de Cookies</a>.
+        </p>
       </article>
 
       <article class="panel-card">
@@ -47,12 +81,14 @@
           <h2>Consultas disponibles</h2>
         </div>
         <p class="panel-card__hint">
-          Consulta las plazas ofertadas en convocatorias ADC, adjudicaciones definitivas y situación en bolsas no docentes.
+          Consulta plazas ofertadas, adjudicaciones definitivas, situación por persona y publicaciones oficiales no docentes.
         </p>
         <div class="stack-actions">
           <a class="button button--secondary button--full" href="/no-docente/plazas">Ver plazas ofertadas</a>
           <a class="button button--secondary button--full" href="/no-docente/adjudicaciones">Ver adjudicaciones</a>
           <a class="button button--secondary button--full" href="/no-docente/consulta-persona">Consulta por persona</a>
+          <a class="button button--secondary button--full" href="/no-docente/publicaciones">Ver publicaciones oficiales</a>
+          <a class="button button--secondary button--full" href="/centros">Buscar centros educativos</a>
           <a class="button button--ghost button--full" href="{{ official_non_docent_bags_url }}" target="_blank" rel="noopener noreferrer">Bolsas oficiales</a>
         </div>
       </article>
@@ -82,22 +118,12 @@
       </table>
     </div>
   </section>
-
-  <section class="content-card content-stack--standalone">
-    <div class="content-card__header">
-      <div>
-        <h2>Últimas publicaciones</h2>
-        <p>Publicaciones no docentes detectadas más recientes.</p>
-      </div>
-    </div>
-    <div id="non-docent-latest-publications" class="result-list"></div>
-  </section>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=5"></script>
-<script src="{{ url_for('static', path='js/non_docent_home.js') }}?v=5"></script>
+<script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=6"></script>
+<script src="{{ url_for('static', path='js/non_docent_home.js') }}?v=6"></script>
 <script>
   // Fallback defensivo: si por caché o bloqueo no se ejecuta el JS estático,
   // carga el resumen mínimo desde la API para no dejar la pantalla en “Cargando…”.
@@ -130,7 +156,6 @@
         var summary = document.getElementById('non-docent-summary');
         var groupsMeta = document.getElementById('non-docent-groups-meta');
         var groupsBody = document.getElementById('non-docent-groups-body');
-        var latest = document.getElementById('non-docent-latest-publications');
 
         if (summary) {
           summary.innerHTML =
@@ -154,16 +179,6 @@
               '<td data-label="Última fecha">' + esc(date(g.latest_publication_date)) + '</td>' +
             '</tr>';
           }).join('') || '<tr><td colspan="6" class="muted data-table__empty">No hay colectivos cargados.</td></tr>';
-        }
-        if (latest) {
-          latest.innerHTML = (data.latest_publications || []).slice(0, 8).map(function (item) {
-            return '<article class="result-item"><div>' +
-              '<h3>' + esc(item.title || 'Publicación') + '</h3>' +
-              '<p>' + esc(item.staff_group_name || 'Sin colectivo') + ' · ' + esc(date(item.publication_date_iso)) + '</p>' +
-              '</div><div class="data-table__actions">' +
-              (item.document_url ? '<a class="button button--ghost button--xs" href="' + esc(item.document_url) + '" target="_blank" rel="noopener noreferrer">PDF</a>' : '—') +
-              '</div></article>';
-          }).join('') || '<p class="muted">No hay publicaciones.</p>';
         }
       })
       .catch(function (error) {

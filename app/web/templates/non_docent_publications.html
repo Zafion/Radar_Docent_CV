@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Publicaciones oficiales · personal no docente</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs"><a href="/valencia-no-docentes">Consulta no docentes</a> <span>›</span> Publicaciones oficiales</div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>Publicaciones no docentes oficiales</h1>
+        <p>Publicaciones detectadas desde fuentes oficiales y procesadas por Funkcionario.com.</p>
+      </div>
+      <a class="button button--ghost" href="{{ official_non_docent_base_url }}" target="_blank" rel="noopener noreferrer">Fuente oficial</a>
+    </div>
+
+    <form id="nd-publications-form" class="search-form">
+      <div class="search-form__row search-form__row--filters search-form__row--filters-wide">
+        <label class="filter-field" for="nd-publication-group"><span>Colectivo</span><select id="nd-publication-group" class="filter-control"><option value="">Todos</option></select></label>
+        <label class="filter-field" for="nd-publication-kind"><span>Tipo</span><select id="nd-publication-kind" class="filter-control"><option value="">Todas</option><option value="adc_call">Convocatoria ADC</option><option value="adc_award">Adjudicación ADC</option><option value="bag_update">Actualización de bolsa</option><option value="funcion_publica_bag">Bolsa Función Pública</option></select></label>
+        <label class="filter-field" for="nd-publication-query"><span>Búsqueda</span><input id="nd-publication-query" class="filter-control" type="text" placeholder="Título, código o URL"></label>
+        <label class="filter-field" for="nd-publication-from"><span>Desde</span><input id="nd-publication-from" class="filter-control" type="date"></label>
+        <label class="filter-field" for="nd-publication-to"><span>Hasta</span><input id="nd-publication-to" class="filter-control" type="date"></label>
+        <label class="filter-field" for="nd-publication-order"><span>Orden</span><select id="nd-publication-order" class="filter-control"><option value="publication_date:desc">Fecha más reciente</option><option value="publication_date:asc">Fecha más antigua</option><option value="title:asc">Título A-Z</option></select></label>
+        <button class="button button--accent search-form__button filter-submit" type="submit">Buscar</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header"><div><h2>Resultados</h2><p id="nd-publications-meta">Cargando...</p></div></div>
+    <div class="table-wrap">
+      <table class="data-table data-table--cards">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Colectivo</th><th>Título</th><th>Código</th><th>Datos</th><th>Fuente</th></tr></thead>
+        <tbody id="nd-publications-body"></tbody>
+      </table>
+    </div>
+    <div id="nd-publications-pagination" class="pagination-controls"></div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=6"></script>
+<script src="{{ url_for('static', path='js/non_docent_publications.js') }}?v=6"></script>
+{% endblock %}

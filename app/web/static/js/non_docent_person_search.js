@@ -14,11 +14,11 @@
 
   function render(items) {
     if (!items.length) {
-      feedbackEl.textContent = "Sin coincidencias.";
+      feedbackEl.textContent = "Sin coincidencias. Prueba con menos términos o revisa el formato del nombre.";
       resultsEl.innerHTML = "";
       return;
     }
-    feedbackEl.textContent = `${items.length} coincidencias.`;
+    feedbackEl.textContent = `Mostrando hasta 20 coincidencias. Si no encuentras el resultado, afina la búsqueda con nombre y apellidos.`;
     resultsEl.innerHTML = items.map((item, index) => `
       <article class="result-item">
         <div>
@@ -47,7 +47,7 @@
     }
     feedbackEl.textContent = "Buscando...";
     resultsEl.innerHTML = "";
-    ui.apiGet(`/api/non-docent/persons/search?q=${encodeURIComponent(q)}`)
+    ui.apiGet(`/api/non-docent/persons/search?q=${encodeURIComponent(q)}&limit=20`)
       .then((data) => render(data.items || []))
       .catch((error) => {
         feedbackEl.textContent = error.message;
