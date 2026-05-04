@@ -36,7 +36,7 @@
   }
 
   function render(items, total, offset) {
-    metaEl.textContent = `${ui.compactNumber(total)} plazas encontradas. Mostrando ${ui.compactNumber(items.length)} por página.`;
+    metaEl.textContent = `${ui.compactNumber(total)} plazas disponibles encontradas. Mostrando ${ui.compactNumber(items.length)} por página.`;
     bodyEl.innerHTML = items.map((item) => `
       <tr>
         <td data-label="Colectivo"><strong>${ui.escapeHtml(item.staff_group_code || "—")}</strong><br><span class="muted">${ui.escapeHtml(item.staff_group_name || "")}</span></td>
@@ -47,7 +47,7 @@
         <td data-label="Código">${ui.escapeHtml(item.position_code || "—")}</td>
         <td data-label="Acciones" class="data-table__actions">${actions(item)}</td>
       </tr>
-    `).join("") || ui.tableEmpty(7, "No hay plazas con los filtros actuales.");
+    `).join("") || ui.tableEmpty(7, "No hay plazas no docentes disponibles actualmente para los filtros seleccionados.");
 
     ui.renderPager(pagerEl, {
       total,

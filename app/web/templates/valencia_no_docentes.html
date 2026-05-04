@@ -34,7 +34,7 @@
         </div>
         <div id="non-docent-summary" class="status-grid">
           <div class="status-grid__item"><span>Publicaciones</span><strong>—</strong></div>
-          <div class="status-grid__item"><span>Plazas</span><strong>—</strong></div>
+          <div class="status-grid__item"><span>Plazas disponibles</span><strong>—</strong></div>
           <div class="status-grid__item"><span>Adjudicaciones</span><strong>—</strong></div>
           <div class="status-grid__item"><span>Personas en bolsa</span><strong>—</strong></div>
         </div>
@@ -108,7 +108,7 @@
           <tr>
             <th>Colectivo</th>
             <th>Publicaciones</th>
-            <th>Plazas</th>
+            <th>Plazas detectadas</th>
             <th>Adjudicaciones</th>
             <th>Bolsa</th>
             <th>Última fecha</th>
@@ -149,10 +149,15 @@
       return parts.length === 3 ? parts[2] + '/' + parts[1] + '/' + parts[0] : String(value);
     }
 
-    fetch('/api/non-docent/summary', { headers: { Accept: 'application/json' } })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
+    Promise.all([
+      fetch('/api/non-docent/summary', { headers: { Accept: 'application/json' } }).then(function (r) { return r.json(); }),
+      fetch('/api/non-docent/positions?limit=1', { headers: { Accept: 'application/json' } }).then(function (r) { return r.json(); }).catch(function () { return { total: 0 }; })
+    ])
+      .then(function (responses) {
+        var data = responses[0] || {};
+        var positions = responses[1] || {};
         var totals = data.totals || {};
+        totals.available_positions = Number(positions.total || 0);
         var summary = document.getElementById('non-docent-summary');
         var groupsMeta = document.getElementById('non-docent-groups-meta');
         var groupsBody = document.getElementById('non-docent-groups-body');
@@ -160,11 +165,11 @@
         if (summary) {
           summary.innerHTML =
             '<div class="status-grid__item"><span>Publicaciones</span><strong>' + num(totals.publications) + '</strong></div>' +
-            '<div class="status-grid__item"><span>Plazas</span><strong>' + num(totals.offered_positions) + '</strong></div>' +
+            '<div class="status-grid__item"><span>Plazas disponibles</span><strong>' + num(totals.available_positions || 0) + '</strong></div>' +
             '<div class="status-grid__item"><span>Adjudicaciones</span><strong>' + num(totals.awards) + '</strong></div>' +
             '<div class="status-grid__item"><span>Personas en bolsa</span><strong>' + num(totals.bag_members) + '</strong></div>';
         }
-        feedback.textContent = 'Datos cargados desde publicaciones oficiales procesadas.';
+        feedback.textContent = 'Datos cargados desde publicaciones oficiales procesadas. Las plazas adjudicadas o ya no visibles no se muestran como disponibles. ' + num(totals.offered_positions) + ' plazas detectadas en total.';
 
         var groups = data.by_group || [];
         if (groupsMeta) groupsMeta.textContent = groups.length + ' colectivos con datos detectados.';
@@ -173,7 +178,7 @@
             return '<tr>' +
               '<td data-label="Colectivo"><strong>' + esc(g.staff_group_code || '—') + '</strong><br><span class="muted">' + esc(g.staff_group_name || '—') + '</span></td>' +
               '<td data-label="Publicaciones">' + num(g.publications_count) + '</td>' +
-              '<td data-label="Plazas">' + num(g.offered_positions_count) + '</td>' +
+              '<td data-label="Plazas detectadas">' + num(g.offered_positions_count) + '</td>' +
               '<td data-label="Adjudicaciones">' + num(g.awards_count) + '</td>' +
               '<td data-label="Bolsa">' + num(g.bag_members_count) + '</td>' +
               '<td data-label="Última fecha">' + esc(date(g.latest_publication_date)) + '</td>' +

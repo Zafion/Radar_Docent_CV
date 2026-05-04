@@ -500,3 +500,71 @@ CREATE INDEX IF NOT EXISTS idx_centers_locality_norm
 
 CREATE INDEX IF NOT EXISTS idx_centers_province_norm
     ON centers(normalize_text(province));
+
+
+-- Lifecycle / availability state for positions and non-docent ADC publications.
+ALTER TABLE offered_positions
+    ADD COLUMN IF NOT EXISTS availability_status TEXT NOT NULL DEFAULT 'available',
+    ADD COLUMN IF NOT EXISTS availability_reason TEXT,
+    ADD COLUMN IF NOT EXISTS availability_checked_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS closed_by_document_id BIGINT REFERENCES documents(id),
+    ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ;
+
+ALTER TABLE difficult_coverage_positions
+    ADD COLUMN IF NOT EXISTS availability_status TEXT NOT NULL DEFAULT 'available',
+    ADD COLUMN IF NOT EXISTS availability_reason TEXT,
+    ADD COLUMN IF NOT EXISTS availability_checked_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS closed_by_document_id BIGINT REFERENCES documents(id),
+    ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ;
+
+ALTER TABLE non_docent_publications
+    ADD COLUMN IF NOT EXISTS is_current BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS missing_since TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS availability_status TEXT NOT NULL DEFAULT 'available',
+    ADD COLUMN IF NOT EXISTS availability_reason TEXT,
+    ADD COLUMN IF NOT EXISTS availability_checked_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS closed_by_document_id BIGINT REFERENCES documents(id),
+    ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ;
+
+ALTER TABLE non_docent_offered_positions
+    ADD COLUMN IF NOT EXISTS availability_status TEXT NOT NULL DEFAULT 'available',
+    ADD COLUMN IF NOT EXISTS availability_reason TEXT,
+    ADD COLUMN IF NOT EXISTS availability_checked_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS closed_by_document_id BIGINT REFERENCES documents(id),
+    ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS push_notification_events (
+    id BIGSERIAL PRIMARY KEY,
+    event_key TEXT NOT NULL UNIQUE,
+    event_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    url TEXT NOT NULL,
+    payload_json JSONB,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    sent_at TIMESTAMPTZ,
+    sent_count INTEGER NOT NULL DEFAULT 0,
+    failed_count INTEGER NOT NULL DEFAULT 0,
+    deleted_count INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_offered_positions_availability_status
+    ON offered_positions(availability_status);
+
+CREATE INDEX IF NOT EXISTS idx_difficult_positions_availability_status
+    ON difficult_coverage_positions(availability_status);
+
+CREATE INDEX IF NOT EXISTS idx_non_docent_publications_is_current
+    ON non_docent_publications(is_current);
+
+CREATE INDEX IF NOT EXISTS idx_non_docent_publications_availability_status
+    ON non_docent_publications(availability_status);
+
+CREATE INDEX IF NOT EXISTS idx_non_docent_positions_availability_status
+    ON non_docent_offered_positions(availability_status);
+
+CREATE INDEX IF NOT EXISTS idx_push_notification_events_status_created_at
+    ON push_notification_events(status, created_at);

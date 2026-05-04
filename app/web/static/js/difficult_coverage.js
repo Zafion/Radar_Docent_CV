@@ -333,10 +333,10 @@
   }
 
   function renderPositions(items, total) {
-    resultsMetaEl.textContent = `${total} puestos encontrados`;
+    resultsMetaEl.textContent = `${total} puestos disponibles encontrados`;
 
     if (!items.length) {
-      tableBody.innerHTML = '<tr><td colspan="8" class="muted data-table__empty">No hay puestos para los filtros actuales.</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="8" class="muted data-table__empty">No hay puestos de difícil cobertura disponibles actualmente.</td></tr>';
       return;
     }
 

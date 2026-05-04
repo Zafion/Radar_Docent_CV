@@ -58,18 +58,18 @@
       const totals = data.totals || {};
       summaryEl.innerHTML = `
         <div class="status-grid__item"><span>Publicaciones</span><strong>${ui.compactNumber(totals.publications)}</strong></div>
-        <div class="status-grid__item"><span>Plazas</span><strong>${ui.compactNumber(totals.offered_positions)}</strong></div>
+        <div class="status-grid__item"><span>Plazas disponibles</span><strong>${ui.compactNumber(totals.available_positions || 0)}</strong></div>
         <div class="status-grid__item"><span>Adjudicaciones</span><strong>${ui.compactNumber(totals.awards)}</strong></div>
         <div class="status-grid__item"><span>Personas en bolsa</span><strong>${ui.compactNumber(totals.bag_members)}</strong></div>
       `;
-      feedbackEl.textContent = "Datos cargados desde publicaciones oficiales procesadas.";
+      feedbackEl.textContent = `Datos cargados desde publicaciones oficiales procesadas. Las plazas adjudicadas o ya no visibles no se muestran como disponibles. ${ui.compactNumber(totals.offered_positions)} plazas detectadas en total.`;
 
       groupsMetaEl.textContent = `${(data.by_group || []).length} colectivos con datos detectados.`;
       groupsBodyEl.innerHTML = (data.by_group || []).map((group) => `
         <tr>
           <td data-label="Colectivo"><strong>${ui.escapeHtml(group.staff_group_code || "—")}</strong><br><span class="muted">${ui.escapeHtml(group.staff_group_name || "—")}</span></td>
           <td data-label="Publicaciones">${ui.compactNumber(group.publications_count)}</td>
-          <td data-label="Plazas">${ui.compactNumber(group.offered_positions_count)}</td>
+          <td data-label="Plazas detectadas">${ui.compactNumber(group.offered_positions_count)}</td>
           <td data-label="Adjudicaciones">${ui.compactNumber(group.awards_count)}</td>
           <td data-label="Bolsa">${ui.compactNumber(group.bag_members_count)}</td>
           <td data-label="Última fecha">${ui.escapeHtml(ui.formatDate(group.latest_publication_date))}</td>
@@ -77,8 +77,15 @@
       `).join("") || ui.tableEmpty(6, "No hay colectivos cargados.");
     }
 
-    ui.apiGet("/api/non-docent/summary")
-      .then(renderSummary)
+    Promise.all([
+      ui.apiGet("/api/non-docent/summary"),
+      ui.apiGet("/api/non-docent/positions?limit=1").catch(() => ({ total: 0 })),
+    ])
+      .then(([summary, positions]) => {
+        summary.totals = summary.totals || {};
+        summary.totals.available_positions = Number(positions.total || 0);
+        renderSummary(summary);
+      })
       .catch((error) => {
         feedbackEl.textContent = `No se pudo cargar el resumen: ${error.message}`;
         groupsMetaEl.textContent = "No se pudo cargar el resumen.";

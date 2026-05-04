@@ -21,7 +21,9 @@ def _resolve_vapid_private_key(value: str) -> str:
 
     candidate = Path(value).expanduser()
     if candidate.exists() and candidate.is_file():
-        return candidate.read_text(encoding="utf-8").strip()
+        # pywebpush accepts a PEM file path. Do not read PEM contents here:
+        # passing the raw PEM text makes py_vapid try to decode it as DER/base64.
+        return str(candidate)
 
     return value
 
@@ -62,6 +64,7 @@ def send_push_notification_to_all(
     sent = 0
     failed = 0
     deleted = 0
+    last_error: str | None = None
 
     subscriptions = list_active_push_subscriptions(conn)
 
@@ -84,10 +87,22 @@ def send_push_notification_to_all(
             sent += 1
         except WebPushException as exc:
             failed += 1
+            last_error = str(exc)
             response = getattr(exc, "response", None)
             status_code = getattr(response, "status_code", None)
             if status_code in (404, 410):
                 delete_push_subscription(conn, sub["endpoint"])
                 deleted += 1
+        except Exception as exc:
+            failed += 1
+            last_error = str(exc)
 
-    return {"sent": sent, "failed": failed, "deleted": deleted}
+    result = {
+        "active_subscriptions": len(subscriptions),
+        "sent": sent,
+        "failed": failed,
+        "deleted": deleted,
+    }
+    if last_error:
+        result["last_error"] = last_error
+    return result

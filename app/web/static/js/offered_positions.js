@@ -350,10 +350,10 @@
     const latestLabel = latestOnlyInput.checked && latestOffersDate
       ? ` · última publicación ${formatDate(latestOffersDate)}`
       : "";
-    resultsMetaEl.textContent = `${total} plazas encontradas${latestLabel}`;
+    resultsMetaEl.textContent = `${total} plazas disponibles encontradas${latestLabel}`;
 
     if (!items.length) {
-      tableBody.innerHTML = '<tr><td colspan="8" class="muted data-table__empty">No hay plazas para los filtros actuales.</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="8" class="muted data-table__empty">No hay plazas ofertadas disponibles actualmente para los filtros seleccionados.</td></tr>';
       return;
     }
 

@@ -43,5 +43,7 @@ echo "Inicio pipeline: $(date '+%F %T')"
 python run_sync_all.py
 python run_register_documents.py
 python run_parse_documents.py
+python run_update_position_lifecycle.py
+python run_send_notifications.py
 
 echo "Fin pipeline: $(date '+%F %T')"

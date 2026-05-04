@@ -1280,6 +1280,7 @@ def list_offered_positions(
     position_code: str | None = None,
     position_type: str | None = None,
     only_unmatched: bool | None = Query(None, description="True = puestos que no aparecen enlazados desde award_assignments"),
+    include_unavailable: bool = Query(False, description="True = incluir plazas adjudicadas o no disponibles"),
     origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
     origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
     order_by: str = Query("document_date"),
@@ -1330,6 +1331,8 @@ def list_offered_positions(
         where.append("NOT EXISTS (SELECT 1 FROM award_assignments aa WHERE aa.matched_offered_position_id = op.id)")
     elif only_unmatched is False:
         where.append("EXISTS (SELECT 1 FROM award_assignments aa WHERE aa.matched_offered_position_id = op.id)")
+    if not include_unavailable:
+        where.append("op.availability_status = 'available'")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     order_sql = build_order_by(order_by, order_dir, ALLOWED_OFFERED_ORDER_FIELDS, "d.document_date_iso")
@@ -1365,6 +1368,10 @@ def list_offered_positions(
             op.position_type,
             op.composition,
             op.observations,
+            op.availability_status,
+            op.availability_reason,
+            op.closed_by_document_id,
+            op.closed_at,
 
             c.denomination AS center_catalog_name,
             c.regime AS center_regime,
@@ -1410,6 +1417,7 @@ def list_difficult_positions(
     center_code: str | None = None,
     position_code: str | None = None,
     selected_only: bool | None = Query(None, description="True = solo puestos con al menos una persona seleccionada"),
+    include_unavailable: bool = Query(False, description="True = incluir plazas adjudicadas o no disponibles"),
     origin_lat: float | None = Query(None, description="Latitud opcional del origen para calcular distancia"),
     origin_lon: float | None = Query(None, description="Longitud opcional del origen para calcular distancia"),
     order_by: str = Query("document_date"),
@@ -1448,6 +1456,8 @@ def list_difficult_positions(
         where.append("EXISTS (SELECT 1 FROM difficult_coverage_candidates dc WHERE dc.position_id = p.id AND dc.is_selected IS TRUE)")
     elif selected_only is False:
         where.append("NOT EXISTS (SELECT 1 FROM difficult_coverage_candidates dc WHERE dc.position_id = p.id AND dc.is_selected IS TRUE)")
+    if not include_unavailable:
+        where.append("p.availability_status = 'available'")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     order_params: list[Any] = []
@@ -1493,6 +1503,10 @@ def list_difficult_positions(
             p.sorteo_number,
             p.registro_superior,
             p.registro_inferior,
+            p.availability_status,
+            p.availability_reason,
+            p.closed_by_document_id,
+            p.closed_at,
 
             c.denomination AS center_catalog_name,
             c.regime AS center_regime,
@@ -1811,6 +1825,12 @@ def list_non_docent_publications(
             p.publication_date_text,
             p.publication_date_iso,
             p.status_text,
+            p.is_current,
+            p.missing_since,
+            p.availability_status,
+            p.availability_reason,
+            p.closed_by_document_id,
+            p.closed_at,
             p.notes,
             g.code AS staff_group_code,
             g.name AS staff_group_name,
@@ -1847,6 +1867,7 @@ def list_non_docent_positions(
     locality: str | None = None,
     position_code: str | None = None,
     q: str | None = Query(None, description="Texto libre en denominación, centro o localidad"),
+    include_unavailable: bool = Query(False, description="True = incluir plazas adjudicadas o no disponibles"),
     order_by: str = Query("publication_date"),
     order_dir: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
@@ -1877,6 +1898,8 @@ def list_non_docent_positions(
         )
         pattern = f"%{q}%"
         params.extend([pattern, pattern, pattern])
+    if not include_unavailable:
+        where.append("pos.availability_status = 'available'")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     order_sql = build_order_by(
@@ -1915,6 +1938,10 @@ def list_non_docent_positions(
             pos.occupancy_percent,
             pos.functional_assignment,
             pos.reason,
+            pos.availability_status,
+            pos.availability_reason,
+            pos.closed_by_document_id,
+            pos.closed_at,
             pos.raw_row_text
         """
         + base_sql
