@@ -35,17 +35,16 @@ SITEMAP_PAGES: tuple[tuple[str, str, str], ...] = (
     ("/no-docente/plazas", "0.8", "daily"),
     ("/no-docente/adjudicaciones", "0.8", "daily"),
     ("/no-docente/publicaciones", "0.7", "daily"),
-    ("/no-docente/consulta-persona", "0.8", "daily"),
+    ("/no-docente/consulta-persona", "0.6", "daily"),
     ("/centros", "0.8", "weekly"),
-    ("/plazas-ofertadas", "0.9", "daily"),
-    ("/consulta-persona", "0.8", "daily"),
-    ("/dificil-cobertura", "0.9", "daily"),
+    ("/plazas-ofertadas", "0.8", "daily"),
+    ("/consulta-persona", "0.6", "daily"),
+    ("/dificil-cobertura", "0.8", "daily"),
     ("/quienes-somos", "0.5", "monthly"),
     ("/contacto", "0.4", "monthly"),
     ("/politica-privacidad", "0.3", "yearly"),
     ("/politica-cookies", "0.3", "yearly"),
 )
-
 
 def get_public_base_url(request: Request) -> str:
     """Return the public canonical base URL.
@@ -78,6 +77,18 @@ def build_base_json_ld(request: Request) -> list[dict]:
             "url": base_url,
             "description": DEFAULT_DESCRIPTION,
             "inLanguage": "es-ES",
+            "potentialAction": [
+                {
+                    "@type": "SearchAction",
+                    "target": f"{base_url}/consulta-persona?q={{{'search_term_string'}}}",
+                    "query-input": "required name=search_term_string",
+                },
+                {
+                    "@type": "SearchAction",
+                    "target": f"{base_url}/centros?q={{{'search_term_string'}}}",
+                    "query-input": "required name=search_term_string",
+                },
+            ],
         },
         {
             "@context": "https://schema.org",
@@ -126,6 +137,22 @@ def seo_context(
     if breadcrumbs:
         json_ld.append(build_breadcrumb_json_ld(request, breadcrumbs))
 
+    json_ld.append(
+        {
+            "@context": "https://schema.org",
+            "@type": "WebPage",
+            "name": page_title,
+            "description": page_description,
+            "url": absolute_url(request, path),
+            "inLanguage": "es-ES",
+            "isPartOf": {
+                "@type": "WebSite",
+                "name": "Funkcionario.com",
+                "url": get_public_base_url(request),
+            },
+        }
+    )
+
     if extra_json_ld:
         json_ld.extend(extra_json_ld)
 
@@ -150,7 +177,7 @@ def home(request: Request):
         context=seo_context(
             request,
             active_page="home",
-            page_title="funkcionario.com | Adjudicaciones docentes en la Comunitat Valenciana",
+            page_title="Funkcionario.com | Plazas y adjudicaciones docentes Comunidad Valenciana",
             page_description=(
                 "Consulta en Funkcionario.com plazas ofertadas, adjudicaciones docentes, "
                 "difícil cobertura y resultados de personal interino docente en la Comunitat Valenciana."
@@ -166,7 +193,7 @@ def valencia_docentes(request: Request):
     context = seo_context(
         request,
         active_page="valencia-docentes",
-        page_title="funkcionario.com | Consulta de plazas y adjudicaciones docentes",
+        page_title="Plazas y adjudicaciones docentes Comunidad Valenciana | Funkcionario.com",
         page_description=(
             "Panel de consulta para acceder a plazas ofertadas, consulta por persona, "
             "adjudicaciones y puestos de difícil cobertura docente en la Comunitat Valenciana."
@@ -189,7 +216,7 @@ def valencia_no_docentes(request: Request):
     context = seo_context(
         request,
         active_page="valencia-no-docentes",
-        page_title="funkcionario.com | Personal no docente de atención educativa",
+        page_title="Personal no docente Comunidad Valenciana | Plazas, adjudicaciones y bolsas",
         page_description=(
             "Panel de consulta para personal no docente de atención educativa: "
             "plazas ADC, adjudicaciones y bolsas de empleo temporal publicadas por Conselleria."
@@ -211,7 +238,7 @@ def non_docent_positions(request: Request):
     context = seo_context(
         request,
         active_page="valencia-no-docentes",
-        page_title="funkcionario.com | Plazas no docentes ofertadas",
+        page_title="Plazas personal no docente Educación Valencia | Convocatorias ADC EDU",
         page_description=(
             "Consulta plazas ADC ofertadas para personal no docente de atención educativa "
             "en la Comunitat Valenciana."
@@ -228,7 +255,7 @@ def non_docent_awards(request: Request):
     context = seo_context(
         request,
         active_page="valencia-no-docentes",
-        page_title="funkcionario.com | Adjudicaciones no docentes",
+        page_title="Adjudicaciones personal no docente Valencia | ADC EDU",
         page_description=(
             "Consulta adjudicaciones ADC publicadas para personal no docente de atención educativa."
         ),
@@ -244,7 +271,7 @@ def non_docent_publications(request: Request):
     context = seo_context(
         request,
         active_page="valencia-no-docentes",
-        page_title="funkcionario.com | Publicaciones no docentes oficiales",
+        page_title="Publicaciones personal no docente Valencia | Funkcionario.com",
         page_description=(
             "Consulta publicaciones oficiales de personal no docente de atención educativa "
             "detectadas y procesadas desde fuentes de Conselleria."
@@ -261,7 +288,7 @@ def non_docent_person_search(request: Request):
     context = seo_context(
         request,
         active_page="valencia-no-docentes",
-        page_title="funkcionario.com | Consulta no docente por persona",
+        page_title="Consulta personal no docente por persona | Funkcionario.com",
         page_description=(
             "Busca una persona en adjudicaciones y bolsas no docentes de atención educativa."
         ),
@@ -292,7 +319,7 @@ def offered_positions(request: Request):
     context = seo_context(
         request,
         active_page="valencia-docentes",
-        page_title="funkcionario.com | Plazas ofertadas docentes",
+        page_title="Plazas docentes ofertadas Comunidad Valenciana | Funkcionario.com",
         page_description=(
             "Consulta las últimas plazas docentes ofertadas en la Comunitat Valenciana, "
             "con filtros por fecha, localidad, centro, especialidad y distancia aproximada."
@@ -309,7 +336,7 @@ def person_search(request: Request):
     context = seo_context(
         request,
         active_page="valencia-docentes",
-        page_title="funkcionario.com | Consulta por persona",
+        page_title="Consulta adjudicaciones docentes por persona | Funkcionario.com",
         page_description=(
             "Busca coincidencias por nombre para consultar una ficha de adjudicaciones docentes, "
             "participación en procedimientos y difícil cobertura."
@@ -394,8 +421,8 @@ def center_search(request: Request):
             **seo_context(
                 request,
                 active_page="centros",
-                page_title="funkcionario.com | Buscador de centros educativos",
-                page_description="Busca centros educativos de la Comunitat Valenciana por nombre, localidad, provincia o dirección y consulta mapa, ruta y distancia aproximada.",
+                page_title="Buscador de centros educativos Comunidad Valenciana | Funkcionario.com",
+                page_description="Busca centros educativos de la Comunitat Valenciana por nombre, código, localidad o provincia y consulta mapa, ruta y distancia aproximada.",
                 path="/centros",
                 breadcrumbs=[("Inicio", "/"), ("Centros", "/centros")],
             ),
@@ -446,7 +473,7 @@ def difficult_coverage(request: Request):
     context = seo_context(
         request,
         active_page="valencia-docentes",
-        page_title="funkcionario.com | Difícil cobertura docente",
+        page_title="Difícil cobertura docentes Comunidad Valenciana | Funkcionario.com",
         page_description=(
             "Consulta puestos docentes de difícil cobertura en la Comunitat Valenciana, "
             "con filtros por especialidad, centro, localidad, fecha y distancia."
@@ -506,8 +533,6 @@ def robots_txt(request: Request) -> PlainTextResponse:
             "Disallow: /resultado-persona",
             "Disallow: /resultado-dificil-cobertura",
             "Disallow: /no-docente/resultado-persona",
-            "Disallow: /centros/",
-            "Disallow: /adjudicaciones/",
             "Disallow: /404",
             f"Sitemap: {base_url}/sitemap.xml",
             "",
@@ -568,7 +593,6 @@ Funkcionario.com trabaja a partir de publicaciones oficiales de RRHH Educación 
 - {base_url}/valencia-no-docentes
 - {base_url}/no-docente/plazas
 - {base_url}/no-docente/adjudicaciones
-- {base_url}/no-docente/publicaciones
 - {base_url}/no-docente/consulta-persona
 - {base_url}/plazas-ofertadas
 - {base_url}/consulta-persona

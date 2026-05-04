@@ -19,7 +19,7 @@
     <div class="module-card__header">
       <div>
         <h1>Personal no docente de atención educativa</h1>
-        <p>Seguimiento de plazas ADC, adjudicaciones, publicaciones y bolsas publicadas por Conselleria.</p>
+        <p>Seguimiento de plazas ADC, adjudicaciones y bolsas publicadas por Conselleria.</p>
       </div>
       <a class="button button--ghost" href="{{ official_non_docent_base_url }}" target="_blank" rel="noopener noreferrer">
         Fuente oficial
@@ -30,49 +30,15 @@
       <article class="panel-card">
         <div class="panel-card__title">
           <span class="panel-card__emoji">📊</span>
-          <h2>Información y avisos</h2>
+          <h2>Estado de datos</h2>
         </div>
         <div id="non-docent-summary" class="status-grid">
           <div class="status-grid__item"><span>Publicaciones</span><strong>—</strong></div>
-          <div class="status-grid__item"><span>Plazas disponibles</span><strong>—</strong></div>
+          <div class="status-grid__item"><span>Plazas</span><strong>—</strong></div>
           <div class="status-grid__item"><span>Adjudicaciones</span><strong>—</strong></div>
           <div class="status-grid__item"><span>Personas en bolsa</span><strong>—</strong></div>
         </div>
         <p id="non-docent-summary-feedback" class="panel-card__hint">Cargando resumen...</p>
-
-        <div class="panel-card__meta">
-          Ubicación: <strong id="nd-location-status">No activada · sin distancia calculada</strong>
-        </div>
-
-        <div class="stack-actions">
-          <p class="panel-card__hint">
-            Activa las alertas para recibir avisos cuando se detecten nuevas publicaciones relevantes. Las alertas son generales de Funkcionario.com.
-          </p>
-          <button id="nd-push-toggle-button" class="button button--ghost button--full" type="button">
-            Activar alertas de novedades
-          </button>
-        </div>
-
-        <div class="stack-actions">
-          <p id="nd-location-help" class="panel-card__hint">
-            Activa tu ubicación para calcular distancias aproximadas hasta centros cuando estén disponibles. La ubicación se guarda solo en tu navegador.
-          </p>
-          <button id="nd-use-my-location" class="button button--ghost button--full" type="button">
-            Usar mi ubicación
-          </button>
-          <button id="nd-clear-location" class="button button--ghost button--full is-hidden" type="button">
-            Borrar ubicación
-          </button>
-        </div>
-
-        <div id="nd-page-feedback" class="feedback"></div>
-
-        <p class="panel-card__hint">
-          La ubicación y las alertas requieren permisos del navegador. Consulta la
-          <a href="/politica-privacidad">Política de Privacidad</a>
-          y la
-          <a href="/politica-cookies">Política de Cookies</a>.
-        </p>
       </article>
 
       <article class="panel-card">
@@ -81,21 +47,18 @@
           <h2>Consultas disponibles</h2>
         </div>
         <p class="panel-card__hint">
-          Consulta plazas ofertadas, adjudicaciones definitivas, situación por persona y publicaciones oficiales no docentes.
+          Consulta las plazas ofertadas en convocatorias ADC, adjudicaciones definitivas y situación en bolsas no docentes.
         </p>
         <div class="stack-actions">
           <a class="button button--secondary button--full" href="/no-docente/plazas">Ver plazas ofertadas</a>
           <a class="button button--secondary button--full" href="/no-docente/adjudicaciones">Ver adjudicaciones</a>
           <a class="button button--secondary button--full" href="/no-docente/consulta-persona">Consulta por persona</a>
-          <a class="button button--secondary button--full" href="/no-docente/publicaciones">Ver publicaciones oficiales</a>
-          <a class="button button--secondary button--full" href="/centros">Buscar centros educativos</a>
           <a class="button button--ghost button--full" href="{{ official_non_docent_bags_url }}" target="_blank" rel="noopener noreferrer">Bolsas oficiales</a>
         </div>
       </article>
     </div>
   </section>
-
-  <section class="content-card content-stack--standalone">
+<section class="content-card content-stack--standalone">
     <div class="content-card__header">
       <div>
         <h2>Colectivos monitorizados</h2>
@@ -108,7 +71,7 @@
           <tr>
             <th>Colectivo</th>
             <th>Publicaciones</th>
-            <th>Plazas detectadas</th>
+            <th>Plazas</th>
             <th>Adjudicaciones</th>
             <th>Bolsa</th>
             <th>Última fecha</th>
@@ -118,12 +81,22 @@
       </table>
     </div>
   </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>Últimas publicaciones</h2>
+        <p>Publicaciones no docentes detectadas más recientes.</p>
+      </div>
+    </div>
+    <div id="non-docent-latest-publications" class="result-list"></div>
+  </section>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=6"></script>
-<script src="{{ url_for('static', path='js/non_docent_home.js') }}?v=6"></script>
+<script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=5"></script>
+<script src="{{ url_for('static', path='js/non_docent_home.js') }}?v=5"></script>
 <script>
   // Fallback defensivo: si por caché o bloqueo no se ejecuta el JS estático,
   // carga el resumen mínimo desde la API para no dejar la pantalla en “Cargando…”.
@@ -149,27 +122,23 @@
       return parts.length === 3 ? parts[2] + '/' + parts[1] + '/' + parts[0] : String(value);
     }
 
-    Promise.all([
-      fetch('/api/non-docent/summary', { headers: { Accept: 'application/json' } }).then(function (r) { return r.json(); }),
-      fetch('/api/non-docent/positions?limit=1', { headers: { Accept: 'application/json' } }).then(function (r) { return r.json(); }).catch(function () { return { total: 0 }; })
-    ])
-      .then(function (responses) {
-        var data = responses[0] || {};
-        var positions = responses[1] || {};
+    fetch('/api/non-docent/summary', { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
         var totals = data.totals || {};
-        totals.available_positions = Number(positions.total || 0);
         var summary = document.getElementById('non-docent-summary');
         var groupsMeta = document.getElementById('non-docent-groups-meta');
         var groupsBody = document.getElementById('non-docent-groups-body');
+        var latest = document.getElementById('non-docent-latest-publications');
 
         if (summary) {
           summary.innerHTML =
             '<div class="status-grid__item"><span>Publicaciones</span><strong>' + num(totals.publications) + '</strong></div>' +
-            '<div class="status-grid__item"><span>Plazas disponibles</span><strong>' + num(totals.available_positions || 0) + '</strong></div>' +
+            '<div class="status-grid__item"><span>Plazas</span><strong>' + num(totals.offered_positions) + '</strong></div>' +
             '<div class="status-grid__item"><span>Adjudicaciones</span><strong>' + num(totals.awards) + '</strong></div>' +
             '<div class="status-grid__item"><span>Personas en bolsa</span><strong>' + num(totals.bag_members) + '</strong></div>';
         }
-        feedback.textContent = 'Datos cargados desde publicaciones oficiales procesadas. Las plazas adjudicadas o ya no visibles no se muestran como disponibles. ' + num(totals.offered_positions) + ' plazas detectadas en total.';
+        feedback.textContent = 'Datos cargados desde publicaciones oficiales procesadas.';
 
         var groups = data.by_group || [];
         if (groupsMeta) groupsMeta.textContent = groups.length + ' colectivos con datos detectados.';
@@ -178,12 +147,22 @@
             return '<tr>' +
               '<td data-label="Colectivo"><strong>' + esc(g.staff_group_code || '—') + '</strong><br><span class="muted">' + esc(g.staff_group_name || '—') + '</span></td>' +
               '<td data-label="Publicaciones">' + num(g.publications_count) + '</td>' +
-              '<td data-label="Plazas detectadas">' + num(g.offered_positions_count) + '</td>' +
+              '<td data-label="Plazas">' + num(g.offered_positions_count) + '</td>' +
               '<td data-label="Adjudicaciones">' + num(g.awards_count) + '</td>' +
               '<td data-label="Bolsa">' + num(g.bag_members_count) + '</td>' +
               '<td data-label="Última fecha">' + esc(date(g.latest_publication_date)) + '</td>' +
             '</tr>';
           }).join('') || '<tr><td colspan="6" class="muted data-table__empty">No hay colectivos cargados.</td></tr>';
+        }
+        if (latest) {
+          latest.innerHTML = (data.latest_publications || []).slice(0, 8).map(function (item) {
+            return '<article class="result-item"><div>' +
+              '<h3>' + esc(item.title || 'Publicación') + '</h3>' +
+              '<p>' + esc(item.staff_group_name || 'Sin colectivo') + ' · ' + esc(date(item.publication_date_iso)) + '</p>' +
+              '</div><div class="data-table__actions">' +
+              (item.document_url ? '<a class="button button--ghost button--xs" href="' + esc(item.document_url) + '" target="_blank" rel="noopener noreferrer">PDF</a>' : '—') +
+              '</div></article>';
+          }).join('') || '<p class="muted">No hay publicaciones.</p>';
         }
       })
       .catch(function (error) {
