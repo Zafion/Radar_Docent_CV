@@ -37,7 +37,7 @@ def send_telegram_message(text: str) -> dict[str, Any]:
     if not token or not chat_id:
         raise RuntimeError("telegram_not_configured")
 
-    disable_preview = os.getenv("TELEGRAM_DISABLE_WEB_PAGE_PREVIEW", "false").strip().lower() in {
+    disable_preview = os.getenv("TELEGRAM_DISABLE_WEB_PAGE_PREVIEW", "true").strip().lower() in {
         "1", "true", "yes", "on"
     }
     payload = {"chat_id": chat_id, "text": text, "disable_web_page_preview": disable_preview}
