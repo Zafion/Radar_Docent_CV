@@ -45,5 +45,6 @@ python run_register_documents.py
 python run_parse_documents.py
 python run_update_position_lifecycle.py
 python run_send_notifications.py
+python run_publish_notifications.py
 
 echo "Fin pipeline: $(date '+%F %T')"

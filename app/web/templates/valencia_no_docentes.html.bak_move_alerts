@@ -31,17 +31,6 @@
         <div class="panel-card__title">
           <span class="panel-card__emoji">📊</span>
           <h2>Estado de datos</h2>
-        
-
-        <div class="stack-actions">
-          <p class="panel-card__hint">
-            Los avisos automáticos están centralizados en una página propia, junto con Telegram, RSS y alertas del navegador.
-          </p>
-          <a class="button button--ghost button--full" href="/avisos">
-            Ver avisos y alertas
-          </a>
-        </div>
-
         </div>
         <div id="non-docent-summary" class="status-grid">
           <div class="status-grid__item"><span>Publicaciones</span><strong>—</strong></div>

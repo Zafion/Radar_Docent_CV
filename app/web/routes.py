@@ -5,8 +5,12 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.templating import Jinja2Templates
+
+from app.services.telegram_notifications import get_telegram_channel_url
+from app.storage.db import get_connection
+from app.storage.public_alert_store import count_public_alerts, list_public_alerts
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -32,6 +36,7 @@ SITEMAP_PAGES: tuple[tuple[str, str, str], ...] = (
     ("/", "1.0", "daily"),
     ("/valencia-docentes", "0.9", "daily"),
     ("/valencia-no-docentes", "0.9", "daily"),
+    ("/avisos", "0.8", "hourly"),
     ("/no-docente/plazas", "0.8", "daily"),
     ("/no-docente/adjudicaciones", "0.8", "daily"),
     ("/no-docente/publicaciones", "0.7", "daily"),
@@ -231,6 +236,98 @@ def valencia_no_docentes(request: Request):
         }
     )
     return TEMPLATES.TemplateResponse(request=request, name="valencia_no_docentes.html", context=context)
+
+
+@router.get("/avisos", response_class=HTMLResponse)
+def public_alerts_page(request: Request):
+    context = seo_context(
+        request,
+        active_page="avisos",
+        page_title="Avisos de publicaciones oficiales | Funkcionario.com",
+        page_description=(
+            "Últimos avisos públicos de Funkcionario.com sobre plazas, adjudicaciones, "
+            "difícil cobertura y publicaciones de personal docente y no docente en la Comunitat Valenciana."
+        ),
+        path="/avisos",
+        breadcrumbs=[("Inicio", "/"), ("Avisos", "/avisos")],
+    )
+    conn = get_connection()
+    alerts = list_public_alerts(conn, limit=50, offset=0)
+    total = count_public_alerts(conn)
+    context.update(
+        {
+            "alerts": alerts,
+            "alerts_total": total,
+            "telegram_channel_url": get_telegram_channel_url(),
+        }
+    )
+    return TEMPLATES.TemplateResponse(request=request, name="public_alerts.html", context=context)
+
+
+def _feed_alerts(limit: int = 50) -> list[dict]:
+    conn = get_connection()
+    return list_public_alerts(conn, limit=limit, offset=0)
+
+
+@router.get("/feed.xml", include_in_schema=False)
+def alerts_feed_xml(request: Request) -> Response:
+    base_url = get_public_base_url(request)
+    alerts = _feed_alerts(limit=50)
+    items = []
+    for alert in alerts:
+        link = alert.get("public_url") or "/avisos"
+        if not str(link).startswith(("http://", "https://")):
+            link = f"{base_url}{link}"
+        pub_date = alert.get("detected_at") or alert.get("created_at") or ""
+        items.append(
+            "  <item>\n"
+            f"    <title>{escape(str(alert.get('title') or 'Aviso Funkcionario'))}</title>\n"
+            f"    <link>{escape(str(link))}</link>\n"
+            f"    <guid isPermaLink=\"false\">{escape(str(alert.get('event_key') or alert.get('id')))}</guid>\n"
+            f"    <description>{escape(str(alert.get('summary') or ''))}</description>\n"
+            f"    <pubDate>{escape(str(pub_date))}</pubDate>\n"
+            "  </item>"
+        )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<rss version="2.0">\n'
+        '<channel>\n'
+        '  <title>Funkcionario.com · Avisos</title>\n'
+        f"  <link>{escape(base_url + '/avisos')}</link>\n"
+        '  <description>Avisos públicos de nuevas publicaciones oficiales procesadas por Funkcionario.com.</description>\n'
+        + "\n".join(items)
+        + "\n</channel>\n</rss>\n"
+    )
+    return Response(content=xml, media_type="application/rss+xml; charset=utf-8")
+
+
+@router.get("/feed.json", include_in_schema=False)
+def alerts_feed_json(request: Request) -> JSONResponse:
+    base_url = get_public_base_url(request)
+    alerts = _feed_alerts(limit=50)
+    items = []
+    for alert in alerts:
+        link = alert.get("public_url") or "/avisos"
+        if not str(link).startswith(("http://", "https://")):
+            link = f"{base_url}{link}"
+        items.append(
+            {
+                "id": str(alert.get("event_key") or alert.get("id")),
+                "url": link,
+                "title": alert.get("title"),
+                "content_text": alert.get("summary"),
+                "date_published": alert.get("detected_at") or alert.get("created_at"),
+            }
+        )
+    return JSONResponse(
+        {
+            "version": "https://jsonfeed.org/version/1.1",
+            "title": "Funkcionario.com · Avisos",
+            "home_page_url": base_url,
+            "feed_url": f"{base_url}/feed.json",
+            "items": items,
+        }
+    )
 
 
 @router.get("/no-docente/plazas", response_class=HTMLResponse)
@@ -591,6 +688,9 @@ Funkcionario.com trabaja a partir de publicaciones oficiales de RRHH Educación 
 - {base_url}/
 - {base_url}/valencia-docentes
 - {base_url}/valencia-no-docentes
+- {base_url}/avisos
+- {base_url}/feed.xml
+- {base_url}/feed.json
 - {base_url}/no-docente/plazas
 - {base_url}/no-docente/adjudicaciones
 - {base_url}/no-docente/consulta-persona

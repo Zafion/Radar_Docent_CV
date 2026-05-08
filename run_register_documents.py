@@ -4,6 +4,7 @@ from app.services.document_registry import DocumentRegistryService, RegisteredDo
 from app.services.push_notifications import is_push_configured
 from app.storage.db import get_connection
 from app.storage.push_event_store import enqueue_push_notification_event
+from app.storage.public_alert_store import enqueue_public_alert
 from run_send_notifications import main as send_pending_notifications
 
 
@@ -79,6 +80,7 @@ def build_push_batches(items: list[RegisteredDocument]) -> list[dict[str, object
                 "body": singular_body if count == 1 else plural_body.format(count=count),
                 "url": url,
                 "document_ids": document_ids(selected),
+                "public_url": url,
             }
         )
 
@@ -180,6 +182,16 @@ if push_batches:
     try:
         for batch in push_batches:
             print(f"- {batch['key']}: {batch['count']} documento(s)")
+            enqueue_public_alert(
+                conn,
+                event_key=str(batch["event_key"]),
+                event_type=str(batch["event_type"]),
+                title=str(batch["title"]),
+                summary=str(batch["body"]),
+                public_url=str(batch["public_url"]),
+                source_url=None,
+                payload={"document_ids": batch["document_ids"], "count": batch["count"]},
+            )
             enqueue_push_notification_event(
                 conn,
                 event_key=str(batch["event_key"]),

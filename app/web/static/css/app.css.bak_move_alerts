@@ -1327,24 +1327,3 @@ button:disabled {
     width: 100%;
   }
 }
-
-
-/* Avisos: suscripción centralizada en /avisos */
-.public-alerts-tools--subscription {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.public-alerts-tools__main,
-.public-alerts-tools__note,
-.public-alerts-tools__technical,
-.public-alerts-feedback {
-  grid-column: 1 / -1;
-}
-
-.public-alerts-tools__actions--primary {
-  justify-content: flex-start;
-}
-
-.public-alerts-tools__technical a {
-  font-weight: 800;
-}

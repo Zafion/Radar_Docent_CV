@@ -38,6 +38,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+  <link rel="alternate" type="application/rss+xml" title="Funkcionario.com · Avisos RSS" href="/feed.xml">
+  <link rel="alternate" type="application/feed+json" title="Funkcionario.com · Avisos JSON" href="/feed.json">
   <link rel="stylesheet" href="{{ url_for('static', path='css/ui-overrides.css') }}">
 
   {% if seo_json_ld %}
@@ -74,6 +76,7 @@
       <div class="site-footer__links">
         <a href="/">Inicio</a>
         <a href="/quienes-somos">Quiénes Somos</a>
+        <a href="/avisos">Avisos</a>
         <a href="/contacto">Contacto</a>
         <a href="/politica-privacidad">Privacidad</a>
         <a href="/politica-cookies">Cookies</a>

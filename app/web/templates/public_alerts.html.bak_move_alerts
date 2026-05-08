@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">Avisos públicos automáticos</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="/">Inicio</a>
+    <span>›</span>
+    Avisos
+  </div>
+
+  <section class="module-card public-alerts-module">
+    <div class="module-card__header">
+      <div>
+        <h1>Últimas novedades detectadas</h1>
+        <p>Publicaciones oficiales procesadas por Funkcionario.com. No necesitas registrarte ni ceder email o teléfono para consultar los avisos.</p>
+      </div>
+    </div>
+
+    <div class="panel-card public-alerts-tools public-alerts-tools--subscription">
+      <div class="public-alerts-tools__main">
+        <h2>Recibe avisos automáticos</h2>
+        <p>El canal principal de avisos es Telegram. También puedes activar alertas del navegador en este dispositivo.</p>
+      </div>
+      <div class="public-alerts-tools__actions public-alerts-tools__actions--primary">
+        {% if telegram_channel_url %}
+        <a class="button button--primary" href="{{ telegram_channel_url }}" rel="noopener" target="_blank">Unirme al canal de Telegram</a>
+        {% endif %}
+        <button id="push-toggle-button" class="button button--ghost" type="button">
+          Activar alertas de navegador
+        </button>
+      </div>
+      <div id="page-feedback" class="feedback public-alerts-feedback"></div>
+      <p class="panel-card__hint public-alerts-tools__note">
+        Telegram no requiere que Funkcionario.com guarde tu teléfono, email ni datos personales. Las alertas del navegador dependen de los permisos de este dispositivo.
+      </p>
+      <p class="panel-card__hint public-alerts-tools__technical">
+        Formatos técnicos para lectores de noticias e integraciones: <a href="/feed.xml">RSS</a> · <a href="/feed.json">JSON</a>.
+      </p>
+    </div>
+
+    <div class="panel-card public-alerts-history">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Histórico público</p>
+          <h2>Avisos recientes</h2>
+        </div>
+        <p class="muted">{{ alerts_total }} avisos registrados.</p>
+      </div>
+
+      {% if alerts %}
+        <div class="public-alerts-list">
+          {% for alert in alerts %}
+            <article class="public-alert-card">
+              <div class="public-alert-card__meta">
+                <span>{{ alert.detected_at or alert.created_at }}</span>
+                <span>{{ alert.event_type }}</span>
+              </div>
+              <h3>{{ alert.title }}</h3>
+              <p>{{ alert.summary }}</p>
+              <div class="public-alert-card__actions">
+                <a class="button button--primary" href="{{ alert.public_url }}">Consultar</a>
+                {% if alert.source_url %}
+                  <a class="button button--secondary" href="{{ alert.source_url }}" rel="noopener" target="_blank">Fuente oficial</a>
+                {% endif %}
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <h3>Aún no hay avisos públicos registrados.</h3>
+          <p>Cuando el pipeline detecte nuevas publicaciones oficiales, aparecerán aquí automáticamente.</p>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/app.js') }}?v=7"></script>
+{% endblock %}

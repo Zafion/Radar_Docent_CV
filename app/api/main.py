@@ -29,6 +29,7 @@ from app.storage.push_subscription_store import (
     upsert_push_subscription,
     deactivate_push_subscription,
 )
+from app.storage.public_alert_store import count_public_alerts, list_public_alerts
 from app.api.rate_limit import ApiRateLimitMiddleware
 
 
@@ -486,6 +487,20 @@ def build_user_view(
     return base
 
 
+
+# ---------- public alerts ----------
+
+@app.get("/api/public-alerts")
+def api_public_alerts(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
+    conn = get_connection()
+    items = list_public_alerts(conn, limit=limit, offset=offset)
+    total = count_public_alerts(conn)
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
 # ---------- push ----------
 
 @app.get("/api/push/public-key")
@@ -568,6 +583,7 @@ def health() -> dict[str, Any]:
             "push_subscriptions": conn.execute(
                 "SELECT COUNT(*) FROM push_subscriptions WHERE is_active = TRUE"
             ).fetchone()[0],
+            "public_alerts": conn.execute("SELECT COUNT(*) FROM public_alerts").fetchone()[0],
         }
         latest_docs = rows_to_dicts(
             conn.execute(

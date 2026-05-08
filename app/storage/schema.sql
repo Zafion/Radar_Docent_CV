@@ -568,3 +568,43 @@ CREATE INDEX IF NOT EXISTS idx_non_docent_positions_availability_status
 
 CREATE INDEX IF NOT EXISTS idx_push_notification_events_status_created_at
     ON push_notification_events(status, created_at);
+
+-- ============================================================================
+-- Avisos públicos sin usuarios y publicación automática multicanal
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public_alerts (
+    id BIGSERIAL PRIMARY KEY,
+    event_key TEXT NOT NULL UNIQUE,
+    event_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    public_url TEXT NOT NULL,
+    source_url TEXT,
+    payload_json JSONB,
+    detected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS notification_posts (
+    id BIGSERIAL PRIMARY KEY,
+    alert_id BIGINT NOT NULL REFERENCES public_alerts(id) ON DELETE CASCADE,
+    channel TEXT NOT NULL,
+    rendered_text TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    published_at TIMESTAMPTZ,
+    external_message_id TEXT,
+    error_message TEXT,
+    UNIQUE(alert_id, channel)
+);
+
+CREATE INDEX IF NOT EXISTS idx_public_alerts_detected_at
+    ON public_alerts(detected_at DESC, id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_public_alerts_event_type
+    ON public_alerts(event_type);
+
+CREATE INDEX IF NOT EXISTS idx_notification_posts_channel_status_created_at
+    ON notification_posts(channel, status, created_at);

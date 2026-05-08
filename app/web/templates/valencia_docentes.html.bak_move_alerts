@@ -37,15 +37,6 @@
         <div class="panel-card__meta">
           Ubicación: <strong id="location-status">No activada</strong>
         </div>
-
-        <div class="stack-actions">
-          <p class="panel-card__hint">
-            Los avisos automáticos están centralizados en una página propia, junto con Telegram, RSS y alertas del navegador.
-          </p>
-          <a class="button button--ghost button--full" href="/avisos">
-            Ver avisos y alertas
-          </a>
-        </div>
         <div class="stack-actions">
           <p id="location-help" class="panel-card__hint">
             Activa tu ubicación para calcular la distancia aproximada hasta cada centro y abrir rutas directas en Maps. La ubicación se guarda solo en tu navegador.
@@ -70,7 +61,7 @@
         <div id="page-feedback" class="feedback"></div>
 
         <p class="panel-card__hint">
-          La ubicación requiere permisos del navegador. Esta web puede utilizar almacenamiento técnico del navegador para funciones como las notificaciones. Consulta la
+          La ubicación y las alertas requieren permisos del navegador. Esta web puede utilizar almacenamiento técnico del navegador para funciones como las notificaciones. Consulta la
           <a href="/politica-privacidad">Política de Privacidad</a>
           y la
           <a href="/politica-cookies">Política de Cookies</a>.
