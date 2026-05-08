@@ -495,9 +495,9 @@ def api_public_alerts(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
-    conn = get_connection()
-    items = list_public_alerts(conn, limit=limit, offset=offset)
-    total = count_public_alerts(conn)
+    with get_connection() as conn:
+        items = list_public_alerts(conn, limit=limit, offset=offset)
+        total = count_public_alerts(conn)
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
