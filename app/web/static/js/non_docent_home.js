@@ -42,6 +42,7 @@
     const feedbackEl = document.getElementById("non-docent-summary-feedback");
     const groupsMetaEl = document.getElementById("non-docent-groups-meta");
     const groupsBodyEl = document.getElementById("non-docent-groups-body");
+    const latestPublicationsEl = document.getElementById("non-docent-latest-publications");
     const ui = window.NonDocentUI || fallbackUI();
 
     ui.bindLocationControls?.({
@@ -54,6 +55,38 @@
 
     if (!summaryEl || !feedbackEl || !groupsMetaEl || !groupsBodyEl) return;
 
+    function renderLatestPublications(data) {
+      if (!latestPublicationsEl) return;
+
+      const latest = (data.latest_publications || []).slice(0, 8);
+      if (!latest.length) {
+        latestPublicationsEl.innerHTML = '<p class="muted">No hay publicaciones no docentes detectadas todavía.</p>';
+        return;
+      }
+
+      latestPublicationsEl.innerHTML = latest.map((item) => {
+        const title = item.title || item.publication_title || "Publicación no docente";
+        const group = item.staff_group_name || item.staff_group_code || "Personal no docente";
+        const date = item.publication_date_iso || item.document_date_iso || "";
+        const kind = item.publication_kind || item.asset_role || "";
+        const pdfButton = item.document_url
+          ? `<a class="button button--ghost button--xs" href="${ui.escapeHtml(item.document_url)}" target="_blank" rel="noopener noreferrer">PDF oficial</a>`
+          : "";
+
+        return `
+          <article class="result-item">
+            <div>
+              <h3>${ui.escapeHtml(title)}</h3>
+              <p>${ui.escapeHtml(group)} · ${ui.escapeHtml(ui.formatDate(date))}${kind ? " · " + ui.escapeHtml(kind) : ""}</p>
+            </div>
+            <div class="data-table__actions">
+              ${pdfButton || '<span class="muted">Sin PDF</span>'}
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
     function renderSummary(data) {
       const totals = data.totals || {};
       summaryEl.innerHTML = `
@@ -63,6 +96,7 @@
         <div class="status-grid__item"><span>Personas en bolsa</span><strong>${ui.compactNumber(totals.bag_members)}</strong></div>
       `;
       feedbackEl.textContent = `Datos cargados desde publicaciones oficiales procesadas. Las plazas adjudicadas o ya no visibles no se muestran como disponibles. ${ui.compactNumber(totals.offered_positions)} plazas detectadas en total.`;
+      renderLatestPublications(data);
 
       groupsMetaEl.textContent = `${(data.by_group || []).length} colectivos con datos detectados.`;
       groupsBodyEl.innerHTML = (data.by_group || []).map((group) => `
