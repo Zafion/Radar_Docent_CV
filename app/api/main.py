@@ -10,7 +10,7 @@ from typing import Any, Iterable, Sequence
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -74,6 +74,15 @@ def service_worker() -> FileResponse:
         BASE_DIR / "web" / "static" / "js" / "sw.js",
         media_type="application/javascript",
     )
+
+
+@app.get("/{filename}.txt", response_class=PlainTextResponse, include_in_schema=False)
+def indexnow_key_file(filename: str) -> PlainTextResponse:
+    key = os.getenv("INDEXNOW_KEY", "").strip()
+    if not key or filename != key:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    return PlainTextResponse(key, media_type="text/plain; charset=utf-8")
 
 
 app.add_middleware(
