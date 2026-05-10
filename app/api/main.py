@@ -87,6 +87,63 @@ app.add_middleware(
 app.add_middleware(ApiRateLimitMiddleware)
 
 
+SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "frame-ancestors 'self'; "
+        "frame-src 'none'; "
+        "worker-src 'self'; "
+        "manifest-src 'self'"
+    ),
+    "X-Frame-Options": "SAMEORIGIN",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": (
+        "accelerometer=(), "
+        "ambient-light-sensor=(), "
+        "autoplay=(), "
+        "battery=(), "
+        "camera=(), "
+        "clipboard-read=(), "
+        "clipboard-write=(), "
+        "display-capture=(), "
+        "document-domain=(), "
+        "encrypted-media=(), "
+        "fullscreen=(self), "
+        "geolocation=(self), "
+        "gyroscope=(), "
+        "magnetometer=(), "
+        "microphone=(), "
+        "midi=(), "
+        "payment=(), "
+        "picture-in-picture=(), "
+        "publickey-credentials-get=(), "
+        "screen-wake-lock=(), "
+        "sync-xhr=(), "
+        "usb=(), "
+        "web-share=(self), "
+        "xr-spatial-tracking=(), "
+        "browsing-topics=()"
+    ),
+    "X-Content-Type-Options": "nosniff",
+}
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for header_name, header_value in SECURITY_HEADERS.items():
+        response.headers.setdefault(header_name, header_value)
+    return response
+
+
 @app.exception_handler(StarletteHTTPException)
 async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
     if exc.status_code != 404:
