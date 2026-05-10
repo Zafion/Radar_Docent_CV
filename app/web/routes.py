@@ -5,7 +5,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app.services.telegram_notifications import get_telegram_channel_url
@@ -48,7 +48,6 @@ SITEMAP_PAGES: tuple[tuple[str, str, str], ...] = (
     ("/quienes-somos", "0.5", "monthly"),
     ("/contacto", "0.4", "monthly"),
     ("/politica-privacidad", "0.3", "yearly"),
-    ("/politica-cookies", "0.3", "yearly"),
 )
 
 def get_public_base_url(request: Request) -> str:
@@ -176,21 +175,19 @@ def seo_context(
 
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    return TEMPLATES.TemplateResponse(
-        request=request,
-        name="home.html",
-        context=seo_context(
-            request,
-            active_page="home",
-            page_title="Funkcionario.com | Plazas y adjudicaciones docentes Comunidad Valenciana",
-            page_description=(
-                "Consulta en Funkcionario.com plazas ofertadas, adjudicaciones docentes, "
-                "difícil cobertura y resultados de personal interino docente en la Comunitat Valenciana."
-            ),
-            path="/",
-            breadcrumbs=[("Inicio", "/")],
+    context = seo_context(
+        request,
+        active_page="home",
+        page_title="Funkcionario.com | Plazas y adjudicaciones docentes Comunidad Valenciana",
+        page_description=(
+            "Consulta en Funkcionario.com plazas ofertadas, adjudicaciones docentes, "
+            "difícil cobertura y resultados de personal interino docente en la Comunitat Valenciana."
         ),
+        path="/",
+        breadcrumbs=[("Inicio", "/")],
     )
+    context.update({"telegram_channel_url": get_telegram_channel_url()})
+    return TEMPLATES.TemplateResponse(request=request, name="home.html", context=context)
 
 
 @router.get("/valencia-docentes", response_class=HTMLResponse)
@@ -712,7 +709,7 @@ def politica_privacidad(request: Request):
     context = seo_context(
         request,
         active_page="legal",
-        page_title="funkcionario.com | Política de privacidad",
+        page_title="Política de Privacidad y Cookies | Funkcionario.com",
         page_description="Política de privacidad de Funkcionario.com.",
         path="/politica-privacidad",
         breadcrumbs=[("Inicio", "/"), ("Privacidad", "/politica-privacidad")],
@@ -726,20 +723,6 @@ def politica_privacidad(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="politica_privacidad.html", context=context)
 
 
-@router.get("/politica-cookies", response_class=HTMLResponse)
-def politica_cookies(request: Request):
-    context = seo_context(
-        request,
-        active_page="legal",
-        page_title="funkcionario.com | Política de cookies",
-        page_description="Política de cookies y almacenamiento técnico de Funkcionario.com.",
-        path="/politica-cookies",
-        breadcrumbs=[("Inicio", "/"), ("Cookies", "/politica-cookies")],
-    )
-    context.update(
-        {
-            "project_email": PROJECT_EMAIL,
-            "project_owner": PROJECT_OWNER,
-        }
-    )
-    return TEMPLATES.TemplateResponse(request=request, name="politica_cookies.html", context=context)
+@router.get("/politica-cookies", include_in_schema=False)
+def politica_cookies_redirect():
+    return RedirectResponse(url="/politica-privacidad", status_code=301)

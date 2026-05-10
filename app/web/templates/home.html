@@ -34,11 +34,13 @@
       <div>
         <p class="eyebrow">Avisos sin registro</p>
         <h2>Recibe novedades sin ceder email ni teléfono</h2>
-        <p>Consulta avisos públicos automáticos sobre nuevas publicaciones oficiales. También puedes seguir el feed RSS/JSON o el canal público de Telegram cuando esté configurado.</p>
+        <p>Consulta avisos públicos automáticos sobre nuevas publicaciones oficiales. También puedes unirte al canal público de Telegram para recibir las novedades sin que Funkcionario.com almacene tu email ni tu teléfono.</p>
       </div>
       <div class="public-alerts-entry__actions">
         <a class="button button--primary" href="/avisos">Ver avisos</a>
-        <a class="button button--secondary" href="/feed.xml">RSS</a>
+        {% if telegram_channel_url %}
+        <a class="button button--secondary" href="{{ telegram_channel_url }}" target="_blank" rel="noopener noreferrer">Canal Telegram</a>
+        {% endif %}
       </div>
     </section>
 
