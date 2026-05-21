@@ -31,23 +31,19 @@ def get_telegram_channel_url() -> str | None:
     return None
 
 
-def send_telegram_message(text: str) -> dict[str, Any]:
+def _telegram_json_request(method: str, payload: dict[str, Any]) -> dict[str, Any]:
     token = get_telegram_bot_token()
-    chat_id = get_telegram_channel_id()
-    if not token or not chat_id:
+    if not token:
         raise RuntimeError("telegram_not_configured")
 
-    disable_preview = os.getenv("TELEGRAM_DISABLE_WEB_PAGE_PREVIEW", "true").strip().lower() in {
-        "1", "true", "yes", "on"
-    }
-    payload = {"chat_id": chat_id, "text": text, "disable_web_page_preview": disable_preview}
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(
-        f"{TELEGRAM_API_BASE}/bot{token}/sendMessage",
+        f"{TELEGRAM_API_BASE}/bot{token}/{method}",
         data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
+
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
             body = response.read().decode("utf-8")
@@ -61,3 +57,41 @@ def send_telegram_message(text: str) -> dict[str, Any]:
     if not result.get("ok"):
         raise RuntimeError(f"telegram_api_error: {result}")
     return result
+
+
+def send_telegram_message(text: str) -> dict[str, Any]:
+    chat_id = get_telegram_channel_id()
+    if not get_telegram_bot_token() or not chat_id:
+        raise RuntimeError("telegram_not_configured")
+
+    disable_preview = os.getenv("TELEGRAM_DISABLE_WEB_PAGE_PREVIEW", "true").strip().lower() in {
+        "1", "true", "yes", "on"
+    }
+
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "disable_web_page_preview": disable_preview,
+    }
+    return _telegram_json_request("sendMessage", payload)
+
+
+def send_telegram_photo(photo_url: str, caption: str | None = None) -> dict[str, Any]:
+    """Send a public image URL to Telegram with an optional caption.
+
+    Telegram can fetch the image directly from the public URL, so the image files
+    must be reachable from the production domain, for example:
+    https://funkcionario.com/static/img/telegram/telegram_docent_awards.png
+    """
+    chat_id = get_telegram_channel_id()
+    if not get_telegram_bot_token() or not chat_id:
+        raise RuntimeError("telegram_not_configured")
+
+    payload: dict[str, Any] = {
+        "chat_id": chat_id,
+        "photo": photo_url,
+    }
+    if caption:
+        payload["caption"] = caption
+
+    return _telegram_json_request("sendPhoto", payload)
