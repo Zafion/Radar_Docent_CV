@@ -295,6 +295,32 @@ def build_order_by(field: str, direction: str, allowed: dict[str, str], fallback
     return f" ORDER BY {sql_field} {sql_dir} "
 
 
+def build_distance_order_by(direction: str, secondary_sql: str) -> str:
+    """
+    Ordena por distancia real Haversine en PostgreSQL cuando el cliente envía
+    origin_lat/origin_lon. Mantiene los centros sin coordenadas al final.
+    """
+    sql_dir = "DESC" if direction.lower() == "desc" else "ASC"
+
+    return f"""
+        ORDER BY
+            CASE WHEN c.latitude IS NULL OR c.longitude IS NULL THEN 1 ELSE 0 END ASC,
+            (
+                2 * 6371.0088 * ASIN(
+                    LEAST(
+                        1.0::double precision,
+                        SQRT(
+                            POWER(SIN(RADIANS((CAST(c.latitude AS double precision) - ?) / 2.0)), 2)
+                            + COS(RADIANS(?)) * COS(RADIANS(CAST(c.latitude AS double precision)))
+                            * POWER(SIN(RADIANS((CAST(c.longitude AS double precision) - ?) / 2.0)), 2)
+                        )
+                    )
+                )
+            ) {sql_dir},
+            {secondary_sql}
+    """
+
+
 def make_label(code: str | None, name: str | None) -> str | None:
     if code and name:
         return f"{code} - {name}"
@@ -1417,7 +1443,20 @@ def list_offered_positions(
         where.append("op.availability_status = 'available'")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
-    order_sql = build_order_by(order_by, order_dir, ALLOWED_OFFERED_ORDER_FIELDS, "d.document_date_iso")
+    order_params: list[Any] = []
+    if order_by == "distance" and origin_lat is not None and origin_lon is not None:
+        order_sql = build_distance_order_by(
+            order_dir,
+            "d.document_date_iso DESC, op.id ASC",
+        )
+        order_params = [origin_lat, origin_lat, origin_lon]
+    else:
+        order_sql = build_order_by(
+            order_by,
+            order_dir,
+            ALLOWED_OFFERED_ORDER_FIELDS,
+            "d.document_date_iso",
+        )
     base_sql = f"""
         FROM offered_positions op
         JOIN documents d ON d.id = op.document_id
@@ -1480,7 +1519,9 @@ def list_offered_positions(
     with get_connection() as conn:
         _register_normalize_function(conn)
         total = conn.execute(count_sql, params).fetchone()[0]
-        items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
+        items = rows_to_dicts(
+            conn.execute(items_sql, [*params, *order_params, limit, offset]).fetchall()
+        )
     items = [enrich_center_geo_fields(item, origin_lat, origin_lon) for item in items]
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
@@ -1544,19 +1585,18 @@ def list_difficult_positions(
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     order_params: list[Any] = []
     if order_by == "distance" and origin_lat is not None and origin_lon is not None:
-        # Cheap SQL-side approximation for ordering; exact km values are calculated
-        # afterwards with haversine in enrich_center_geo_fields().
-        sql_dir = "DESC" if order_dir.lower() == "desc" else "ASC"
-        order_sql = f"""
-            ORDER BY
-                CASE WHEN c.latitude IS NULL OR c.longitude IS NULL THEN 1 ELSE 0 END ASC,
-                ((c.latitude - ?) * (c.latitude - ?) + (c.longitude - ?) * (c.longitude - ?)) {sql_dir},
-                d.document_date_iso DESC,
-                p.id ASC
-        """
-        order_params = [origin_lat, origin_lat, origin_lon, origin_lon]
+        order_sql = build_distance_order_by(
+            order_dir,
+            "d.document_date_iso DESC, p.id ASC",
+        )
+        order_params = [origin_lat, origin_lat, origin_lon]
     else:
-        order_sql = build_order_by(order_by, order_dir, ALLOWED_DIFFICULT_ORDER_FIELDS, "d.document_date_iso")
+        order_sql = build_order_by(
+            order_by,
+            order_dir,
+            ALLOWED_DIFFICULT_ORDER_FIELDS,
+            "d.document_date_iso",
+        )
 
     base_sql = f"""
         FROM difficult_coverage_positions p

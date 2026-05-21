@@ -381,7 +381,7 @@
   async function loadPositions() {
     try {
       const { orderBy, orderDir } = parseOrderValue();
-      if (orderBy === "distance" && (userOrigin.lat === null || userOrigin.lon === null)) {
+      if (orderBy === "distance" && !hasUserOrigin()) {
         resultsMetaEl.textContent = "Activa tu ubicación para ordenar por distancia.";
         tableBody.innerHTML = '<tr><td colspan="8" class="muted data-table__empty">Activa tu ubicación para ordenar por distancia.</td></tr>';
         return;
