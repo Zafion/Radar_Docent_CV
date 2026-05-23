@@ -43,10 +43,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}?v=20260523-mobile-lang">
   <link rel="alternate" type="application/rss+xml" title="Funkcionario.com · Avisos RSS" href="/feed.xml">
   <link rel="alternate" type="application/feed+json" title="Funkcionario.com · Avisos JSON" href="/feed.json">
-  <link rel="stylesheet" href="{{ url_for('static', path='css/ui-overrides.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/ui-overrides.css') }}?v=20260523-mobile-lang">
 
   {% if seo_json_ld %}
   <script type="application/ld+json">
@@ -65,7 +65,7 @@
         <img src="{{ url_for('static', path='img/logo.png') }}" alt="Logo de funkcionario.com">
       </a>
 
-      <nav class="language-switcher" aria-label="Seleccionar idioma">
+      <nav class="language-switcher language-switcher--header" aria-label="Seleccionar idioma">
         <span class="language-switcher__label">Idioma</span>
         <div class="language-switcher__options">
           {% for lang in language_links or [] %}
@@ -91,8 +91,25 @@
 
   <footer class="site-footer">
     <div class="shell site-footer__inner">
-      <div>
-        <strong>funkcionario.com</strong>
+      <div class="site-footer__brand-block">
+        <div class="site-footer__brand-row">
+          <strong>funkcionario.com</strong>
+          <nav class="language-switcher language-switcher--footer" aria-label="Seleccionar idioma">
+            <span class="language-switcher__label">Idioma</span>
+            <div class="language-switcher__options">
+              {% for lang in language_links or [] %}
+                <a
+                  class="language-switcher__option{% if lang.code == current_lang %} is-active{% endif %}"
+                  href="{{ lang.path }}"
+                  hreflang="{{ lang.hreflang }}"
+                  lang="{{ lang.html_lang }}"
+                  aria-label="{% if lang.code == 'es' %}Cambiar a castellano{% else %}Cambiar a valenciano{% endif %}"
+                  {% if lang.code == current_lang %}aria-current="true"{% endif %}
+                >{{ lang.short_label }}</a>
+              {% endfor %}
+            </div>
+          </nav>
+        </div>
         <p>Seguimiento de posiciones, plazas ofertadas y adjudicaciones para personal funcionario interino.</p>
       </div>
       <div class="site-footer__links">

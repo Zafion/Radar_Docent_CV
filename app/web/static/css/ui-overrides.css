@@ -169,3 +169,62 @@
     font-size: clamp(1.75rem, 8vw, 2.5rem);
   }
 }
+
+/* Selector de idioma: en móvil se traslada al footer para no tapar la marca. */
+.language-switcher--footer {
+  display: none;
+}
+
+.site-footer__brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+@media (max-width: 720px) {
+  .language-switcher--header {
+    display: none;
+  }
+
+  .site-header__inner {
+    padding-right: 54px;
+  }
+
+  .page-inner .site-header__inner {
+    padding-right: 48px;
+  }
+
+  .site-footer__brand-block {
+    min-width: 0;
+  }
+
+  .site-footer__brand-row {
+    width: 100%;
+  }
+
+  .site-footer__brand-row strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .language-switcher--footer {
+    position: static;
+    transform: none;
+    display: inline-flex;
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding: 4px;
+    gap: 4px;
+    background: rgba(238, 244, 252, 0.96);
+  }
+
+  .language-switcher--footer .language-switcher__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
