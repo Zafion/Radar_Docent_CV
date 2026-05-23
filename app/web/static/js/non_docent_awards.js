@@ -28,7 +28,7 @@
         const item = items[Number(button.dataset.personIndex)];
         if (!item?.person_name_normalized) return;
         saveSelectedPerson(item);
-        window.location.href = "/no-docente/resultado-persona";
+        window.location.href = window.FunkI18n ? window.FunkI18n.path("/no-docente/resultado-persona") : "/no-docente/resultado-persona";
       });
     });
   }

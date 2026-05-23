@@ -11,6 +11,15 @@ from fastapi.templating import Jinja2Templates
 from app.services.telegram_notifications import get_telegram_channel_url
 from app.storage.db import get_connection
 from app.storage.public_alert_store import count_public_alerts, list_public_alerts
+from app.web.i18n import (
+    LANGUAGES,
+    add_language_context,
+    get_language_from_path,
+    localized_path,
+    localize_json_ld,
+    strip_language_prefix,
+    translate_text,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -72,6 +81,9 @@ def absolute_url(request: Request, path: str) -> str:
 
 def build_base_json_ld(request: Request) -> list[dict]:
     base_url = get_public_base_url(request)
+    lang = get_language_from_path(request.url.path)
+    html_lang = LANGUAGES[lang].html_lang
+    description = translate_text(DEFAULT_DESCRIPTION, lang)
 
     return [
         {
@@ -79,17 +91,17 @@ def build_base_json_ld(request: Request) -> list[dict]:
             "@type": "WebSite",
             "name": "Funkcionario.com",
             "url": base_url,
-            "description": DEFAULT_DESCRIPTION,
-            "inLanguage": "es-ES",
+            "description": description,
+            "inLanguage": html_lang,
             "potentialAction": [
                 {
                     "@type": "SearchAction",
-                    "target": f"{base_url}/consulta-persona?q={{{'search_term_string'}}}",
+                    "target": f"{base_url}{localized_path('/consulta-persona', lang)}?q={{{'search_term_string'}}}",
                     "query-input": "required name=search_term_string",
                 },
                 {
                     "@type": "SearchAction",
-                    "target": f"{base_url}/centros?q={{{'search_term_string'}}}",
+                    "target": f"{base_url}{localized_path('/centros', lang)}?q={{{'search_term_string'}}}",
                     "query-input": "required name=search_term_string",
                 },
             ],
@@ -109,6 +121,7 @@ def build_base_json_ld(request: Request) -> list[dict]:
 
 
 def build_breadcrumb_json_ld(request: Request, items: list[tuple[str, str]]) -> dict:
+    lang = get_language_from_path(request.url.path)
     return {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
@@ -116,8 +129,8 @@ def build_breadcrumb_json_ld(request: Request, items: list[tuple[str, str]]) -> 
             {
                 "@type": "ListItem",
                 "position": index,
-                "name": label,
-                "item": absolute_url(request, path),
+                "name": translate_text(label, lang),
+                "item": absolute_url(request, localized_path(path, lang)),
             }
             for index, (label, path) in enumerate(items, start=1)
         ],
@@ -136,6 +149,12 @@ def seo_context(
     page_type: str = "website",
     extra_json_ld: list[dict] | None = None,
 ) -> dict:
+    lang = get_language_from_path(request.url.path)
+    html_lang = LANGUAGES[lang].html_lang
+    clean_path = strip_language_prefix(path)
+    page_path = localized_path(clean_path, lang)
+    translated_title = translate_text(page_title, lang)
+    translated_description = translate_text(page_description, lang)
     json_ld = build_base_json_ld(request)
 
     if breadcrumbs:
@@ -145,10 +164,10 @@ def seo_context(
         {
             "@context": "https://schema.org",
             "@type": "WebPage",
-            "name": page_title,
-            "description": page_description,
-            "url": absolute_url(request, path),
-            "inLanguage": "es-ES",
+            "name": translated_title,
+            "description": translated_description,
+            "url": absolute_url(request, page_path),
+            "inLanguage": html_lang,
             "isPartOf": {
                 "@type": "WebSite",
                 "name": "Funkcionario.com",
@@ -158,21 +177,33 @@ def seo_context(
     )
 
     if extra_json_ld:
-        json_ld.extend(extra_json_ld)
+        json_ld.extend(localize_json_ld(extra_json_ld, lang))
 
-    return {
+    context = {
         "active_page": active_page,
-        "page_title": page_title,
-        "page_description": page_description,
-        "canonical_url": absolute_url(request, path),
+        "page_title": translated_title,
+        "page_description": translated_description,
+        "canonical_url": absolute_url(request, page_path),
         "robots_meta": robots_meta,
         "og_type": page_type,
         "og_image_url": absolute_url(request, "/static/img/og-image.png"),
         "site_name": "Funkcionario.com",
         "seo_json_ld": json_ld,
     }
+    return add_language_context(request, context)
 
 
+@router.get("/es", include_in_schema=False)
+@router.get("/es/{full_path:path}", include_in_schema=False)
+def spanish_language_alias(request: Request, full_path: str = ""):
+    target = "/" + full_path.strip("/") if full_path else "/"
+    if request.url.query:
+        target = f"{target}?{request.url.query}"
+    return RedirectResponse(url=target, status_code=301)
+
+
+@router.get("/va", response_class=HTMLResponse)
+@router.get("/va/", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request):
     context = seo_context(
@@ -190,6 +221,7 @@ def home(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="home.html", context=context)
 
 
+@router.get("/va/valencia-docentes", response_class=HTMLResponse)
 @router.get("/valencia-docentes", response_class=HTMLResponse)
 def valencia_docentes(request: Request):
     context = seo_context(
@@ -213,6 +245,7 @@ def valencia_docentes(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="valencia_docentes.html", context=context)
 
 
+@router.get("/va/valencia-no-docentes", response_class=HTMLResponse)
 @router.get("/valencia-no-docentes", response_class=HTMLResponse)
 def valencia_no_docentes(request: Request):
     context = seo_context(
@@ -235,6 +268,7 @@ def valencia_no_docentes(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="valencia_no_docentes.html", context=context)
 
 
+@router.get("/va/avisos", response_class=HTMLResponse)
 @router.get("/avisos", response_class=HTMLResponse)
 def public_alerts_page(request: Request):
     context = seo_context(
@@ -327,6 +361,30 @@ def alerts_feed_json(request: Request) -> JSONResponse:
     )
 
 
+
+
+def _redirect_with_query(request: Request, target: str) -> RedirectResponse:
+    if request.url.query:
+        target = f"{target}?{request.url.query}"
+    return RedirectResponse(url=target, status_code=301)
+
+
+# Compatibilidad con slugs valencianizados generados por la primera versión i18n.
+# La URL canónica mantiene el slug técnico original para no duplicar páginas ni romper APIs.
+@router.get("/va/no-docente/adjudicacions", include_in_schema=False)
+@router.get("/no-docente/adjudicacions", include_in_schema=False)
+def non_docent_awards_legacy_slug(request: Request):
+    target = "/va/no-docente/adjudicaciones" if get_language_from_path(request.url.path) == "va" else "/no-docente/adjudicaciones"
+    return _redirect_with_query(request, target)
+
+
+@router.get("/va/adjudicacions/{award_result_id}", include_in_schema=False)
+@router.get("/adjudicacions/{award_result_id}", include_in_schema=False)
+def award_detail_legacy_slug(request: Request, award_result_id: int):
+    target = f"/va/adjudicaciones/{award_result_id}" if get_language_from_path(request.url.path) == "va" else f"/adjudicaciones/{award_result_id}"
+    return _redirect_with_query(request, target)
+
+@router.get("/va/no-docente/plazas", response_class=HTMLResponse)
 @router.get("/no-docente/plazas", response_class=HTMLResponse)
 def non_docent_positions(request: Request):
     context = seo_context(
@@ -344,6 +402,7 @@ def non_docent_positions(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="non_docent_positions.html", context=context)
 
 
+@router.get("/va/no-docente/adjudicaciones", response_class=HTMLResponse)
 @router.get("/no-docente/adjudicaciones", response_class=HTMLResponse)
 def non_docent_awards(request: Request):
     context = seo_context(
@@ -360,6 +419,7 @@ def non_docent_awards(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="non_docent_awards.html", context=context)
 
 
+@router.get("/va/no-docente/publicaciones", response_class=HTMLResponse)
 @router.get("/no-docente/publicaciones", response_class=HTMLResponse)
 def non_docent_publications(request: Request):
     context = seo_context(
@@ -377,6 +437,7 @@ def non_docent_publications(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="non_docent_publications.html", context=context)
 
 
+@router.get("/va/no-docente/consulta-persona", response_class=HTMLResponse)
 @router.get("/no-docente/consulta-persona", response_class=HTMLResponse)
 def non_docent_person_search(request: Request):
     context = seo_context(
@@ -393,6 +454,7 @@ def non_docent_person_search(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="non_docent_person_search.html", context=context)
 
 
+@router.get("/va/no-docente/resultado-persona", response_class=HTMLResponse)
 @router.get("/no-docente/resultado-persona", response_class=HTMLResponse)
 def non_docent_person_detail(request: Request):
     context = seo_context(
@@ -408,6 +470,7 @@ def non_docent_person_detail(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="non_docent_person_detail.html", context=context)
 
 
+@router.get("/va/plazas-ofertadas", response_class=HTMLResponse)
 @router.get("/plazas-ofertadas", response_class=HTMLResponse)
 def offered_positions(request: Request):
     context = seo_context(
@@ -425,6 +488,7 @@ def offered_positions(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="offered_positions.html", context=context)
 
 
+@router.get("/va/consulta-persona", response_class=HTMLResponse)
 @router.get("/consulta-persona", response_class=HTMLResponse)
 def person_search(request: Request):
     context = seo_context(
@@ -448,6 +512,7 @@ def person_search(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="person_search.html", context=context)
 
 
+@router.get("/va/resultado-persona", response_class=HTMLResponse)
 @router.get("/resultado-persona", response_class=HTMLResponse)
 def person_detail(request: Request):
     context = seo_context(
@@ -469,6 +534,7 @@ def person_detail(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="person_detail.html", context=context)
 
 
+@router.get("/va/quienes-somos", response_class=HTMLResponse)
 @router.get("/quienes-somos", response_class=HTMLResponse)
 def quienes_somos(request: Request):
     context = seo_context(
@@ -486,6 +552,7 @@ def quienes_somos(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="quienes_somos.html", context=context)
 
 
+@router.get("/va/contacto", response_class=HTMLResponse)
 @router.get("/contacto", response_class=HTMLResponse)
 def contacto(request: Request):
     context = seo_context(
@@ -506,6 +573,7 @@ def contacto(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="contacto.html", context=context)
 
 
+@router.get("/va/centros", response_class=HTMLResponse)
 @router.get("/centros", response_class=HTMLResponse)
 def center_search(request: Request):
     return TEMPLATES.TemplateResponse(
@@ -524,6 +592,7 @@ def center_search(request: Request):
     )
 
 
+@router.get("/va/centros/{center_code}", response_class=HTMLResponse)
 @router.get("/centros/{center_code}", response_class=HTMLResponse)
 def center_detail(request: Request, center_code: str):
     return TEMPLATES.TemplateResponse(
@@ -543,6 +612,7 @@ def center_detail(request: Request, center_code: str):
     )
 
 
+@router.get("/va/adjudicaciones/{award_result_id}", response_class=HTMLResponse)
 @router.get("/adjudicaciones/{award_result_id}", response_class=HTMLResponse)
 def award_detail(request: Request, award_result_id: int):
     context = seo_context(
@@ -562,6 +632,7 @@ def award_detail(request: Request, award_result_id: int):
     return TEMPLATES.TemplateResponse(request=request, name="award_detail.html", context=context)
 
 
+@router.get("/va/dificil-cobertura", response_class=HTMLResponse)
 @router.get("/dificil-cobertura", response_class=HTMLResponse)
 def difficult_coverage(request: Request):
     context = seo_context(
@@ -579,6 +650,7 @@ def difficult_coverage(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="difficult_coverage.html", context=context)
 
 
+@router.get("/va/resultado-dificil-cobertura", response_class=HTMLResponse)
 @router.get("/resultado-dificil-cobertura", response_class=HTMLResponse)
 def difficult_coverage_candidates_result(request: Request):
     context = seo_context(
@@ -594,6 +666,7 @@ def difficult_coverage_candidates_result(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="difficult_coverage_candidates.html", context=context)
 
 
+@router.get("/va/404", response_class=HTMLResponse)
 @router.get("/404", response_class=HTMLResponse)
 def custom_404_preview(request: Request):
     return TEMPLATES.TemplateResponse(
@@ -628,6 +701,10 @@ def robots_txt(request: Request) -> PlainTextResponse:
             "Disallow: /resultado-dificil-cobertura",
             "Disallow: /no-docente/resultado-persona",
             "Disallow: /404",
+            "Disallow: /va/resultado-persona",
+            "Disallow: /va/resultado-dificil-cobertura",
+            "Disallow: /va/no-docente/resultado-persona",
+            "Disallow: /va/404",
             f"Sitemap: {base_url}/sitemap.xml",
             "",
         ]
@@ -640,17 +717,27 @@ def sitemap_xml(request: Request) -> Response:
     base_url = get_public_base_url(request)
     urls = []
     for path, priority, changefreq in SITEMAP_PAGES:
-        urls.append(
-            "  <url>\n"
-            f"    <loc>{escape(base_url + path)}</loc>\n"
-            f"    <changefreq>{changefreq}</changefreq>\n"
-            f"    <priority>{priority}</priority>\n"
-            "  </url>"
-        )
+        for lang in ("es", "va"):
+            loc_path = localized_path(path, lang)
+            alternates = "\n".join(
+                f'    <xhtml:link rel="alternate" hreflang="{LANGUAGES[alt_lang].hreflang}" href="{escape(base_url + localized_path(path, alt_lang))}" />'
+                for alt_lang in ("es", "va")
+            )
+            x_default = f'    <xhtml:link rel="alternate" hreflang="x-default" href="{escape(base_url + localized_path(path, "es"))}" />'
+            urls.append(
+                "  <url>\n"
+                f"    <loc>{escape(base_url + loc_path)}</loc>\n"
+                f"{alternates}\n"
+                f"{x_default}\n"
+                f"    <changefreq>{changefreq}</changefreq>\n"
+                f"    <priority>{priority}</priority>\n"
+                "  </url>"
+            )
 
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+        'xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
         + "\n".join(urls)
         + "\n</urlset>\n"
     )
@@ -696,6 +783,13 @@ Funkcionario.com trabaja a partir de publicaciones oficiales de RRHH Educación 
 - {base_url}/dificil-cobertura
 - {base_url}/quienes-somos
 - {base_url}/contacto
+- {base_url}/va
+- {base_url}/va/valencia-docentes
+- {base_url}/va/valencia-no-docentes
+- {base_url}/va/avisos
+- {base_url}/va/plazas-ofertadas
+- {base_url}/va/consulta-persona
+- {base_url}/va/dificil-cobertura
 
 ## Limitaciones
 
@@ -704,6 +798,7 @@ Funkcionario.com no sustituye a la publicación oficial. Los datos deben verific
     return PlainTextResponse(content)
 
 
+@router.get("/va/politica-privacidad", response_class=HTMLResponse)
 @router.get("/politica-privacidad", response_class=HTMLResponse)
 def politica_privacidad(request: Request):
     context = seo_context(
@@ -723,6 +818,8 @@ def politica_privacidad(request: Request):
     return TEMPLATES.TemplateResponse(request=request, name="politica_privacidad.html", context=context)
 
 
+@router.get("/va/politica-cookies", include_in_schema=False)
 @router.get("/politica-cookies", include_in_schema=False)
-def politica_cookies_redirect():
-    return RedirectResponse(url="/politica-privacidad", status_code=301)
+def politica_cookies_redirect(request: Request):
+    target = "/va/politica-privacidad" if get_language_from_path(request.url.path) == "va" else "/politica-privacidad"
+    return RedirectResponse(url=target, status_code=301)

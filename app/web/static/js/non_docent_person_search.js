@@ -14,18 +14,18 @@
 
   function render(items) {
     if (!items.length) {
-      feedbackEl.textContent = "Sin coincidencias. Prueba con menos términos o revisa el formato del nombre.";
+      feedbackEl.textContent = ui.t("Sin coincidencias. Prueba con menos términos o revisa el formato del nombre.");
       resultsEl.innerHTML = "";
       return;
     }
-    feedbackEl.textContent = `Mostrando hasta 20 coincidencias. Si no encuentras el resultado, afina la búsqueda con nombre y apellidos.`;
+    feedbackEl.textContent = ui.t("Mostrando hasta 20 coincidencias. Si no encuentras el resultado, afina la búsqueda con nombre y apellidos.");
     resultsEl.innerHTML = items.map((item, index) => `
       <article class="result-item">
         <div>
           <h3>${ui.escapeHtml(item.display_name)}</h3>
-          <p>${ui.compactNumber(item.total_awards)} adjudicaciones · ${ui.compactNumber(item.total_bag_records)} registros de bolsa · última fecha ${ui.escapeHtml(ui.formatDate(item.last_seen_date))}</p>
+          <p>${ui.compactNumber(item.total_awards)} adjudicaciones · ${ui.compactNumber(item.total_bag_records)} registros de bolsa · ${ui.t("última fecha")} ${ui.escapeHtml(ui.formatDate(item.last_seen_date))}</p>
         </div>
-        <button class="button button--secondary" type="button" data-index="${index}">Ver ficha</button>
+        <button class="button button--secondary" type="button" data-index="${index}">${ui.t("Ver ficha")}</button>
       </article>
     `).join("");
 
@@ -33,7 +33,7 @@
       button.addEventListener("click", () => {
         const item = items[Number(button.dataset.index)];
         saveSelectedPerson(item);
-        window.location.href = "/no-docente/resultado-persona";
+        window.location.href = window.FunkI18n ? window.FunkI18n.path("/no-docente/resultado-persona") : "/no-docente/resultado-persona";
       });
     });
   }
@@ -42,10 +42,10 @@
     event.preventDefault();
     const q = queryInput.value.trim();
     if (q.length < 2) {
-      feedbackEl.textContent = "Introduce al menos dos caracteres.";
+      feedbackEl.textContent = ui.t("Introduce al menos dos caracteres.");
       return;
     }
-    feedbackEl.textContent = "Buscando...";
+    feedbackEl.textContent = ui.t("Buscando...");
     resultsEl.innerHTML = "";
     ui.apiGet(`/api/non-docent/persons/search?q=${encodeURIComponent(q)}&limit=20`)
       .then((data) => render(data.items || []))

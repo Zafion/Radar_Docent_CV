@@ -18,7 +18,7 @@
 
   function formatDistance(value) {
     if (value === null || value === undefined || Number.isNaN(Number(value))) {
-      return ui.hasOrigin() ? "—" : "Activa ubicación";
+      return ui.hasOrigin() ? "—" : ui.t("Activa ubicación");
     }
     return `${Number(value).toFixed(2)} km`;
   }
@@ -27,7 +27,7 @@
     const buttons = [];
     const centerSearchText = item.center_name || item.functional_assignment || item.locality || "";
     if (centerSearchText) {
-      buttons.push(`<a class="button button--ghost button--xs" href="/centros?q=${encodeURIComponent(centerSearchText)}">Buscar centro</a>`);
+      buttons.push(`<a class="button button--ghost button--xs" href="${window.FunkI18n ? window.FunkI18n.path("/centros") : "/centros"}?q=${encodeURIComponent(centerSearchText)}">${ui.t("Buscar centro")}</a>`);
     }
     if (item.document_url) {
       buttons.push(ui.sourceButton(item.document_url));
@@ -36,7 +36,7 @@
   }
 
   function render(items, total, offset) {
-    metaEl.textContent = `${ui.compactNumber(total)} plazas disponibles encontradas. Mostrando ${ui.compactNumber(items.length)} por página.`;
+    metaEl.textContent = ui.t(`${ui.compactNumber(total)} plazas disponibles encontradas. Mostrando ${ui.compactNumber(items.length)} por página.`);
     bodyEl.innerHTML = items.map((item) => `
       <tr>
         <td data-label="Colectivo"><strong>${ui.escapeHtml(item.staff_group_code || "—")}</strong><br><span class="muted">${ui.escapeHtml(item.staff_group_name || "")}</span></td>
@@ -64,7 +64,7 @@
     if (groupInput.value) params.set("staff_group_code", groupInput.value);
     if (provinceInput.value) params.set("province", provinceInput.value);
     if (queryInput.value.trim()) params.set("q", queryInput.value.trim());
-    metaEl.textContent = "Cargando...";
+    metaEl.textContent = ui.t("Cargando...");
     return ui.apiGet(`/api/non-docent/positions?${params.toString()}`).then((data) => render(data.items || [], data.total || 0, data.offset || 0)).catch((error) => {
       metaEl.textContent = error.message;
       bodyEl.innerHTML = ui.tableEmpty(7, "No se pudo cargar el listado.");

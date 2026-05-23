@@ -1,4 +1,7 @@
 (function () {
+  function t(value) {
+    return window.FunkI18n ? window.FunkI18n.t(value) : value;
+  }
   const localityInput = document.getElementById("dc-locality");
   const specialtyCodeInput = document.getElementById("dc-specialty-code");
   const selectedOnlyInput = document.getElementById("dc-selected-only");
@@ -32,7 +35,7 @@
   }
 
   function formatDate(dateIso) {
-    if (!dateIso) return "Sin fecha";
+    if (!dateIso) return t("Sin fecha");
     const [year, month, day] = dateIso.split("-");
     if (!year || !month || !day) return dateIso;
     return `${day}/${month}/${year}`;
@@ -41,7 +44,7 @@
   function formatDistance(distanceKm) {
     if (distanceKm === null || distanceKm === undefined || Number.isNaN(Number(distanceKm))) {
       return (userOrigin.lat === null || userOrigin.lon === null)
-        ? "Activa ubicación"
+        ? t("Activa ubicación")
         : "—";
     }
     return `${Number(distanceKm).toFixed(2)} km`;
@@ -87,13 +90,13 @@
   }
 
   function locationButtonText() {
-    return hasUserOrigin() ? "Actualizar ubicación" : "Usar mi ubicación";
+    return hasUserOrigin() ? t("Actualizar ubicación") : t("Usar mi ubicación");
   }
 
   function updateLocationButtonState() {
     if (useMyLocationButton) {
       if (!navigator.geolocation) {
-        useMyLocationButton.textContent = "Ubicación no disponible";
+        useMyLocationButton.textContent = t("Ubicación no disponible");
         useMyLocationButton.disabled = true;
       } else {
         useMyLocationButton.textContent = locationButtonText();
@@ -112,9 +115,9 @@
       locationStatusEl.classList.toggle("location-status--active", hasUserOrigin());
 
       if (hasUserOrigin()) {
-        locationStatusEl.textContent = "Activa · distancia disponible";
+        locationStatusEl.textContent = t("Activa · distancia disponible");
       } else {
-        locationStatusEl.textContent = "No activada · sin distancia calculada";
+        locationStatusEl.textContent = t("No activada · sin distancia calculada");
       }
     }
 
@@ -122,16 +125,16 @@
   }
 
   function geolocationErrorMessage(error) {
-    if (!error) return "No se pudo obtener tu ubicación.";
-    if (error.code === 1) return "Permiso de ubicación denegado. Revisa los permisos del navegador para funkcionario.com.";
-    if (error.code === 2) return "No se pudo determinar la ubicación del dispositivo.";
-    if (error.code === 3) return "La ubicación ha tardado demasiado. Prueba de nuevo.";
-    return error.message || "No se pudo obtener tu ubicación.";
+    if (!error) return t("No se pudo obtener tu ubicación.");
+    if (error.code === 1) return t("Permiso de ubicación denegado. Revisa los permisos del navegador para funkcionario.com.");
+    if (error.code === 2) return t("No se pudo determinar la ubicación del dispositivo.");
+    if (error.code === 3) return t("La ubicación ha tardado demasiado. Prueba de nuevo.");
+    return error.message || t("No se pudo obtener tu ubicación.");
   }
 
   async function ensureUserLocation() {
     if (!navigator.geolocation) {
-      throw new Error("Tu navegador no permite geolocalización.");
+      throw new Error(t("Tu navegador no permite geolocalización."));
     }
 
     return new Promise((resolve, reject) => {
@@ -141,7 +144,7 @@
           const lon = Number(position.coords.longitude);
 
           if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-            reject(new Error("El navegador devolvió una ubicación no válida."));
+            reject(new Error(t("El navegador devolvió una ubicación no válida.")));
             return;
           }
 
@@ -329,14 +332,14 @@
       })
     );
 
-    window.location.href = "/resultado-dificil-cobertura";
+    window.location.href = window.FunkI18n ? window.FunkI18n.path("/resultado-dificil-cobertura") : "/resultado-dificil-cobertura";
   }
 
   function renderPositions(items, total) {
-    resultsMetaEl.textContent = `${total} puestos disponibles encontrados`;
+    resultsMetaEl.textContent = t(`${total} puestos disponibles encontrados`);
 
     if (!items.length) {
-      tableBody.innerHTML = '<tr><td colspan="8" class="muted data-table__empty">No hay puestos de difícil cobertura disponibles actualmente.</td></tr>';
+      tableBody.innerHTML = `<tr><td colspan="8" class="muted data-table__empty">${t("No hay puestos de difícil cobertura disponibles actualmente.")}</td></tr>`;
       return;
     }
 
@@ -375,8 +378,8 @@
     try {
       const { orderBy, orderDir } = parseOrderValue();
       if (orderBy === "distance" && !hasUserOrigin()) {
-        resultsMetaEl.textContent = "Activa tu ubicación para ordenar por distancia.";
-        tableBody.innerHTML = '<tr><td colspan="8" class="muted data-table__empty">Activa tu ubicación para ordenar por distancia.</td></tr>';
+        resultsMetaEl.textContent = t("Activa tu ubicación para ordenar por distancia.");
+        tableBody.innerHTML = `<tr><td colspan="8" class="muted data-table__empty">${t("Activa tu ubicación para ordenar por distancia.")}</td></tr>`;
         return;
       }
 
@@ -415,7 +418,7 @@
 
   useMyLocationButton?.addEventListener("click", async () => {
     useMyLocationButton.disabled = true;
-    useMyLocationButton.textContent = "Obteniendo ubicación...";
+    useMyLocationButton.textContent = t("Obteniendo ubicación...");
 
     try {
       await ensureUserLocation();

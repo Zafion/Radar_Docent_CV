@@ -1,6 +1,10 @@
 window.NonDocentUI = window.NonDocentUI || (function () {
   const LOCATION_STORAGE_KEY = "radar_docent_user_origin";
 
+  function t(value) {
+    return window.FunkI18n ? window.FunkI18n.t(value) : value;
+  }
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replaceAll("&", "&amp;")
@@ -11,7 +15,7 @@ window.NonDocentUI = window.NonDocentUI || (function () {
   }
 
   function formatDate(dateIso) {
-    if (!dateIso) return "Sin fecha";
+    if (!dateIso) return t("Sin fecha");
     const [year, month, day] = String(dateIso).split("-");
     if (!year || !month || !day) return dateIso;
     return `${day}/${month}/${year}`;
@@ -60,7 +64,7 @@ window.NonDocentUI = window.NonDocentUI || (function () {
       .filter((item) => item && item.value)
       .map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label || item.value)}</option>`)
       .join("");
-    selectEl.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>${optionHtml}`;
+    selectEl.innerHTML = `<option value="">${escapeHtml(t(placeholder))}</option>${optionHtml}`;
     if (Array.from(selectEl.options).some((option) => option.value === current)) {
       selectEl.value = current;
     }
@@ -68,11 +72,11 @@ window.NonDocentUI = window.NonDocentUI || (function () {
 
   function sourceButton(url, label = "PDF oficial") {
     if (!url) return "—";
-    return `<a class="button button--ghost button--xs" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+    return `<a class="button button--ghost button--xs" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(t(label))}</a>`;
   }
 
   function tableEmpty(colspan, message) {
-    return `<tr><td colspan="${colspan}" class="muted data-table__empty">${escapeHtml(message)}</td></tr>`;
+    return `<tr><td colspan="${colspan}" class="muted data-table__empty">${escapeHtml(t(message))}</td></tr>`;
   }
 
   function groupOptionsFromSummary(summary) {
@@ -83,12 +87,12 @@ window.NonDocentUI = window.NonDocentUI || (function () {
   }
 
   function publicationKindLabel(kind) {
-    return {
+    return t({
       adc_call: "Convocatoria ADC",
       adc_award: "Adjudicación ADC",
       bag_update: "Actualización de bolsa",
       funcion_publica_bag: "Bolsa Función Pública",
-    }[kind] || kind || "Publicación";
+    }[kind] || kind || "Publicación");
   }
 
   function loadStoredOrigin() {
@@ -134,16 +138,16 @@ window.NonDocentUI = window.NonDocentUI || (function () {
   }
 
   function geolocationErrorMessage(error) {
-    if (!error) return "No se pudo obtener tu ubicación.";
-    if (error.code === 1) return "Permiso de ubicación denegado. Revisa los permisos del navegador para funkcionario.com.";
-    if (error.code === 2) return "No se pudo determinar la ubicación del dispositivo.";
-    if (error.code === 3) return "La ubicación ha tardado demasiado. Prueba de nuevo.";
-    return error.message || "No se pudo obtener tu ubicación.";
+    if (!error) return t("No se pudo obtener tu ubicación.");
+    if (error.code === 1) return t("Permiso de ubicación denegado. Revisa los permisos del navegador para funkcionario.com.");
+    if (error.code === 2) return t("No se pudo determinar la ubicación del dispositivo.");
+    if (error.code === 3) return t("La ubicación ha tardado demasiado. Prueba de nuevo.");
+    return error.message || t("No se pudo obtener tu ubicación.");
   }
 
   function getCurrentPosition() {
     if (!navigator.geolocation) {
-      return Promise.reject(new Error("Tu navegador no permite geolocalización."));
+      return Promise.reject(new Error(t("Tu navegador no permite geolocalización.")));
     }
     return new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(
@@ -151,7 +155,7 @@ window.NonDocentUI = window.NonDocentUI || (function () {
           const lat = Number(position.coords.latitude);
           const lon = Number(position.coords.longitude);
           if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-            reject(new Error("El navegador devolvió una ubicación no válida."));
+            reject(new Error(t("El navegador devolvió una ubicación no válida.")));
             return;
           }
           const origin = { lat, lon };
@@ -180,14 +184,14 @@ window.NonDocentUI = window.NonDocentUI || (function () {
       const active = hasOrigin();
       if (statusEl) {
         statusEl.classList.toggle("location-status--active", active);
-        statusEl.textContent = active ? "Activa · distancia disponible" : "No activada · sin distancia calculada";
+        statusEl.textContent = active ? t("Activa · distancia disponible") : t("No activada · sin distancia calculada");
       }
       if (useButton) {
         if (!navigator.geolocation) {
-          useButton.textContent = "Ubicación no disponible";
+          useButton.textContent = t("Ubicación no disponible");
           useButton.disabled = true;
         } else {
-          useButton.textContent = active ? "Actualizar ubicación" : "Usar mi ubicación";
+          useButton.textContent = active ? t("Actualizar ubicación") : t("Usar mi ubicación");
           useButton.classList.toggle("is-active", active);
         }
       }
@@ -199,11 +203,11 @@ window.NonDocentUI = window.NonDocentUI || (function () {
 
     useButton?.addEventListener("click", async () => {
       useButton.disabled = true;
-      useButton.textContent = "Obteniendo ubicación...";
+      useButton.textContent = t("Obteniendo ubicación...");
       try {
         await getCurrentPosition();
         update();
-        setFeedback("Ubicación activada correctamente. Se usará para calcular distancias cuando haya centros localizados.");
+        setFeedback(t("Ubicación activada correctamente. Se usará para calcular distancias cuando haya centros localizados."));
         if (typeof onChange === "function") await onChange();
       } catch (error) {
         setFeedback(error.message, true);
@@ -216,7 +220,7 @@ window.NonDocentUI = window.NonDocentUI || (function () {
     clearButton?.addEventListener("click", async () => {
       clearStoredOrigin();
       update();
-      setFeedback("Ubicación borrada. Ya no se calcularán distancias con tu posición.");
+      setFeedback(t("Ubicación borrada. Ya no se calcularán distancias con tu posición."));
       if (typeof onChange === "function") await onChange();
     });
 
@@ -275,21 +279,21 @@ window.NonDocentUI = window.NonDocentUI || (function () {
     async function updateLabel() {
       if (!button) return;
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-        button.textContent = "Alertas no disponibles";
+        button.textContent = t("Alertas no disponibles");
         button.disabled = true;
         return;
       }
       try {
         const keyData = await apiGet("/api/push/public-key");
         if (!keyData.configured || !keyData.public_key) {
-          button.textContent = "Alertas no disponibles";
+          button.textContent = t("Alertas no disponibles");
           button.disabled = true;
           return;
         }
         const sub = await getPushSubscription();
-        button.textContent = sub ? "Desactivar alertas de novedades" : "Activar alertas de novedades";
+        button.textContent = sub ? t("Desactivar alertas de novedades") : t("Activar alertas de novedades");
       } catch (_) {
-        button.textContent = "Alertas no disponibles";
+        button.textContent = t("Alertas no disponibles");
         button.disabled = true;
       }
     }
@@ -299,16 +303,16 @@ window.NonDocentUI = window.NonDocentUI || (function () {
       try {
         const current = await getPushSubscription();
         if (current) {
-          button.textContent = "Desactivando alertas...";
+          button.textContent = t("Desactivando alertas...");
           await unsubscribePush();
-          setFeedback("Alertas de novedades desactivadas.");
+          setFeedback(t("Alertas de novedades desactivadas."));
         } else {
-          button.textContent = "Activando alertas...";
+          button.textContent = t("Activando alertas...");
           await subscribePush();
-          setFeedback("Alertas de novedades activadas.");
+          setFeedback(t("Alertas de novedades activadas."));
         }
       } catch (error) {
-        setFeedback(error.message || "No se pudo cambiar el estado de las alertas.", true);
+        setFeedback(error.message || t("No se pudo cambiar el estado de las alertas."), true);
       } finally {
         button.disabled = false;
         await updateLabel();
@@ -330,10 +334,10 @@ window.NonDocentUI = window.NonDocentUI || (function () {
     const nextDisabled = offsetNumber + limitNumber >= totalNumber;
 
     container.innerHTML = `
-      <div class="pagination-controls__summary">Mostrando ${compactNumber(from)}–${compactNumber(to)} de ${compactNumber(totalNumber)}. Si no encuentras el resultado, afina la búsqueda.</div>
+      <div class="pagination-controls__summary">${t(`Mostrando ${compactNumber(from)}–${compactNumber(to)} de ${compactNumber(totalNumber)}. Si no encuentras el resultado, afina la búsqueda.`)}</div>
       <div class="pagination-controls__buttons">
-        <button class="button button--ghost" type="button" data-page="prev" ${prevDisabled ? "disabled" : ""}>Anterior</button>
-        <button class="button button--ghost" type="button" data-page="next" ${nextDisabled ? "disabled" : ""}>Siguiente</button>
+        <button class="button button--ghost" type="button" data-page="prev" ${prevDisabled ? "disabled" : ""}>${t("Anterior")}</button>
+        <button class="button button--ghost" type="button" data-page="next" ${nextDisabled ? "disabled" : ""}>${t("Siguiente")}</button>
       </div>
     `;
 
@@ -365,5 +369,6 @@ window.NonDocentUI = window.NonDocentUI || (function () {
     bindLocationControls,
     bindPushToggle,
     renderPager,
+    t,
   };
 })();

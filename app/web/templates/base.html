@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="{{ html_lang or 'es' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,6 +12,12 @@
 
   {% if canonical_url %}
   <link rel="canonical" href="{{ canonical_url }}">
+  {% endif %}
+  {% for alt in alternate_urls or [] %}
+  <link rel="alternate" hreflang="{{ alt.hreflang }}" href="{{ alt.url }}">
+  {% endfor %}
+  {% if alternate_urls %}
+  <link rel="alternate" hreflang="x-default" href="{{ alternate_urls[0].url }}">
   {% endif %}
 
   <meta property="og:site_name" content="{{ site_name or 'Funkcionario.com' }}">
@@ -58,6 +64,22 @@
       <a href="/" class="site-header__logo" aria-label="Volver a inicio">
         <img src="{{ url_for('static', path='img/logo.png') }}" alt="Logo de funkcionario.com">
       </a>
+
+      <nav class="language-switcher" aria-label="Seleccionar idioma">
+        <span class="language-switcher__label">Idioma</span>
+        <div class="language-switcher__options">
+          {% for lang in language_links or [] %}
+            <a
+              class="language-switcher__option{% if lang.code == current_lang %} is-active{% endif %}"
+              href="{{ lang.path }}"
+              hreflang="{{ lang.hreflang }}"
+              lang="{{ lang.html_lang }}"
+              aria-label="{% if lang.code == 'es' %}Cambiar a castellano{% else %}Cambiar a valenciano{% endif %}"
+              {% if lang.code == current_lang %}aria-current="true"{% endif %}
+            >{{ lang.short_label }}</a>
+          {% endfor %}
+        </div>
+      </nav>
     </div>
   </header>
 
@@ -83,6 +105,10 @@
     </div>
   </footer>
 
+  <script>
+    window.FUNKCIONARIO_LANG = {{ (current_lang or 'es') | tojson }};
+  </script>
+  <script src="{{ url_for('static', path='js/i18n.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

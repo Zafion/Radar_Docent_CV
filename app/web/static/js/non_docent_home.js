@@ -44,6 +44,8 @@
     const groupsBodyEl = document.getElementById("non-docent-groups-body");
     const latestPublicationsEl = document.getElementById("non-docent-latest-publications");
     const ui = window.NonDocentUI || fallbackUI();
+    const i18n = window.FunkI18n;
+    const t = (value) => (i18n && typeof i18n.t === "function" ? i18n.t(value) : value);
 
     ui.bindLocationControls?.({
       statusId: "nd-location-status",
@@ -98,7 +100,7 @@
       feedbackEl.textContent = `Datos cargados desde publicaciones oficiales procesadas. Las plazas adjudicadas o ya no visibles no se muestran como disponibles. ${ui.compactNumber(totals.offered_positions)} plazas detectadas en total.`;
       renderLatestPublications(data);
 
-      groupsMetaEl.textContent = `${(data.by_group || []).length} colectivos con datos detectados.`;
+      groupsMetaEl.textContent = `${ui.compactNumber((data.by_group || []).length)} ${t("colectivos con datos detectados")}.`;
       groupsBodyEl.innerHTML = (data.by_group || []).map((group) => `
         <tr>
           <td data-label="Colectivo"><strong>${ui.escapeHtml(group.staff_group_code || "—")}</strong><br><span class="muted">${ui.escapeHtml(group.staff_group_name || "—")}</span></td>
@@ -108,7 +110,7 @@
           <td data-label="Bolsa">${ui.compactNumber(group.bag_members_count)}</td>
           <td data-label="Última fecha">${ui.escapeHtml(ui.formatDate(group.latest_publication_date))}</td>
         </tr>
-      `).join("") || ui.tableEmpty(6, "No hay colectivos cargados.");
+      `).join("") || ui.tableEmpty(6, t("No hay colectivos cargados."));
     }
 
     Promise.all([
@@ -121,9 +123,9 @@
         renderSummary(summary);
       })
       .catch((error) => {
-        feedbackEl.textContent = `No se pudo cargar el resumen: ${error.message}`;
-        groupsMetaEl.textContent = "No se pudo cargar el resumen.";
-        groupsBodyEl.innerHTML = ui.tableEmpty(6, "No se pudo cargar el resumen.");
+        feedbackEl.textContent = `${t("No se pudo cargar el resumen:")} ${error.message}`;
+        groupsMetaEl.textContent = t("No se pudo cargar el resumen.");
+        groupsBodyEl.innerHTML = ui.tableEmpty(6, t("No se pudo cargar el resumen."));
       });
   }
 

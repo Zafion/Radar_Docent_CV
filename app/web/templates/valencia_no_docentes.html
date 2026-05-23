@@ -107,7 +107,7 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', path='js/non_docent_common.js') }}?v=5"></script>
-<script src="{{ url_for('static', path='js/non_docent_home.js') }}?v=6"></script>
+<script src="{{ url_for('static', path='js/non_docent_home.js') }}?v=7"></script>
 <script>
   // Fallback defensivo: si por caché o bloqueo no se ejecuta el JS estático,
   // carga el resumen mínimo desde la API para no dejar la pantalla en “Cargando…”.
@@ -127,8 +127,9 @@
       var n = Number(value || 0);
       return isFinite(n) ? n.toLocaleString('es-ES') : '0';
     }
+    function tr(value) { return window.FunkI18n && window.FunkI18n.t ? window.FunkI18n.t(value) : value; }
     function date(value) {
-      if (!value) return 'Sin fecha';
+      if (!value) return tr('Sin fecha');
       var parts = String(value).split('-');
       return parts.length === 3 ? parts[2] + '/' + parts[1] + '/' + parts[0] : String(value);
     }
@@ -152,7 +153,7 @@
         feedback.textContent = 'Datos cargados desde publicaciones oficiales procesadas.';
 
         var groups = data.by_group || [];
-        if (groupsMeta) groupsMeta.textContent = groups.length + ' colectivos con datos detectados.';
+        if (groupsMeta) groupsMeta.textContent = num(groups.length) + ' ' + tr('colectivos con datos detectados') + '.';
         if (groupsBody) {
           groupsBody.innerHTML = groups.map(function (g) {
             return '<tr>' +
@@ -163,7 +164,7 @@
               '<td data-label="Bolsa">' + num(g.bag_members_count) + '</td>' +
               '<td data-label="Última fecha">' + esc(date(g.latest_publication_date)) + '</td>' +
             '</tr>';
-          }).join('') || '<tr><td colspan="6" class="muted data-table__empty">No hay colectivos cargados.</td></tr>';
+          }).join('') || '<tr><td colspan="6" class="muted data-table__empty">' + tr('No hay colectivos cargados.') + '</td></tr>';
         }
         if (latest) {
           latest.innerHTML = (data.latest_publications || []).slice(0, 8).map(function (item) {
@@ -177,7 +178,7 @@
         }
       })
       .catch(function (error) {
-        feedback.textContent = 'No se pudo cargar el resumen: ' + error.message;
+        feedback.textContent = tr('No se pudo cargar el resumen:') + ' ' + error.message;
       });
   }, 800);
 </script>

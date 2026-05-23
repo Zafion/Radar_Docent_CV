@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 from app.web.routes import TEMPLATES, router as web_router
+from app.web.i18n import get_language_from_path, translate_html
 
 import os
 from contextlib import contextmanager
@@ -10,7 +11,7 @@ from typing import Any, Iterable, Sequence
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse, Response
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -153,6 +154,41 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def localize_html_response(request: Request, call_next):
+    response = await call_next(request)
+    lang = get_language_from_path(request.url.path)
+    content_type = response.headers.get("content-type", "")
+    if lang != "va" or "text/html" not in content_type.lower():
+        if "text/html" in content_type.lower():
+            response.headers.setdefault("Content-Language", "es")
+        return response
+
+    body = b""
+    async for chunk in response.body_iterator:
+        body += chunk
+
+    charset = "utf-8"
+    for part in content_type.split(";"):
+        part = part.strip().lower()
+        if part.startswith("charset="):
+            charset = part.split("=", 1)[1]
+            break
+
+    html = body.decode(charset, errors="replace")
+    localized = translate_html(html, lang).encode(charset)
+    headers = dict(response.headers)
+    headers.pop("content-length", None)
+    headers["Content-Language"] = "ca-ES-valencia"
+    return Response(
+        content=localized,
+        status_code=response.status_code,
+        headers=headers,
+        media_type=response.media_type,
+        background=response.background,
+    )
+
+
 @app.exception_handler(StarletteHTTPException)
 async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
     if exc.status_code != 404:
@@ -165,13 +201,19 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
     if path.startswith("/api/") or path.startswith("/static/") or not wants_html:
         return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
+    from app.web.routes import seo_context
+
     return TEMPLATES.TemplateResponse(
         request=request,
         name="404.html",
-        context={
-            "active_page": "not-found",
-            "page_title": "funkcionario.com | Funk not found",
-        },
+        context=seo_context(
+            request,
+            active_page="not-found",
+            page_title="funkcionario.com | Funk not found",
+            page_description="Página no encontrada en Funkcionario.com.",
+            path="/404",
+            robots_meta="noindex,nofollow",
+        ),
         status_code=404,
     )
 

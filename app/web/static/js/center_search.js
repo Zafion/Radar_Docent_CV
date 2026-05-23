@@ -19,7 +19,7 @@
 
   function formatDistance(value) {
     if (value === null || value === undefined || Number.isNaN(Number(value))) {
-      return ui.hasOrigin() ? "—" : "Activa ubicación";
+      return ui.hasOrigin() ? "—" : ui.t("Activa ubicación");
     }
     return `${Number(value).toFixed(2)} km`;
   }
@@ -27,19 +27,19 @@
   function actionButtons(item) {
     const buttons = [];
     if (item.center_code) {
-      buttons.push(`<a class="button button--ghost button--xs" href="/centros/${encodeURIComponent(item.center_code)}">Ficha</a>`);
+      buttons.push(`<a class="button button--ghost button--xs" href="${window.FunkI18n ? window.FunkI18n.path(`/centros/${encodeURIComponent(item.center_code)}`) : `/centros/${encodeURIComponent(item.center_code)}`}">${ui.t("Ficha")}</a>`);
     }
     if (item.maps_url) {
-      buttons.push(`<a class="button button--ghost button--xs" href="${ui.escapeHtml(item.maps_url)}" target="_blank" rel="noopener noreferrer">Mapa</a>`);
+      buttons.push(`<a class="button button--ghost button--xs" href="${ui.escapeHtml(item.maps_url)}" target="_blank" rel="noopener noreferrer">${ui.t("Mapa")}</a>`);
     }
     if (item.directions_url) {
-      buttons.push(`<a class="button button--ghost button--xs" href="${ui.escapeHtml(item.directions_url)}" target="_blank" rel="noopener noreferrer">Ruta</a>`);
+      buttons.push(`<a class="button button--ghost button--xs" href="${ui.escapeHtml(item.directions_url)}" target="_blank" rel="noopener noreferrer">${ui.t("Ruta")}</a>`);
     }
     return buttons.join("") || "—";
   }
 
   function render(items, total, offset) {
-    metaEl.textContent = `${ui.compactNumber(total)} centros encontrados. Mostrando ${ui.compactNumber(items.length)} por página.`;
+    metaEl.textContent = ui.t(`${ui.compactNumber(total)} centros encontrados. Mostrando ${ui.compactNumber(items.length)} por página.`);
     bodyEl.innerHTML = items.map((item) => `
       <tr>
         <td data-label="Centro"><strong>${ui.escapeHtml(item.denomination || "—")}</strong><br><span class="muted">${ui.escapeHtml(item.center_code || "")}${item.full_address ? ` · ${ui.escapeHtml(item.full_address)}` : ""}</span></td>
@@ -78,7 +78,7 @@
   function loadCenters(offset = 0) {
     currentOffset = offset;
     const params = buildParams(offset);
-    metaEl.textContent = "Cargando...";
+    metaEl.textContent = ui.t("Cargando...");
     return ui.apiGet(`/api/centers?${params.toString()}`)
       .then((data) => render(data.items || [], data.total || 0, data.offset || 0))
       .catch((error) => {

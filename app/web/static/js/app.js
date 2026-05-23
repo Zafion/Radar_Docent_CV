@@ -1,4 +1,7 @@
 (function () {
+  function t(value) {
+    return window.FunkI18n ? window.FunkI18n.t(value) : value;
+  }
   const latestOffersDateEl = document.getElementById("latest-offers-date");
 
   const personSearchForm = document.getElementById("person-search-form");
@@ -37,7 +40,7 @@
   }
 
   function formatDate(dateIso) {
-    if (!dateIso) return "Sin fecha";
+    if (!dateIso) return t("Sin fecha");
     const [year, month, day] = dateIso.split("-");
     if (!year || !month || !day) return dateIso;
     return `${day}/${month}/${year}`;
@@ -83,13 +86,13 @@
   }
 
   function locationButtonText() {
-    return hasUserOrigin() ? "Actualizar ubicación" : "Usar mi ubicación";
+    return hasUserOrigin() ? t("Actualizar ubicación") : t("Usar mi ubicación");
   }
 
   function updateLocationButtonState() {
     if (useMyLocationButton) {
       if (!navigator.geolocation) {
-        useMyLocationButton.textContent = "Ubicación no disponible";
+        useMyLocationButton.textContent = t("Ubicación no disponible");
         useMyLocationButton.disabled = true;
       } else {
         useMyLocationButton.textContent = locationButtonText();
@@ -108,9 +111,9 @@
       locationStatusEl.classList.toggle("location-status--active", hasUserOrigin());
 
       if (hasUserOrigin()) {
-        locationStatusEl.textContent = "Activa · distancia disponible";
+        locationStatusEl.textContent = t("Activa · distancia disponible");
       } else {
-        locationStatusEl.textContent = "No activada · sin distancia calculada";
+        locationStatusEl.textContent = t("No activada · sin distancia calculada");
       }
     }
 
@@ -118,16 +121,16 @@
   }
 
   function geolocationErrorMessage(error) {
-    if (!error) return "No se pudo obtener tu ubicación.";
-    if (error.code === 1) return "Permiso de ubicación denegado. Revisa los permisos del navegador para funkcionario.com.";
-    if (error.code === 2) return "No se pudo determinar la ubicación del dispositivo.";
-    if (error.code === 3) return "La ubicación ha tardado demasiado. Prueba de nuevo.";
-    return error.message || "No se pudo obtener tu ubicación.";
+    if (!error) return t("No se pudo obtener tu ubicación.");
+    if (error.code === 1) return t("Permiso de ubicación denegado. Revisa los permisos del navegador para funkcionario.com.");
+    if (error.code === 2) return t("No se pudo determinar la ubicación del dispositivo.");
+    if (error.code === 3) return t("La ubicación ha tardado demasiado. Prueba de nuevo.");
+    return error.message || t("No se pudo obtener tu ubicación.");
   }
 
   async function ensureUserLocation() {
     if (!navigator.geolocation) {
-      throw new Error("Tu navegador no permite geolocalización.");
+      throw new Error(t("Tu navegador no permite geolocalización."));
     }
 
     return new Promise((resolve, reject) => {
@@ -137,7 +140,7 @@
           const lon = Number(position.coords.longitude);
 
           if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-            reject(new Error("El navegador devolvió una ubicación no válida."));
+            reject(new Error(t("El navegador devolvió una ubicación no válida.")));
             return;
           }
 
@@ -201,7 +204,7 @@ async function apiGet(url) {
   async function updatePushToggleLabel() {
     if (!pushToggleButton) return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      pushToggleButton.textContent = "Alertas no disponibles";
+      pushToggleButton.textContent = t("Alertas no disponibles");
       pushToggleButton.disabled = true;
       return;
     }
@@ -209,17 +212,17 @@ async function apiGet(url) {
     try {
       const keyData = await apiGet("/api/push/public-key");
       if (!keyData.configured || !keyData.public_key) {
-        pushToggleButton.textContent = "Alertas no disponibles";
+        pushToggleButton.textContent = t("Alertas no disponibles");
         pushToggleButton.disabled = true;
         return;
       }
 
       const sub = await getPushSubscription();
       pushToggleButton.textContent = sub
-        ? "Desactivar alertas de novedades"
-        : "Activar alertas de novedades";
+        ? t("Desactivar alertas de novedades")
+        : t("Activar alertas de novedades");
     } catch (_) {
-      pushToggleButton.textContent = "Alertas no disponibles";
+      pushToggleButton.textContent = t("Alertas no disponibles");
       pushToggleButton.disabled = true;
     }
   }
@@ -227,7 +230,7 @@ async function apiGet(url) {
   async function subscribePush() {
     const keyData = await apiGet("/api/push/public-key");
     if (!keyData.configured || !keyData.public_key) {
-      throw new Error("Las alertas no están configuradas todavía.");
+      throw new Error(t("Las alertas no están configuradas todavía."));
     }
 
     const registration = await navigator.serviceWorker.register("/sw.js");
@@ -275,7 +278,7 @@ async function apiGet(url) {
     if (!personSearchResults) return;
 
     if (!items.length) {
-      personSearchResults.innerHTML = '<div class="result-item"><div><h3>Sin coincidencias</h3><p>Prueba con menos términos o revisa el formato del nombre.</p></div></div>';
+      personSearchResults.innerHTML = `<div class="result-item"><div><h3>${t("Sin coincidencias")}</h3><p>${t("Prueba con menos términos o revisa el formato del nombre.")}</p></div></div>`;
       return;
     }
 
@@ -285,7 +288,7 @@ async function apiGet(url) {
           <h3>${escapeHtml(item.display_name)}</h3>
           <p>${escapeHtml(item.total_records)} registros · ${escapeHtml(item.total_awarded)} adjudicaciones · ${escapeHtml(item.total_difficult_positions)} difícil cobertura</p>
         </div>
-        <button class="button button--secondary" type="button" data-person-detail="true" data-normalized-name="${escapeHtml(item.normalized_name)}" data-display-name="${escapeHtml(item.display_name)}">Ver ficha</button>
+        <button class="button button--secondary" type="button" data-person-detail="true" data-normalized-name="${escapeHtml(item.normalized_name)}" data-display-name="${escapeHtml(item.display_name)}">${t("Ver ficha")}</button>
       </div>
     `).join("");
 
@@ -300,7 +303,7 @@ async function apiGet(url) {
           selectedAt: new Date().toISOString(),
         }));
 
-        window.location.href = "/resultado-persona";
+        window.location.href = window.FunkI18n ? window.FunkI18n.path("/resultado-persona") : "/resultado-persona";
       });
     });
   }
@@ -311,16 +314,16 @@ async function apiGet(url) {
 
     const query = personQueryInput.value.trim();
     if (query.length < 2) {
-      setFeedback("Introduce al menos 2 caracteres.", true);
+      setFeedback(t("Introduce al menos 2 caracteres."), true);
       return;
     }
 
-    setFeedback("Buscando coincidencias...");
+    setFeedback(t("Buscando coincidencias..."));
     personSearchResults.innerHTML = "";
 
     try {
       const data = await apiGet(`/api/search/persons?q=${encodeURIComponent(query)}&limit=10`);
-      setFeedback(data.count ? "Abre la ficha completa de la coincidencia que te interese." : "");
+      setFeedback(data.count ? t("Abre la ficha completa de la coincidencia que te interese.") : "");
       renderSearchResults(data.items || []);
     } catch (error) {
       setFeedback(error.message, true);
@@ -329,11 +332,11 @@ async function apiGet(url) {
 
   useMyLocationButton?.addEventListener("click", async () => {
     useMyLocationButton.disabled = true;
-    useMyLocationButton.textContent = "Obteniendo ubicación...";
+    useMyLocationButton.textContent = t("Obteniendo ubicación...");
 
     try {
       await ensureUserLocation();
-      setFeedback("Ubicación activada correctamente. Se usará para calcular distancias en los listados.");
+      setFeedback(t("Ubicación activada correctamente. Se usará para calcular distancias en los listados."));
     } catch (error) {
       setFeedback(error.message, true);
     } finally {
@@ -344,7 +347,7 @@ async function apiGet(url) {
 
   clearLocationButton?.addEventListener("click", () => {
     clearStoredOrigin();
-    setFeedback("Ubicación borrada. Ya no se calcularán distancias con tu posición.", false);
+    setFeedback(t("Ubicación borrada. Ya no se calcularán distancias con tu posición."), false);
   });
 
   pushToggleButton?.addEventListener("click", async () => {
@@ -355,16 +358,16 @@ async function apiGet(url) {
       const current = await getPushSubscription();
 
       if (current) {
-        pushToggleButton.textContent = "Desactivando alertas...";
+        pushToggleButton.textContent = t("Desactivando alertas...");
         await unsubscribePush();
-        setFeedback("Alertas de novedades desactivadas.");
+        setFeedback(t("Alertas de novedades desactivadas."));
       } else {
-        pushToggleButton.textContent = "Activando alertas...";
+        pushToggleButton.textContent = t("Activando alertas...");
         await subscribePush();
-        setFeedback("Alertas de novedades activadas.");
+        setFeedback(t("Alertas de novedades activadas."));
       }
     } catch (error) {
-      setFeedback(error.message || "No se pudo cambiar el estado de las alertas.", true);
+      setFeedback(error.message || t("No se pudo cambiar el estado de las alertas."), true);
     } finally {
       pushToggleButton.disabled = false;
       await updatePushToggleLabel();
