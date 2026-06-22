@@ -299,6 +299,23 @@ class BaseDiscoveryAdapter(ABC):
             "dificil provision",
             "puesto asignado provisionalmente",
             "lloc assignat provisionalment",
+            # Inicio de curso: listados de participantes/bolsa publicados antes de plazas/adjudicaciones.
+            "participantes",
+            "participants",
+            "listado provisional",
+            "llistat provisional",
+            "llista provisional",
+            "relacion provisional",
+            "relacio provisional",
+            "personal funcionario interino participante",
+            "personal funcionari interi participant",
+            "bolsa del cuerpo de maestros",
+            "borsa del cos de mestres",
+            "bolsas de especialidades",
+            "borses d'especialitats",
+            "par_pro_int_lis",
+            "par_pro_int_res",
+            "ini_2026_par_pro",
         )
 
         strong_negative_markers = (

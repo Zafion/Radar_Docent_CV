@@ -25,7 +25,7 @@ class ClassifiedDocument:
 
 
 class DocumentClassifierService:
-    classifier_version = "0.6.0"
+    classifier_version = "0.7.0"
 
     def classify(
         self,
@@ -96,6 +96,23 @@ class DocumentClassifierService:
         )
         if non_docent is not None:
             doc_family, list_scope, signals = non_docent
+            return ClassifiedDocument(
+                doc_family=doc_family,
+                list_scope=list_scope,
+                title=title,
+                document_date_text=document_date_text,
+                document_date_iso=document_date_iso,
+                classifier_version=self.classifier_version,
+                signals=signals,
+            )
+
+        docent_bag = self._classify_docent_bag_document(
+            filename=normalized_filename,
+            title=normalized_title,
+            combined_text=combined_text,
+        )
+        if docent_bag is not None:
+            doc_family, list_scope, signals = docent_bag
             return ClassifiedDocument(
                 doc_family=doc_family,
                 list_scope=list_scope,
@@ -294,6 +311,69 @@ class DocumentClassifierService:
 
         return None
 
+
+
+    def _classify_docent_bag_document(
+        self,
+        *,
+        filename: str,
+        title: str,
+        combined_text: str,
+    ) -> tuple[str, Optional[str], str] | None:
+        if "_par_pro_int_lis_mae" in filename:
+            return "docent_bag_participants", "maestros", "filename=par_pro_int_lis_mae"
+
+        if "_par_pro_int_lis_sec" in filename:
+            return "docent_bag_participants", "secundaria_otros", "filename=par_pro_int_lis_sec"
+
+        if "_par_pro_int_res" in filename:
+            return "docent_bag_resolution", None, "filename=par_pro_int_res"
+
+        if "_par_pro_mae" in filename:
+            return "docent_career_practice_participants", "maestros", "filename=par_pro_mae"
+
+        if "_par_pro_sec" in filename:
+            return "docent_career_practice_participants", "secundaria_otros", "filename=par_pro_sec"
+
+        if "_par_pro_rpp_res" in filename:
+            return "docent_career_practice_resolution", None, "filename=par_pro_rpp_res"
+
+        if (
+            "bolsa del cuerpo de maestros" in combined_text
+            or "borsa del cos de mestres" in combined_text
+        ) and "listado provisional" in combined_text:
+            return "docent_bag_participants", "maestros", "content=docent_bag_maestros"
+
+        if (
+            "bolsas de especialidades de todos los cuerpos excepto maestros" in combined_text
+            or "borses d'especialitats de tots els cossos excepte mestres" in combined_text
+        ):
+            return "docent_bag_participants", "secundaria_otros", "content=docent_bag_secundaria_otros"
+
+        if (
+            "adjudicacio fc/fp inici curs cos de mestres" in combined_text
+            or "adjudicacion fc/fp inicio curso cuerpo de maestros" in combined_text
+        ):
+            return "docent_career_practice_participants", "maestros", "content=career_practice_participants_maestros"
+
+        if (
+            "adjudicacio fc/fp inici curs" in combined_text
+            or "adjudicacion fc/fp inicio curso" in combined_text
+        ) and (
+            "secundaria" in combined_text
+            or "altres cossos" in combined_text
+            or "otros cuerpos" in combined_text
+        ):
+            return "docent_career_practice_participants", "secundaria_otros", "content=career_practice_participants_secundaria_otros"
+
+        if (
+            "personal funcionario interino participante" in combined_text
+            and "listado provisional" in combined_text
+            and "lista unica del cuerpo de maestros" in combined_text
+        ):
+            return "docent_bag_resolution", None, "content=docent_bag_resolution"
+
+        return None
 
     def _classify_non_docent_document(
         self,

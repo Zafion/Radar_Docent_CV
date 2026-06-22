@@ -342,6 +342,66 @@ CREATE INDEX IF NOT EXISTS idx_award_results_person_display_name_norm_trgm
 CREATE INDEX IF NOT EXISTS idx_difficult_candidates_full_name_norm_trgm
     ON difficult_coverage_candidates
     USING gin (normalize_text(full_name) gin_trgm_ops);
+
+-- ============================================================================
+-- Bolsas docentes y participantes de inicio de curso
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS docent_bag_snapshots (
+    id BIGSERIAL PRIMARY KEY,
+    document_id BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    course_year TEXT,
+    list_stage TEXT NOT NULL,
+    staff_kind TEXT NOT NULL,
+    position_scope TEXT NOT NULL,
+    list_scope TEXT NOT NULL,
+    body_code TEXT,
+    body_name TEXT,
+    specialty_code TEXT,
+    specialty_name TEXT,
+    source_page_url TEXT,
+    document_url TEXT,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS docent_bag_members (
+    id BIGSERIAL PRIMARY KEY,
+    snapshot_id BIGINT NOT NULL REFERENCES docent_bag_snapshots(id) ON DELETE CASCADE,
+    order_number INTEGER NOT NULL,
+    masked_dni TEXT,
+    person_display_name TEXT NOT NULL,
+    person_name_normalized TEXT NOT NULL,
+    service_status TEXT,
+    collective TEXT,
+    habilitations TEXT[],
+    disabled_habilitation BOOLEAN NOT NULL DEFAULT FALSE,
+    raw_row_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_docent_bag_snapshots_document_id
+    ON docent_bag_snapshots(document_id);
+
+CREATE INDEX IF NOT EXISTS idx_docent_bag_snapshots_scope
+    ON docent_bag_snapshots(list_scope, position_scope);
+
+CREATE INDEX IF NOT EXISTS idx_docent_bag_snapshots_specialty_code
+    ON docent_bag_snapshots(specialty_code);
+
+CREATE INDEX IF NOT EXISTS idx_docent_bag_members_snapshot_id
+    ON docent_bag_members(snapshot_id);
+
+CREATE INDEX IF NOT EXISTS idx_docent_bag_members_order_number
+    ON docent_bag_members(order_number);
+
+CREATE INDEX IF NOT EXISTS idx_docent_bag_members_name_norm
+    ON docent_bag_members(person_name_normalized);
+
+CREATE INDEX IF NOT EXISTS idx_docent_bag_members_person_display_name_norm_trgm
+    ON docent_bag_members
+    USING gin (normalize_text(person_display_name) gin_trgm_ops);
+
 -- ============================================================================
 -- Personal no docente de atención educativa
 -- ============================================================================

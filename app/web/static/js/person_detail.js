@@ -53,6 +53,11 @@
     return `${Number(distanceKm).toFixed(2)} km`;
   }
 
+  function formatList(values) {
+    if (!Array.isArray(values) || !values.length) return "—";
+    return values.filter(Boolean).join(", ") || "—";
+  }
+
   function loadStoredOrigin() {
     try {
       const raw = localStorage.getItem(LOCATION_STORAGE_KEY);
@@ -187,6 +192,7 @@
       case "participated_without_award":
         return "status-pill status-pill--participated";
       case "difficult_coverage_candidate":
+      case "docent_bag_member":
         return "status-pill status-pill--candidate";
       default:
         return "status-pill status-pill--info";
@@ -196,6 +202,7 @@
   function fallbackUserView(profile) {
     const firstAward = profile.awards?.[0] ?? null;
     const firstAssignment = firstAward?.assignments?.[0] ?? null;
+    const firstBag = profile.bag_memberships?.[0] ?? null;
 
     if (firstAward?.status === "Adjudicat" && firstAssignment) {
       return {
@@ -210,6 +217,27 @@
         assigned_center: firstAssignment.center_name,
         assigned_locality: firstAssignment.locality,
         recommended_action: "Consulta la resolución oficial y el centro adjudicado para los siguientes pasos administrativos."
+      };
+    }
+
+    if (firstBag) {
+      return {
+        display_name: profile.person.display_name,
+        current_result: "docent_bag_member",
+        current_result_label: "Consta en bolsa docente",
+        current_result_message: "Figura en un listado de bolsa o participantes de inicio de curso cargado en la web.",
+        latest_scope_label: firstBag.position_scope === "general" ? "Bolsa general" : "Bolsa por especialidad",
+        latest_specialty_label: [firstBag.specialty_code, firstBag.specialty_name].filter(Boolean).join(" - ") || firstBag.list_scope || null,
+        latest_date: firstBag.document_date_iso || null,
+        assigned_position: null,
+        assigned_center: null,
+        assigned_locality: null,
+        recommended_action: "Revisa futuras publicaciones definitivas o adjudicaciones.",
+        bag_position: firstBag.order_number,
+        bag_course_year: firstBag.course_year,
+        bag_list_stage: firstBag.list_stage,
+        bag_service_status: firstBag.service_status || firstBag.collective || null,
+        bag_habilitations: firstBag.habilitations || null,
       };
     }
 
@@ -246,7 +274,8 @@
 
     const awardsCount = profile.awards?.length || 0;
     const difficultCount = profile.difficult_coverage?.length || 0;
-    subtitleEl.textContent = `${awardsCount} adjudicaciones · ${difficultCount} registros de difícil cobertura`;
+    const bagCount = profile.bag_memberships?.length || 0;
+    subtitleEl.textContent = `${awardsCount} adjudicaciones · ${difficultCount} registros de difícil cobertura · ${bagCount} registros de bolsa`;
 
     summaryEl.innerHTML = `
       <div class="status-card">
@@ -261,6 +290,11 @@
           <div class="status-grid__item"><span>Especialidad</span><strong>${escapeHtml(userView.latest_specialty_label || "—")}</strong></div>
           <div class="status-grid__item"><span>Centro / localidad</span><strong>${escapeHtml([userView.assigned_center, userView.assigned_locality].filter(Boolean).join(" · ") || "—")}</strong></div>
           <div class="status-grid__item"><span>Distancia</span><strong>${escapeHtml(formatDistance(userView.assigned_distance_km))}</strong></div>
+          ${userView.bag_position ? `<div class="status-grid__item"><span>Posición en bolsa</span><strong>${escapeHtml(userView.bag_position)}</strong></div>` : ""}
+          ${userView.bag_course_year ? `<div class="status-grid__item"><span>Curso</span><strong>${escapeHtml(userView.bag_course_year)}</strong></div>` : ""}
+          ${userView.bag_list_stage ? `<div class="status-grid__item"><span>Listado</span><strong>${escapeHtml(userView.bag_list_stage)}</strong></div>` : ""}
+          ${userView.bag_service_status ? `<div class="status-grid__item"><span>Estado bolsa</span><strong>${escapeHtml(userView.bag_service_status)}</strong></div>` : ""}
+          ${Array.isArray(userView.bag_habilitations) && userView.bag_habilitations.length ? `<div class="status-grid__item"><span>Habilitaciones</span><strong>${escapeHtml(formatList(userView.bag_habilitations))}</strong></div>` : ""}
         </div>
         ${userView.assigned_center_address ? `<p><strong>Dirección:</strong> ${escapeHtml(userView.assigned_center_address)}</p>` : ""}
         ${userView.assigned_center_phone ? `<p><strong>Teléfono:</strong> ${escapeHtml(userView.assigned_center_phone)}</p>` : ""}
@@ -281,6 +315,20 @@
         ${userView.recommended_action ? `<p><strong>Siguiente paso orientativo:</strong> ${escapeHtml(userView.recommended_action)}</p>` : ""}
       </div>
     `;
+
+    const bagRows = (profile.bag_memberships || []).map((row) => `
+      <tr>
+        <td data-label="Fecha">${escapeHtml(formatDate(row.document_date_iso))}</td>
+        <td data-label="Curso">${escapeHtml(row.course_year || "—")}</td>
+        <td data-label="Listado">${escapeHtml(row.list_stage || "—")}</td>
+        <td data-label="Ámbito">${escapeHtml(row.position_scope === "general" ? "General" : "Por especialidad")}</td>
+        <td data-label="Cuerpo">${escapeHtml(row.body_name || "—")}</td>
+        <td data-label="Especialidad">${escapeHtml([row.specialty_code, row.specialty_name].filter(Boolean).join(" - ") || "—")}</td>
+        <td data-label="Posición">${escapeHtml(row.order_number || "—")}</td>
+        <td data-label="Estado">${escapeHtml(row.service_status || row.collective || "—")}</td>
+        <td data-label="Habilitaciones">${escapeHtml(formatList(row.habilitations))}${row.disabled_habilitation ? " · habilitación desactivada" : ""}</td>
+      </tr>
+    `).join("") || '<tr><td colspan="9" class="muted data-table__empty">No hay registros de bolsa docente.</td></tr>';
 
     const awardsRows = (profile.awards || []).map((award) => {
       const firstAssignment = award.assignments?.[0] || null;
@@ -313,6 +361,33 @@
     `).join("") || '<tr><td colspan="6" class="muted data-table__empty">No hay registros de difícil cobertura.</td></tr>';
 
     historyEl.innerHTML = `
+      <div class="content-card section-space--sm">
+        <div class="content-card__header">
+          <div>
+            <h2>Bolsa docente</h2>
+            <p>Posiciones detectadas en listados de bolsa o participantes de inicio de curso.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table data-table--cards">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Curso</th>
+                <th>Listado</th>
+                <th>Ámbito</th>
+                <th>Cuerpo</th>
+                <th>Especialidad</th>
+                <th>Posición</th>
+                <th>Estado</th>
+                <th>Habilitaciones</th>
+              </tr>
+            </thead>
+            <tbody>${bagRows}</tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="content-card section-space--sm">
         <div class="content-card__header">
           <div>

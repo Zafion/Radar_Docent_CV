@@ -10,6 +10,9 @@ from app.services.difficult_coverage_provisional_parser import (
 from app.services.final_award_listing_maestros_parser import (
     FinalAwardListingMaestrosParserService,
 )
+from app.services.docent_bag_participants_parser import (
+    DocentBagParticipantsParserService,
+)
 from app.services.final_award_listing_secundaria_parser import (
     FinalAwardListingSecundariaParserService,
 )
@@ -44,6 +47,7 @@ class DocumentParseDispatcherService:
             ("final_award_listing_maestros", FinalAwardListingMaestrosParserService()),
             ("final_award_listing_secundaria", FinalAwardListingSecundariaParserService()),
             ("difficult_coverage_provisional", DifficultCoverageProvisionalParserService()),
+            ("docent_bag_participants", DocentBagParticipantsParserService()),
             ("non_docent", NonDocentParserService()),
         ]
 

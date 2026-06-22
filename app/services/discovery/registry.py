@@ -39,6 +39,13 @@ def get_discovery_adapters() -> list[BaseDiscoveryAdapter]:
             max_suffix=9,
             max_depth=2,
         ),
+        GenericFamilyDiscoveryAdapter(
+            source_key="family_participantes",
+            base_slug="participantes",
+            source_label="Familia participantes*",
+            max_suffix=9,
+            max_depth=1,
+        ),
         *get_non_docent_discovery_adapters(),
         GenericFamilyDiscoveryAdapter(
             source_key="family_plazas",

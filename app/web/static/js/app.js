@@ -286,7 +286,7 @@ async function apiGet(url) {
       <div class="result-item">
         <div>
           <h3>${escapeHtml(item.display_name)}</h3>
-          <p>${escapeHtml(item.total_records)} registros · ${escapeHtml(item.total_awarded)} adjudicaciones · ${escapeHtml(item.total_difficult_positions)} difícil cobertura</p>
+          <p>${escapeHtml(item.total_records)} registros · ${escapeHtml(item.total_awarded)} adjudicaciones · ${escapeHtml(item.total_difficult_positions)} difícil cobertura · ${escapeHtml(item.total_bag_records || 0)} bolsa docente</p>
         </div>
         <button class="button button--secondary" type="button" data-person-detail="true" data-normalized-name="${escapeHtml(item.normalized_name)}" data-display-name="${escapeHtml(item.display_name)}">${t("Ver ficha")}</button>
       </div>

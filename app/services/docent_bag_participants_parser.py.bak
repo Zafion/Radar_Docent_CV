@@ -1,0 +1,571 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+import re
+import subprocess
+import unicodedata
+from typing import Any
+
+from pypdf import PdfReader
+
+
+
+PARSER_KEY = "docent_bag_participants_parser"
+PARSER_VERSION = "0.1.0"
+
+SERVICE_STATUS_RE = re.compile(r"(?P<status>AMB\s+SERVEIS|SENSE\s+SERVEIS)\b", re.IGNORECASE)
+BAG_ROW_RE = re.compile(r"^(?P<order>\d{1,6})\s+(?P<rest>.+)$")
+SPECIALTY_HEADER_RE = re.compile(r"(?:Col·lectiu\s*)?\((?P<code>[0-9A-Z]{2,5})\)\s*(?P<name>.+)$", re.IGNORECASE)
+FC_FP_ROW_RE = re.compile(
+    r"^(?P<name>.+?)\s*(?P<masked_dni>\*{3}\d{4}\*{2})\s+(?P<order>\d{1,5})\s+(?P<collective>[A-ZÀ-Ý ]+)$"
+)
+FC_FP_ROW_DNI_FIRST_RE = re.compile(
+    r"^(?P<masked_dni>\*{3}\d{4}\*{2})\s+(?P<name>.+?)\s+(?P<order>\d{1,5})\s+(?P<collective>[A-ZÀ-Ý ]+)$"
+)
+COURSE_YEAR_RE = re.compile(r"(?P<start>20\d{2})\s*/\s*(?P<end>20?\d{2})")
+SHORT_COURSE_YEAR_RE = re.compile(r"(?P<start>20\d{2})\s*/\s*(?P<end>\d{2})")
+
+HABILITATION_CODES = {
+    "INF",
+    "PRI",
+    "ING",
+    "FRA",
+    "EF",
+    "PT",
+    "AL",
+    "MUS",
+}
+
+STATIC_HEADER_MARKERS = (
+    "BOLSA DEL CUERPO DE MAESTROS",
+    "BORSA DEL COS DE MESTRES",
+    "BOLSAS DE ESPECIALIDADES",
+    "BORSES D'ESPECIALITATS",
+    "LISTADO PROVISIONAL",
+    "LLISTA PROVISIONAL",
+    "LLISTAT PROVISIONAL",
+    "ADJUDICACIÓ FC/FP",
+    "ADJUDICACION FC/FP",
+    "CURSO / CURS",
+    "DNI COGNOMS I NOM ORDRE",
+    "DNI COGNOMS I NOM",
+    "MESTRES",
+    "(*) HABILITACIÓ DESACTIVADA",
+    "(*) HABILITACION DESACTIVADA",
+)
+
+
+@dataclass(slots=True, frozen=True)
+class SnapshotKey:
+    course_year: str | None
+    list_stage: str
+    staff_kind: str
+    position_scope: str
+    list_scope: str
+    body_code: str | None
+    body_name: str | None
+    specialty_code: str | None
+    specialty_name: str | None
+
+
+@dataclass(slots=True)
+class ParsedBagMember:
+    snapshot_key: SnapshotKey
+    order_number: int
+    masked_dni: str | None
+    person_display_name: str
+    person_name_normalized: str
+    service_status: str | None
+    collective: str | None
+    habilitations: list[str] | None
+    disabled_habilitation: bool
+    raw_row_text: str
+
+
+class DocentBagParticipantsParserService:
+    def parse_all_documents(self) -> list[dict[str, Any]]:
+        from app.storage.docent_bag_store import DocentBagStore
+
+        store = DocentBagStore()
+        summaries: list[dict[str, Any]] = []
+
+        try:
+            documents = store.list_documents_for_parser(
+                parser_key=PARSER_KEY,
+                parser_version=PARSER_VERSION,
+            )
+
+            for document in documents:
+                started_at = self._utc_now_iso()
+                parse_run_id = store.create_parse_run(
+                    document_version_id=int(document["document_version_id"]),
+                    parser_key=PARSER_KEY,
+                    parser_version=PARSER_VERSION,
+                    started_at=started_at,
+                )
+
+                try:
+                    rows = self._parse_document(document)
+                    store.clear_for_document(int(document["document_id"]))
+                    snapshot_ids: dict[SnapshotKey, int] = {}
+
+                    for row in rows:
+                        snapshot_id = snapshot_ids.get(row.snapshot_key)
+                        if snapshot_id is None:
+                            snapshot_id = store.insert_snapshot(
+                                document_id=int(document["document_id"]),
+                                course_year=row.snapshot_key.course_year,
+                                list_stage=row.snapshot_key.list_stage,
+                                staff_kind=row.snapshot_key.staff_kind,
+                                position_scope=row.snapshot_key.position_scope,
+                                list_scope=row.snapshot_key.list_scope,
+                                body_code=row.snapshot_key.body_code,
+                                body_name=row.snapshot_key.body_name,
+                                specialty_code=row.snapshot_key.specialty_code,
+                                specialty_name=row.snapshot_key.specialty_name,
+                                source_page_url=document.get("source_url"),
+                                document_url=document.get("asset_url") or document.get("asset_canonical_url"),
+                                notes=f"parser={PARSER_KEY}; parser_version={PARSER_VERSION}",
+                            )
+                            snapshot_ids[row.snapshot_key] = snapshot_id
+
+                        store.insert_member(
+                            snapshot_id=snapshot_id,
+                            order_number=row.order_number,
+                            masked_dni=row.masked_dni,
+                            person_display_name=row.person_display_name,
+                            person_name_normalized=row.person_name_normalized,
+                            service_status=row.service_status,
+                            collective=row.collective,
+                            habilitations=row.habilitations,
+                            disabled_habilitation=row.disabled_habilitation,
+                            raw_row_text=row.raw_row_text,
+                        )
+
+                    finished_at = self._utc_now_iso()
+                    store.finish_parse_run(
+                        parse_run_id=parse_run_id,
+                        finished_at=finished_at,
+                        status="success",
+                        rows_extracted=len(rows),
+                        error_message=None,
+                    )
+                    store.mark_document_parsed(
+                        document_id=int(document["document_id"]),
+                        parsed_at=finished_at,
+                    )
+                    store.connection.commit()
+
+                    summaries.append(
+                        {
+                            "document_id": int(document["document_id"]),
+                            "doc_family": document["doc_family"],
+                            "original_filename": document["original_filename"],
+                            "rows_extracted": len(rows),
+                            "snapshots_extracted": len(snapshot_ids),
+                            "status": "success",
+                        }
+                    )
+
+                except Exception as exc:
+                    store.connection.rollback()
+                    finished_at = self._utc_now_iso()
+
+                    try:
+                        store.finish_parse_run(
+                            parse_run_id=parse_run_id,
+                            finished_at=finished_at,
+                            status="failed",
+                            rows_extracted=0,
+                            error_message=str(exc),
+                        )
+                        store.connection.commit()
+                    except Exception:
+                        store.connection.rollback()
+
+                    summaries.append(
+                        {
+                            "document_id": int(document["document_id"]),
+                            "doc_family": document["doc_family"],
+                            "original_filename": document["original_filename"],
+                            "rows_extracted": 0,
+                            "status": "failed",
+                            "error": str(exc),
+                        }
+                    )
+
+            return summaries
+
+        finally:
+            store.close()
+
+    def _parse_document(self, document: dict[str, Any]) -> list[ParsedBagMember]:
+        pdf_path = self._resolve_file_path(document["file_path"])
+        text = self._extract_text(pdf_path)
+        lines = self._extract_clean_lines_from_text(text)
+        course_year = self._infer_course_year(text=text, document=document)
+        list_stage = self._infer_list_stage(text=text, document=document)
+        doc_family = document["doc_family"]
+        list_scope = document.get("list_scope")
+
+        if doc_family == "docent_bag_participants" and list_scope == "maestros":
+            return self._parse_interino_maestros(lines, course_year, list_stage)
+
+        if doc_family == "docent_bag_participants" and list_scope == "secundaria_otros":
+            return self._parse_interino_secundaria(lines, course_year, list_stage)
+
+        if doc_family == "docent_career_practice_participants":
+            return self._parse_fc_fp_participants(
+                lines=lines,
+                course_year=course_year,
+                list_stage=list_stage,
+                list_scope=list_scope or "maestros",
+            )
+
+        return []
+
+    def _parse_interino_maestros(
+        self,
+        lines: list[str],
+        course_year: str | None,
+        list_stage: str,
+    ) -> list[ParsedBagMember]:
+        snapshot_key = SnapshotKey(
+            course_year=course_year,
+            list_stage=list_stage,
+            staff_kind="interino",
+            position_scope="general",
+            list_scope="maestros",
+            body_code=None,
+            body_name="MESTRES / MAESTROS",
+            specialty_code=None,
+            specialty_name=None,
+        )
+        rows: list[ParsedBagMember] = []
+
+        for line in lines:
+            parsed = self._parse_interino_bag_row(line)
+            if parsed is None:
+                continue
+            rows.append(
+                ParsedBagMember(
+                    snapshot_key=snapshot_key,
+                    order_number=parsed["order_number"],
+                    masked_dni=None,
+                    person_display_name=parsed["person_display_name"],
+                    person_name_normalized=self._normalize_person_name(parsed["person_display_name"]),
+                    service_status=parsed["service_status"],
+                    collective=None,
+                    habilitations=parsed["habilitations"],
+                    disabled_habilitation=parsed["disabled_habilitation"],
+                    raw_row_text=line,
+                )
+            )
+
+        return rows
+
+    def _parse_interino_secundaria(
+        self,
+        lines: list[str],
+        course_year: str | None,
+        list_stage: str,
+    ) -> list[ParsedBagMember]:
+        rows: list[ParsedBagMember] = []
+        current_body_name: str | None = None
+        current_specialty_code: str | None = None
+        current_specialty_name: str | None = None
+
+        for line in lines:
+            if self._is_static_header_line(line):
+                continue
+
+            specialty = self._parse_specialty_header(line)
+            if specialty is not None:
+                current_specialty_code = specialty["specialty_code"]
+                current_specialty_name = specialty["specialty_name"]
+                continue
+
+            parsed = self._parse_interino_bag_row(line)
+            if parsed is not None and current_specialty_code is not None:
+                snapshot_key = SnapshotKey(
+                    course_year=course_year,
+                    list_stage=list_stage,
+                    staff_kind="interino",
+                    position_scope="specialty",
+                    list_scope="secundaria_otros",
+                    body_code=None,
+                    body_name=current_body_name,
+                    specialty_code=current_specialty_code,
+                    specialty_name=current_specialty_name,
+                )
+                rows.append(
+                    ParsedBagMember(
+                        snapshot_key=snapshot_key,
+                        order_number=parsed["order_number"],
+                        masked_dni=None,
+                        person_display_name=parsed["person_display_name"],
+                        person_name_normalized=self._normalize_person_name(parsed["person_display_name"]),
+                        service_status=parsed["service_status"],
+                        collective=None,
+                        habilitations=None,
+                        disabled_habilitation=parsed["disabled_habilitation"],
+                        raw_row_text=line,
+                    )
+                )
+                continue
+
+            if self._looks_like_body_header(line):
+                current_body_name = line
+
+        return rows
+
+    def _parse_fc_fp_participants(
+        self,
+        *,
+        lines: list[str],
+        course_year: str | None,
+        list_stage: str,
+        list_scope: str,
+    ) -> list[ParsedBagMember]:
+        rows: list[ParsedBagMember] = []
+        current_body_name: str | None = (
+            "MESTRES / MAESTROS" if list_scope == "maestros" else None
+        )
+        current_specialty_name: str | None = None
+
+        for line in lines:
+            if self._is_static_header_line(line):
+                continue
+
+            if self._looks_like_fc_fp_body_header(line):
+                current_body_name = line
+                current_specialty_name = None
+                continue
+
+            match = FC_FP_ROW_RE.match(line) or FC_FP_ROW_DNI_FIRST_RE.match(line)
+            if match is not None and current_specialty_name is not None:
+                person_display_name = self._normalize_spaces(match.group("name"))
+                collective = self._normalize_spaces(match.group("collective"))
+                snapshot_key = SnapshotKey(
+                    course_year=course_year,
+                    list_stage=list_stage,
+                    staff_kind="career_practice",
+                    position_scope="specialty",
+                    list_scope=list_scope,
+                    body_code=None,
+                    body_name=current_body_name,
+                    specialty_code=None,
+                    specialty_name=current_specialty_name,
+                )
+                rows.append(
+                    ParsedBagMember(
+                        snapshot_key=snapshot_key,
+                        order_number=int(match.group("order")),
+                        masked_dni=match.group("masked_dni"),
+                        person_display_name=person_display_name,
+                        person_name_normalized=self._normalize_person_name(person_display_name),
+                        service_status=None,
+                        collective=collective,
+                        habilitations=None,
+                        disabled_habilitation=False,
+                        raw_row_text=line,
+                    )
+                )
+                continue
+
+            if self._looks_like_fc_fp_specialty_header(line):
+                current_specialty_name = line
+
+        return rows
+
+    def _parse_interino_bag_row(self, line: str) -> dict[str, Any] | None:
+        match = BAG_ROW_RE.match(line)
+        if match is None:
+            return None
+
+        order_number = int(match.group("order"))
+        rest = match.group("rest")
+        status_match = SERVICE_STATUS_RE.search(rest)
+        if status_match is None:
+            return None
+
+        disabled_habilitation = "(*)" in rest
+        person_display_name = self._normalize_spaces(rest[: status_match.start()])
+        tail = self._normalize_spaces(rest[status_match.end() :].replace("(*)", ""))
+        service_status = self._normalize_service_status(status_match.group("status"))
+        habilitations = self._parse_habilitations(tail)
+
+        if not person_display_name or "," not in person_display_name:
+            return None
+
+        return {
+            "order_number": order_number,
+            "person_display_name": person_display_name,
+            "service_status": service_status,
+            "habilitations": habilitations,
+            "disabled_habilitation": disabled_habilitation,
+        }
+
+    def _parse_specialty_header(self, line: str) -> dict[str, str] | None:
+        clean = self._normalize_spaces(line.replace("Col·lectiu", ""))
+        match = SPECIALTY_HEADER_RE.search(clean)
+        if match is None:
+            return None
+
+        specialty_name = self._normalize_spaces(match.group("name"))
+        if not specialty_name:
+            return None
+
+        return {
+            "specialty_code": match.group("code").upper(),
+            "specialty_name": specialty_name,
+        }
+
+    def _parse_habilitations(self, value: str) -> list[str] | None:
+        if not value:
+            return None
+
+        tokens = [token.strip().upper() for token in value.split() if token.strip()]
+        habilitations = [token for token in tokens if token in HABILITATION_CODES]
+        return habilitations or None
+
+    def _looks_like_body_header(self, line: str) -> bool:
+        if self._is_static_header_line(line):
+            return False
+        if BAG_ROW_RE.match(line) or self._parse_specialty_header(line) is not None:
+            return False
+        if len(line) < 8:
+            return False
+        return line == line.upper() and "," not in line
+
+    def _looks_like_fc_fp_body_header(self, line: str) -> bool:
+        normalized = self._normalize_match_text(line)
+        body_markers = (
+            "mestres",
+            "maestros",
+            "professors",
+            "profesores",
+            "catedratics",
+            "catedraticos",
+            "catedratiques",
+        )
+        if not any(marker in normalized for marker in body_markers):
+            return False
+        if FC_FP_ROW_RE.match(line) or FC_FP_ROW_DNI_FIRST_RE.match(line) or BAG_ROW_RE.match(line):
+            return False
+        return line == line.upper() and "," not in line and "***" not in line
+
+    def _looks_like_fc_fp_specialty_header(self, line: str) -> bool:
+        if self._is_static_header_line(line):
+            return False
+        if FC_FP_ROW_RE.match(line) or FC_FP_ROW_DNI_FIRST_RE.match(line) or BAG_ROW_RE.match(line):
+            return False
+        if len(line) < 3:
+            return False
+        return line == line.upper() and "," not in line and "***" not in line
+
+    def _is_static_header_line(self, line: str) -> bool:
+        normalized = self._normalize_match_text(line)
+        if not normalized:
+            return True
+        return any(marker in normalized for marker in (self._normalize_match_text(item) for item in STATIC_HEADER_MARKERS))
+
+    def _infer_course_year(self, *, text: str, document: dict[str, Any]) -> str | None:
+        candidates = "\n".join(
+            [
+                text[:2000],
+                str(document.get("title") or ""),
+                str(document.get("original_filename") or ""),
+                str(document.get("publication_label") or ""),
+            ]
+        )
+        match = COURSE_YEAR_RE.search(candidates) or SHORT_COURSE_YEAR_RE.search(candidates)
+        if match is None:
+            return None
+        start = match.group("start")
+        end = match.group("end")
+        if len(end) == 2:
+            end = f"20{end}"
+        return f"{start}/{end}"
+
+    def _infer_list_stage(self, *, text: str, document: dict[str, Any]) -> str:
+        combined = self._normalize_match_text(
+            "\n".join(
+                [
+                    text[:2000],
+                    str(document.get("title") or ""),
+                    str(document.get("original_filename") or ""),
+                    str(document.get("publication_label") or ""),
+                ]
+            )
+        )
+        if "definitiv" in combined:
+            return "definitivo"
+        return "provisional"
+
+    def _extract_text(self, file_path: Path) -> str:
+        # pdftotext es mucho más rápido en listados grandes de bolsa (más de 1.000 páginas).
+        # Si no está instalado, se mantiene pypdf como fallback sin dependencia obligatoria.
+        try:
+            completed = subprocess.run(
+                ["pdftotext", "-layout", "-q", str(file_path), "-"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=180,
+            )
+            if completed.stdout.strip():
+                return completed.stdout
+        except Exception:
+            pass
+
+        reader = PdfReader(str(file_path))
+        chunks: list[str] = []
+        for page in reader.pages:
+            chunks.append(page.extract_text() or "")
+        return "\n".join(chunks)
+
+    def _extract_clean_lines_from_text(self, text: str) -> list[str]:
+        return [
+            normalized
+            for raw in text.splitlines()
+            if (normalized := self._normalize_spaces(raw))
+        ]
+
+    def _resolve_file_path(self, value: str) -> Path:
+        path = Path(value)
+        if path.exists():
+            return path
+
+        fallback = Path.cwd() / value
+        if fallback.exists():
+            return fallback
+
+        raise FileNotFoundError(f"No existe el PDF: {value}")
+
+    def _normalize_service_status(self, value: str) -> str:
+        return self._normalize_spaces(value).upper()
+
+    def _normalize_person_name(self, value: str) -> str:
+        value = value.strip().lower()
+        value = unicodedata.normalize("NFKD", value)
+        value = "".join(ch for ch in value if not unicodedata.combining(ch))
+        value = re.sub(r"[^a-z0-9]+", " ", value)
+        value = re.sub(r"\s+", " ", value).strip()
+        return value
+
+    def _normalize_match_text(self, value: str) -> str:
+        value = value.strip().lower()
+        value = unicodedata.normalize("NFKD", value)
+        value = "".join(ch for ch in value if not unicodedata.combining(ch))
+        value = re.sub(r"\s+", " ", value)
+        return value
+
+    def _normalize_spaces(self, value: str) -> str:
+        return re.sub(r"\s+", " ", value.replace("\u00a0", " ")).strip()
+
+    def _utc_now_iso(self) -> str:
+        return datetime.now(timezone.utc).isoformat()

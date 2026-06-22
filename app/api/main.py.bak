@@ -962,8 +962,8 @@ def search_persons(
         sql = """
         WITH award_people AS (
             SELECT
-                normalize_text(ar.person_display_name) AS normalized_name,
-                MIN(ar.person_display_name) AS display_name,
+                ar.person_name_normalized AS normalized_name,
+                ar.person_display_name AS display_name,
                 'award_results' AS source_kind,
                 COUNT(*) AS total_records,
                 SUM(CASE WHEN ar.status = 'Adjudicat' THEN 1 ELSE 0 END) AS total_awarded,
@@ -971,13 +971,13 @@ def search_persons(
                 0::bigint AS total_bag_records
             FROM award_results ar
             WHERE normalize_text(ar.person_display_name) LIKE normalize_text(?)
-               OR normalize_text(ar.person_name_normalized) LIKE normalize_text(?)
-            GROUP BY normalize_text(ar.person_display_name)
+               OR ar.person_name_normalized LIKE normalize_text(?)
+            GROUP BY ar.person_name_normalized, ar.person_display_name
         ),
         difficult_people AS (
             SELECT
-                normalize_text(dc.full_name) AS normalized_name,
-                MIN(dc.full_name) AS display_name,
+                dc.full_name_normalized AS normalized_name,
+                dc.full_name AS display_name,
                 'difficult_coverage_candidates' AS source_kind,
                 COUNT(*) AS total_records,
                 SUM(CASE WHEN dc.is_selected IS TRUE THEN 1 ELSE 0 END) AS total_awarded,
@@ -985,13 +985,13 @@ def search_persons(
                 0::bigint AS total_bag_records
             FROM difficult_coverage_candidates dc
             WHERE normalize_text(dc.full_name) LIKE normalize_text(?)
-               OR normalize_text(dc.full_name_normalized) LIKE normalize_text(?)
-            GROUP BY normalize_text(dc.full_name)
+               OR dc.full_name_normalized LIKE normalize_text(?)
+            GROUP BY dc.full_name_normalized, dc.full_name
         ),
         bag_people AS (
             SELECT
-                normalize_text(dbm.person_display_name) AS normalized_name,
-                MIN(dbm.person_display_name) AS display_name,
+                dbm.person_name_normalized AS normalized_name,
+                dbm.person_display_name AS display_name,
                 'docent_bag_members' AS source_kind,
                 COUNT(*) AS total_records,
                 0::bigint AS total_awarded,
@@ -999,8 +999,8 @@ def search_persons(
                 COUNT(*) AS total_bag_records
             FROM docent_bag_members dbm
             WHERE normalize_text(dbm.person_display_name) LIKE normalize_text(?)
-               OR normalize_text(dbm.person_name_normalized) LIKE normalize_text(?)
-            GROUP BY normalize_text(dbm.person_display_name)
+               OR dbm.person_name_normalized LIKE normalize_text(?)
+            GROUP BY dbm.person_name_normalized, dbm.person_display_name
         ),
         unioned AS (
             SELECT * FROM award_people
@@ -1011,14 +1011,14 @@ def search_persons(
         )
         SELECT
             normalized_name,
-            MIN(display_name) AS display_name,
+            display_name,
             SUM(total_records) AS total_records,
             SUM(total_awarded) AS total_awarded,
             SUM(total_difficult_positions) AS total_difficult_positions,
             SUM(total_bag_records) AS total_bag_records,
             string_agg(source_kind, ',' ORDER BY source_kind) AS source_kinds
         FROM unioned
-        GROUP BY normalized_name
+        GROUP BY normalized_name, display_name
         ORDER BY total_records DESC, display_name ASC
         LIMIT ?
         """
@@ -1044,35 +1044,32 @@ def get_person_profile(
             """
             WITH candidates AS (
                 SELECT
-                    normalize_text(ar.person_display_name) AS normalized_name,
+                    ar.person_name_normalized AS normalized_name,
                     ar.person_display_name AS display_name,
                     COUNT(*) AS total_rows
                 FROM award_results ar
-                WHERE normalize_text(ar.person_display_name) = normalize_text(?)
-                   OR normalize_text(ar.person_name_normalized) = normalize_text(?)
-                GROUP BY normalize_text(ar.person_display_name), ar.person_display_name
+                WHERE ar.person_name_normalized = ?
+                GROUP BY ar.person_name_normalized, ar.person_display_name
 
                 UNION ALL
 
                 SELECT
-                    normalize_text(dc.full_name) AS normalized_name,
+                    dc.full_name_normalized AS normalized_name,
                     dc.full_name AS display_name,
                     COUNT(*) AS total_rows
                 FROM difficult_coverage_candidates dc
-                WHERE normalize_text(dc.full_name) = normalize_text(?)
-                   OR normalize_text(dc.full_name_normalized) = normalize_text(?)
-                GROUP BY normalize_text(dc.full_name), dc.full_name
+                WHERE dc.full_name_normalized = ?
+                GROUP BY dc.full_name_normalized, dc.full_name
 
                 UNION ALL
 
                 SELECT
-                    normalize_text(dbm.person_display_name) AS normalized_name,
+                    dbm.person_name_normalized AS normalized_name,
                     dbm.person_display_name AS display_name,
                     COUNT(*) AS total_rows
                 FROM docent_bag_members dbm
-                WHERE normalize_text(dbm.person_display_name) = normalize_text(?)
-                   OR normalize_text(dbm.person_name_normalized) = normalize_text(?)
-                GROUP BY normalize_text(dbm.person_display_name), dbm.person_display_name
+                WHERE dbm.person_name_normalized = ?
+                GROUP BY dbm.person_name_normalized, dbm.person_display_name
             )
             SELECT
                 normalized_name,
@@ -1081,11 +1078,7 @@ def get_person_profile(
             ORDER BY total_rows DESC, display_name ASC
             LIMIT 1
             """,
-            [
-                normalized_name, normalized_name,
-                normalized_name, normalized_name,
-                normalized_name, normalized_name,
-            ],
+            [normalized_name, normalized_name, normalized_name],
         ).fetchone()
 
         if person is None:
@@ -1100,16 +1093,14 @@ def get_person_profile(
                     MAX(d.document_date_iso) AS last_award_date
                 FROM award_results ar
                 JOIN documents d ON d.id = ar.document_id
-                WHERE normalize_text(ar.person_display_name) = normalize_text(?)
-                   OR normalize_text(ar.person_name_normalized) = normalize_text(?)
+                WHERE ar.person_name_normalized = ?
             ),
             assignment_summary AS (
                 SELECT
                     COUNT(*) AS total_assignments
                 FROM award_assignments aa
                 JOIN award_results ar ON ar.id = aa.award_result_id
-                WHERE normalize_text(ar.person_display_name) = normalize_text(?)
-                   OR normalize_text(ar.person_name_normalized) = normalize_text(?)
+                WHERE ar.person_name_normalized = ?
             ),
             difficult_summary AS (
                 SELECT
@@ -1120,8 +1111,7 @@ def get_person_profile(
                 FROM difficult_coverage_candidates dc
                 JOIN difficult_coverage_positions p ON p.id = dc.position_id
                 JOIN documents d ON d.id = p.document_id
-                WHERE normalize_text(dc.full_name) = normalize_text(?)
-                   OR normalize_text(dc.full_name_normalized) = normalize_text(?)
+                WHERE dc.full_name_normalized = ?
             )
             SELECT
                 COALESCE(award_summary.total_award_records, 0) AS total_award_records,
@@ -1138,11 +1128,7 @@ def get_person_profile(
                 END AS last_seen_date
             FROM award_summary, assignment_summary, difficult_summary
             """,
-            [
-                normalized_name, normalized_name,
-                normalized_name, normalized_name,
-                normalized_name, normalized_name,
-            ],
+            [normalized_name, normalized_name, normalized_name],
         ).fetchone()
 
         summary_dict = dict(summary)
@@ -1156,10 +1142,9 @@ def get_person_profile(
             FROM docent_bag_members dbm
             JOIN docent_bag_snapshots dbs ON dbs.id = dbm.snapshot_id
             JOIN documents d ON d.id = dbs.document_id
-            WHERE normalize_text(dbm.person_display_name) = normalize_text(?)
-               OR normalize_text(dbm.person_name_normalized) = normalize_text(?)
+            WHERE dbm.person_name_normalized = ?
             """,
-            [normalized_name, normalized_name],
+            [normalized_name],
         ).fetchone()
         summary_dict.update(dict(bag_summary))
         summary_dict["last_seen_date"] = max(
@@ -1206,11 +1191,10 @@ def get_person_profile(
                 FROM award_results ar
                 JOIN documents d ON d.id = ar.document_id
                 JOIN sources s ON s.id = d.source_id
-                WHERE normalize_text(ar.person_display_name) = normalize_text(?)
-                   OR normalize_text(ar.person_name_normalized) = normalize_text(?)
+                WHERE ar.person_name_normalized = ?
                 ORDER BY COALESCE(d.document_date_iso, '') DESC, ar.document_id DESC, ar.order_number ASC, ar.id ASC
                 """,
-                [normalized_name, normalized_name],
+                [normalized_name],
             ).fetchall()
         )
 
@@ -1321,11 +1305,10 @@ def get_person_profile(
                 JOIN documents d ON d.id = p.document_id
                 JOIN sources s ON s.id = d.source_id
                 LEFT JOIN centers c ON c.center_code = p.center_code
-                WHERE normalize_text(dc.full_name) = normalize_text(?)
-                   OR normalize_text(dc.full_name_normalized) = normalize_text(?)
+                WHERE dc.full_name_normalized = ?
                 ORDER BY COALESCE(d.document_date_iso, '') DESC, dc.is_selected DESC, dc.row_number ASC, dc.id ASC
                 """,
-                [normalized_name, normalized_name],
+                [normalized_name],
             ).fetchall()
         )
 
@@ -1364,8 +1347,7 @@ def get_person_profile(
                 JOIN docent_bag_snapshots dbs ON dbs.id = dbm.snapshot_id
                 JOIN documents d ON d.id = dbs.document_id
                 JOIN sources s ON s.id = d.source_id
-                WHERE normalize_text(dbm.person_display_name) = normalize_text(?)
-                   OR normalize_text(dbm.person_name_normalized) = normalize_text(?)
+                WHERE dbm.person_name_normalized = ?
                 ORDER BY
                     COALESCE(d.document_date_iso, '') DESC,
                     COALESCE(dbs.course_year, '') DESC,
@@ -1375,7 +1357,7 @@ def get_person_profile(
                     dbm.order_number ASC,
                     dbm.id ASC
                 """,
-                [normalized_name, normalized_name],
+                [normalized_name],
             ).fetchall()
         )
 
