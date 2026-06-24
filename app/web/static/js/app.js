@@ -262,15 +262,14 @@ async function apiGet(url) {
   async function loadLatestOffersMeta() {
     if (!latestOffersDateEl) return;
 
-    latestOffersDateEl.textContent = "Cargando...";
+    latestOffersDateEl.textContent = t("Cargando...");
 
     try {
-      const data = await apiGet("/api/offered-positions?limit=1&order_by=document_date&order_dir=desc");
-      const latestItem = data.items?.[0];
-      const latestOffersDate = latestItem?.document_date_iso || null;
-      latestOffersDateEl.textContent = latestOffersDate ? formatDate(latestOffersDate) : "Sin datos";
+      const data = await apiGet("/api/docent/summary");
+      const latestDate = data.latest_date || null;
+      latestOffersDateEl.textContent = latestDate ? formatDate(latestDate) : t("Sin datos");
     } catch (_) {
-      latestOffersDateEl.textContent = "No disponible";
+      latestOffersDateEl.textContent = t("No disponible");
     }
   }
 

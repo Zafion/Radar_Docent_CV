@@ -442,6 +442,19 @@ class DocumentClassifierService:
         # y "profesorado especialista", este es el punto donde habrá que
         # relajar exclusiones y crear familias/parsers propios.
 
+        out_of_current_scope_markers = (
+            "suprimidos y desplazados",
+            "suprimits i desplacats",
+            "suprimits i desplaçats",
+            "relacion de vacantes para la adjudicacion de suprimidos y desplazados",
+            "relacio de vacants per a l'adjudicacio de suprimits",
+            "comisiones de servicio",
+            "baremacion por interes profesional",
+            "baremaci",
+        )
+        if any(marker in combined_text or marker in filename for marker in out_of_current_scope_markers):
+            return True
+
         if re.match(r"^\d{3}\s+[a-z]", title):
             return True
 
@@ -682,12 +695,16 @@ class DocumentClassifierService:
             date_text = f"01/{bag_month_match.group('mm')}/20{bag_month_match.group('yy')}"
             return date_text, self._parse_ddmmyyyy_to_iso(date_text)
 
+        filename_year = self._extract_year_from_filename(original_filename)
+        if publication_date_text and filename_year and self._date_text_year(publication_date_text) == filename_year:
+            return publication_date_text, self._parse_ddmmyyyy_to_iso(publication_date_text)
+
         preview_match = DATE_RE.search(preview_text)
         if preview_match:
             date_text = preview_match.group(1)
             return date_text, self._parse_ddmmyyyy_to_iso(date_text)
 
-        if publication_date_text:
+        if publication_date_text and (not filename_year or self._date_text_year(publication_date_text) == filename_year):
             return publication_date_text, self._parse_ddmmyyyy_to_iso(publication_date_text)
 
         filename_match = re.match(
@@ -702,6 +719,19 @@ class DocumentClassifierService:
             return date_text, self._parse_ddmmyyyy_to_iso(date_text)
 
         return None, None
+
+
+    def _extract_year_from_filename(self, filename: str) -> int | None:
+        match = re.search(r"(?:^|_)(20\d{2})(?:_|$)", filename)
+        if not match:
+            return None
+        return int(match.group(1))
+
+    def _date_text_year(self, value: str) -> int | None:
+        match = DATE_RE.search(value)
+        if not match:
+            return None
+        return int(match.group(1).split("/")[2])
 
     def _parse_ddmmyyyy_to_iso(self, value: str) -> Optional[str]:
         try:

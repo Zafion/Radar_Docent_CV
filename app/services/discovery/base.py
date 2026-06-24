@@ -256,8 +256,9 @@ class BaseDiscoveryAdapter(ABC):
         elif len(incoming.title) > len(existing.title):
             title = incoming.title
 
-        publication_date_text = (
-            existing.publication_date_text or incoming.publication_date_text
+        publication_date_text = self._newest_date_text(
+            existing.publication_date_text,
+            incoming.publication_date_text,
         )
         publication_label = existing.publication_label or incoming.publication_label
         section = existing.section or incoming.section
@@ -269,6 +270,24 @@ class BaseDiscoveryAdapter(ABC):
             publication_label=publication_label,
             section=section,
         )
+
+
+    def _newest_date_text(self, left: Optional[str], right: Optional[str]) -> Optional[str]:
+        def parse(value: Optional[str]) -> tuple[int, int, int] | None:
+            if not value:
+                return None
+            match = DATE_RE.search(value)
+            if not match:
+                return None
+            day, month, year = match.group(1).split("/")
+            return int(year), int(month), int(day)
+
+        left_parsed = parse(left)
+        right_parsed = parse(right)
+
+        if left_parsed and right_parsed:
+            return right if right_parsed > left_parsed else left
+        return left or right
 
     def _is_relevant_pdf_candidate(
         self,

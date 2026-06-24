@@ -667,6 +667,57 @@ def build_user_view(
 
 
 
+# ---------- docent summary ----------
+
+@app.get("/api/docent/summary")
+def get_docent_summary() -> dict[str, Any]:
+    tracked_doc_families = (
+        "offered_positions",
+        "final_award_listing",
+        "difficult_coverage_provisional",
+        "docent_bag_participants",
+        "docent_career_practice_participants",
+        "docent_bag_resolution",
+        "docent_career_practice_resolution",
+    )
+    placeholders = ",".join("%s" for _ in tracked_doc_families)
+
+    with get_connection() as conn:
+        row = conn.execute(
+            f"""
+            SELECT
+                MAX(d.document_date_iso) AS latest_date,
+                COUNT(*) AS documents_count
+            FROM documents d
+            WHERE d.doc_family IN ({placeholders})
+              AND d.document_date_iso IS NOT NULL
+            """,
+            tracked_doc_families,
+        ).fetchone()
+
+        latest_by_family = rows_to_dicts(
+            conn.execute(
+                f"""
+                SELECT
+                    d.doc_family,
+                    MAX(d.document_date_iso) AS latest_date,
+                    COUNT(*) AS documents_count
+                FROM documents d
+                WHERE d.doc_family IN ({placeholders})
+                GROUP BY d.doc_family
+                ORDER BY MAX(d.document_date_iso) DESC NULLS LAST, d.doc_family ASC
+                """,
+                tracked_doc_families,
+            ).fetchall()
+        )
+
+    return {
+        "latest_date": row["latest_date"] if row else None,
+        "documents_count": int(row["documents_count"] or 0) if row else 0,
+        "latest_by_family": latest_by_family,
+    }
+
+
 # ---------- public alerts ----------
 
 @app.get("/api/public-alerts")

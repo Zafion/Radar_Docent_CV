@@ -414,6 +414,7 @@ ES_TO_VA.update({
     "Ver adjudicaciones oficiales": "Veure adjudicacions oficials",
     "Ver difícil cobertura oficial": "Veure difícil cobertura oficial",
     "Esta ficha reúne el resumen principal, el histórico de adjudicaciones y los registros de difícil cobertura de la persona seleccionada.": "Aquesta fitxa reuneix el resum principal, l'històric d'adjudicacions i els registres de difícil cobertura de la persona seleccionada.",
+    "Esta ficha reúne el resumen principal, posiciones en bolsa docente, histórico de adjudicaciones y registros de difícil cobertura de la persona seleccionada.": "Aquesta fitxa reuneix el resum principal, les posicions en borsa docent, l'històric d'adjudicacions i els registres de difícil cobertura de la persona seleccionada.",
     "Cargando historial...": "Carregant historial...",
     "Consulta por persona · adjudicaciones y difícil cobertura": "Consulta per persona · adjudicacions i difícil cobertura",
     "Busca coincidencias y abre una ficha completa del resultado seleccionado": "Busca coincidències i obri una fitxa completa del resultat seleccionat",
