@@ -12,7 +12,7 @@ from app.storage.offered_positions_store import OfferedPositionsStore
 
 
 PARSER_KEY = "offered_positions_parser"
-PARSER_VERSION = "0.4.0"
+PARSER_VERSION = "0.3.0"
 
 ROW_START_RE = re.compile(r"^(?:\d+\s+)?(.+?)\s+-\s+\d{8}\s+-\s+.+$")
 LOCALITY_CENTER_RE = re.compile(
@@ -20,12 +20,8 @@ LOCALITY_CENTER_RE = re.compile(
 )
 SPECIALTY_RE_1 = re.compile(r"^(?P<code>[0-9A-Z]+)\s*-\s*(?P<name>.+)$")
 SPECIALTY_RE_2 = re.compile(r"^(?P<code>[0-9A-Z]+)\s+(?P<name>.+)$")
-POSITION_CODE_RE = re.compile(r"(?P<code>\d{6})(?!\d)")
+POSITION_CODE_RE = re.compile(r"\b(?P<code>\d{6})\b")
 HOURS_RE = re.compile(r"\b(?P<hours>\d{1,2}(?:,\d+)?)\b")
-TYPE_ONLY_ROW_RE = re.compile(
-    r"^(?P<number>\d+)\s+(?P<type>SUSTITUCIÓN INDETERMINADA|SUSTITUCIÓN DETERMINADA|VACANTE)$",
-    flags=re.IGNORECASE,
-)
 
 
 @dataclass(slots=True)
@@ -163,15 +159,86 @@ class OfferedPositionsParserService:
         current_province: Optional[str] = None
 
         row_buffer: Optional[str] = None
-        pending_row_prefix: Optional[str] = None
         parsed_rows: list[ParsedOfferedPosition] = []
 
-        def flush_row_buffer() -> None:
-            nonlocal row_buffer
+        for line in self._extract_clean_lines(file_path):
+            if self._is_body_line(line):
+                if row_buffer:
+                    parsed = self._parse_row(
+                        row_text=row_buffer,
+                        source_type=source_type,
+                        body_name=current_body_name,
+                        specialty_code=current_specialty_code,
+                        specialty_name=current_specialty_name,
+                        province=current_province,
+                    )
+                    if parsed:
+                        parsed_rows.append(parsed)
+                    row_buffer = None
 
-            if not row_buffer:
-                return
+                current_body_name = self._parse_body_name(line)
+                continue
 
+            if self._is_specialty_line(line):
+                if row_buffer:
+                    parsed = self._parse_row(
+                        row_text=row_buffer,
+                        source_type=source_type,
+                        body_name=current_body_name,
+                        specialty_code=current_specialty_code,
+                        specialty_name=current_specialty_name,
+                        province=current_province,
+                    )
+                    if parsed:
+                        parsed_rows.append(parsed)
+                    row_buffer = None
+
+                (
+                    current_specialty_code,
+                    current_specialty_name,
+                ) = self._parse_specialty(line)
+                continue
+
+            if self._is_province_line(line):
+                if row_buffer:
+                    parsed = self._parse_row(
+                        row_text=row_buffer,
+                        source_type=source_type,
+                        body_name=current_body_name,
+                        specialty_code=current_specialty_code,
+                        specialty_name=current_specialty_name,
+                        province=current_province,
+                    )
+                    if parsed:
+                        parsed_rows.append(parsed)
+                    row_buffer = None
+
+                current_province = self._parse_province(line)
+                continue
+
+            if self._should_ignore_non_row_line(line):
+                continue
+
+            if self._looks_like_row_start(line):
+                if row_buffer:
+                    parsed = self._parse_row(
+                        row_text=row_buffer,
+                        source_type=source_type,
+                        body_name=current_body_name,
+                        specialty_code=current_specialty_code,
+                        specialty_name=current_specialty_name,
+                        province=current_province,
+                    )
+                    if parsed:
+                        parsed_rows.append(parsed)
+
+                row_buffer = line
+                continue
+
+            if row_buffer:
+                row_buffer = f"{row_buffer} {line}"
+
+        if row_buffer:
             parsed = self._parse_row(
                 row_text=row_buffer,
                 source_type=source_type,
@@ -183,57 +250,6 @@ class OfferedPositionsParserService:
             if parsed:
                 parsed_rows.append(parsed)
 
-            row_buffer = None
-
-        for line in self._extract_clean_lines(file_path):
-            if self._is_body_line(line):
-                flush_row_buffer()
-                pending_row_prefix = None
-                current_body_name = self._parse_body_name(line)
-                continue
-
-            if self._is_specialty_line(line):
-                flush_row_buffer()
-                pending_row_prefix = None
-                (
-                    current_specialty_code,
-                    current_specialty_name,
-                ) = self._parse_specialty(line)
-                continue
-
-            if self._is_province_line(line):
-                flush_row_buffer()
-                pending_row_prefix = None
-                current_province = self._parse_province(line)
-                continue
-
-            if self._should_ignore_non_row_line(line):
-                continue
-
-            # In PDFs with itinerant/composite positions, text extraction may place
-            # the row number and type on one line, the composition detail in the
-            # middle and the actual locality/centre row afterwards. Keep the prefix
-            # so the following row retains both its number and position type.
-            if TYPE_ONLY_ROW_RE.match(line):
-                flush_row_buffer()
-                pending_row_prefix = line
-                continue
-
-            if self._looks_like_row_start(line):
-                flush_row_buffer()
-
-                if pending_row_prefix and not re.match(r"^\d+\s+", line):
-                    row_buffer = f"{pending_row_prefix} {line}"
-                else:
-                    row_buffer = line
-
-                pending_row_prefix = None
-                continue
-
-            if row_buffer:
-                row_buffer = f"{row_buffer} {line}"
-
-        flush_row_buffer()
         return parsed_rows
 
     def _parse_row(
