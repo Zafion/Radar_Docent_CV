@@ -13,10 +13,13 @@ from app.storage.award_results_store import AwardResultsStore
 
 
 PARSER_KEY = "final_award_listing_secundaria_parser"
-PARSER_VERSION = "0.2.0"
+PARSER_VERSION = "0.3.0"
 
-ENTRY_START_WITH_NAME_RE = re.compile(r"^(?P<order>\d{1,5})\s+(?P<name>.+,\s*.+)$")
-ENTRY_START_ONLY_ORDER_RE = re.compile(r"^(?P<order>\d{1,5})$")
+ENTRY_START_WITH_NAME_RE = re.compile(
+    r"^(?P<order>\d{1,5})(?:\s*/\s*\d{1,5})?\s*"
+    r"(?P<name>[A-ZÁÉÍÓÚÀÈÌÒÙÄËÏÖÜÑÇ][^,]+,\s*.+)$"
+)
+ENTRY_START_ONLY_ORDER_RE = re.compile(r"^(?P<order>\d{1,5})(?:\s*/\s*\d{1,5})?$")
 
 CENTER_LINE_RE = re.compile(
     r"^(?P<locality>.+?)\((?P<center_code>\d{8})\)(?P<center_name>.+)$"
@@ -25,7 +28,7 @@ ASSIGNMENT_SPECIALTY_RE = re.compile(
     r"^(?P<code>[0-9A-Z]{2,5})\s*/\s*(?P<name>.+)$"
 )
 POSITION_CODE_RE = re.compile(r"^\d{6}$")
-NUMERIC_HOURS_RE = re.compile(r"^(?P<hours>\d{1,2}(?:,\d+)?)\s+hores?$", re.IGNORECASE)
+NUMERIC_HOURS_RE = re.compile(r"^(?P<hours>\d{1,2}(?:,\d+)?)\s+hor(?:a|e)s?$", re.IGNORECASE)
 
 HEADING_SPECIALTY_RE = re.compile(
     r"^(?P<name>.+?)\s+(?P<code>[0-9A-Z]{2,5})$"
@@ -366,7 +369,7 @@ class FinalAwardListingSecundariaParserService:
             assignment_lines.append(line)
 
             if assignment_kind is None and self._is_assignment_kind_line(line):
-                assignment_kind = line
+                assignment_kind = "VACANT" if line.upper().startswith("VACANT") else line
                 continue
 
             if center_code is None:
@@ -443,6 +446,9 @@ class FinalAwardListingSecundariaParserService:
         upper = line.upper()
 
         if re.fullmatch(r"\d{2}/\d{2}/\d{4}", line):
+            return True
+
+        if upper.startswith("NN / MM") or upper.startswith("NN/MM"):
             return True
 
         ignored_prefixes = (
@@ -542,7 +548,11 @@ class FinalAwardListingSecundariaParserService:
         return self._is_assignment_kind_line(next_line)
 
     def _is_assignment_kind_line(self, line: str) -> bool:
-        return line.upper() in ASSIGNMENT_KIND_VALUES
+        upper = line.upper()
+        return (
+            upper in ASSIGNMENT_KIND_VALUES
+            or upper.startswith("VACANT")
+        )
 
     def _looks_like_hours_line(self, line: str) -> bool:
         lower = line.lower()
@@ -599,7 +609,7 @@ class FinalAwardListingSecundariaParserService:
         if not value:
             return None, None
 
-        match = re.match(r"^(?P<text>.+?)\s+(?P<number>\d+)$", value)
+        match = re.match(r"^(?P<text>.+?)\s*(?P<number>\d+)$", value)
         if match:
             return match.group("text").strip(), int(match.group("number"))
 
