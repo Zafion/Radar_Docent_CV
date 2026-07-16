@@ -13,7 +13,7 @@ from app.storage.award_results_store import AwardResultsStore
 
 
 PARSER_KEY = "final_award_listing_maestros_parser"
-PARSER_VERSION = "0.1.0"
+PARSER_VERSION = "0.2.0"
 
 ENTRY_START_WITH_NAME_RE = re.compile(r"^(?P<order>\d{1,5})\s+(?P<name>.+,\s*.+)$")
 ENTRY_START_ONLY_ORDER_RE = re.compile(r"^(?P<order>\d{1,5})$")
@@ -24,10 +24,31 @@ SPECIALTY_LINE_RE = re.compile(
     r"^(?P<code>[0-9A-Z]{2,5})\s*/\s*(?P<name>.+)$"
 )
 POSITION_CODE_RE = re.compile(r"^\d{6}$")
-HOURS_LINE_RE = re.compile(r"^(?P<hours>\d{1,2}(?:,\d+)?)\s+horas?$", re.IGNORECASE)
-PETITION_LINE_RE = re.compile(
-    r"^(?P<name>.+?)\s+Petici[oó]n:\s*(?P<request_type>.+?)\s+(?P<petition_number>\d+)$",
+HOURS_LINE_RE = re.compile(
+    r"^(?P<hours>\d{1,2}(?:,\d+)?)\s+hor(?:a|e)s?$",
     re.IGNORECASE,
+)
+
+STATUS_VALUES = (
+    "Adjudicat",
+    "No adjudicat",
+    "Ha participat",
+    "No ha participat",
+    "Desactivat",
+)
+
+ASSIGNMENT_KIND_VALUES = (
+    "VACANT",
+    "SUBSTITUCIÓ DETERMINADA",
+    "SUBSTITUCIÓ INDETERMINADA",
+)
+
+REQUEST_KEYWORDS = (
+    "Petición:",
+    "Peticio:",
+    "Voluntaria",
+    "PREFERÈNCIA",
+    "PREFERENCIA",
 )
 
 
@@ -287,7 +308,7 @@ class FinalAwardListingMaestrosParserService:
             assignment_lines.append(line)
 
             if assignment_kind is None and self._is_assignment_kind_line(line):
-                assignment_kind = line
+                assignment_kind = "VACANT" if line.upper().startswith("VACANT") else line
                 continue
 
             if center_code is None:
@@ -316,11 +337,8 @@ class FinalAwardListingMaestrosParserService:
                     hours_value = self._coerce_hours(hours_text)
                     continue
 
-            petition_match = PETITION_LINE_RE.match(line)
-            if petition_match:
-                petition_text = petition_match.group("name").strip()
-                request_type = petition_match.group("request_type").strip()
-                petition_number = int(petition_match.group("petition_number"))
+            if petition_text is None and self._looks_like_petition_line(line):
+                petition_text, request_type, petition_number = self._parse_petition_line(line)
                 continue
 
         if assignment_kind is None and not assignment_lines:
@@ -343,16 +361,8 @@ class FinalAwardListingMaestrosParserService:
         )
 
     def _extract_status(self, lines: list[str]) -> Optional[str]:
-        statuses = (
-            "Adjudicat",
-            "No adjudicat",
-            "Ha participat",
-            "No ha participat",
-            "Desactivat",
-        )
-
         for line in reversed(lines):
-            for status in statuses:
+            for status in STATUS_VALUES:
                 if line == status:
                     return status
 
@@ -383,6 +393,8 @@ class FinalAwardListingMaestrosParserService:
         ignored_prefixes = (
             "ADJUDICACIÓ DE PERSONAL DOCENT INTERÍ DIA",
             "ADJUDICACIÓN DE PERSONAL DOCENTE INTERINO DÍA",
+            "ADJUDICACIÓ DE PERSONAL DOCENT INICI DE CURS",
+            "ADJUDICACIÓN DE PERSONAL DOCENTE INICIO DE CURSO",
             "MESTRES / MAESTROS",
             "MESTRES",
             "PÀG ",
@@ -394,11 +406,54 @@ class FinalAwardListingMaestrosParserService:
 
     def _is_assignment_kind_line(self, line: str) -> bool:
         upper = line.upper()
-        return upper in {
-            "VACANT",
-            "SUBSTITUCIÓ DETERMINADA",
-            "SUBSTITUCIÓ INDETERMINADA",
-        }
+        return upper in ASSIGNMENT_KIND_VALUES or upper.startswith("VACANT")
+
+    def _looks_like_petition_line(self, line: str) -> bool:
+        if "," not in line:
+            return False
+
+        upper = line.upper()
+        return any(keyword.upper() in upper for keyword in REQUEST_KEYWORDS)
+
+    def _parse_petition_line(
+        self,
+        line: str,
+    ) -> tuple[str, Optional[str], Optional[int]]:
+        value = line.strip()
+
+        if "Petición:" in value:
+            name, tail = value.split("Petición:", 1)
+            person_name = name.strip()
+            request_type, petition_number = self._parse_request_tail(tail.strip())
+            return person_name, request_type, petition_number
+
+        if "Peticio:" in value:
+            name, tail = value.split("Peticio:", 1)
+            person_name = name.strip()
+            request_type, petition_number = self._parse_request_tail(tail.strip())
+            return person_name, request_type, petition_number
+
+        name_part, tail = self._split_name_and_request_tail(value)
+        request_type, petition_number = self._parse_request_tail(tail)
+        return name_part, request_type, petition_number
+
+    def _split_name_and_request_tail(self, value: str) -> tuple[str, str]:
+        for keyword in ("Voluntaria", "PREFERÈNCIA", "PREFERENCIA"):
+            idx = value.upper().find(keyword.upper())
+            if idx != -1:
+                return value[:idx].strip(), value[idx:].strip()
+
+        return value.strip(), ""
+
+    def _parse_request_tail(self, value: str) -> tuple[Optional[str], Optional[int]]:
+        if not value:
+            return None, None
+
+        match = re.match(r"^(?P<text>.+?)\s*(?P<number>\d+)$", value)
+        if match:
+            return match.group("text").strip(), int(match.group("number"))
+
+        return value.strip(), None
 
     def _normalize_person_name(self, value: str) -> str:
         value = value.strip().upper()
