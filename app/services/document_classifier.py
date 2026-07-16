@@ -270,6 +270,12 @@ class DocumentClassifierService:
         if "_adj_" in filename and "_lis_sec" in filename:
             return "final_award_listing", "secundaria_otros", "filename=adj_lis_sec"
 
+        if "_adj_int_mae" in filename:
+            return "final_award_listing", "maestros", "filename=adj_int_mae"
+
+        if "_adj_int_sec" in filename:
+            return "final_award_listing", "secundaria_otros", "filename=adj_int_sec"
+
         if "_adj_int_lis_mae" in filename:
             return "final_award_listing", "maestros", "filename=adj_int_lis_mae"
 

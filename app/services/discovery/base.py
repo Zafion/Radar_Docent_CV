@@ -319,6 +319,17 @@ class BaseDiscoveryAdapter(ABC):
             "llistat actualitzat de vacants",
             "lis_vac_act_adj_ini",
             "vac_act_adj_ini",
+
+            # Inicio de curso: adjudicaciones de interinos publicadas sin "_lis_" en el nombre.
+            "adjudicaciones inicio de curso",
+            "adjudicacions inici de curs",
+            "adjudicacion de personal docente inicio de curso",
+            "adjudicacio de personal docent inici de curs",
+            "ini_2026_adj_int",
+            "adj_int_mae",
+            "adj_int_sec",
+            "adj_int_",
+
             "dificil cobertura",
             "dificil provisio",
             "dificil provision",
