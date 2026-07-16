@@ -30,6 +30,12 @@ class AssignmentMatcherService:
                     position_code=row["position_code"],
                 )
 
+                if not candidates and self._is_start_of_course_award(row):
+                    candidates = store.find_candidate_inicio_curso_offered_positions(
+                        document_date_iso=row["document_date_iso"],
+                        position_code=row["position_code"],
+                    )
+
                 matched_id = None
                 status = "no_match"
 
@@ -68,6 +74,10 @@ class AssignmentMatcherService:
 
         finally:
             store.close()
+
+    def _is_start_of_course_award(self, row) -> bool:
+        filename = (row.get("original_filename") or "").lower()
+        return filename.startswith("ini_") and "_adj_" in filename
 
     def _refine_candidates(self, assignment_row, candidates):
         center_code = assignment_row["center_code"]

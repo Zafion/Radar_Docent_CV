@@ -27,13 +27,17 @@ class AssignmentMatchingStore:
                 ar.document_id AS award_document_id,
                 d.source_id,
                 d.document_date_iso,
+                d.doc_family,
                 d.list_scope,
+                dv.original_filename,
                 s.source_key
             FROM award_assignments aa
             JOIN award_results ar
                 ON ar.id = aa.award_result_id
             JOIN documents d
                 ON d.id = ar.document_id
+            JOIN document_versions dv
+                ON dv.id = d.document_version_id
             JOIN sources s
                 ON s.id = d.source_id
             WHERE aa.position_code IS NOT NULL
@@ -97,6 +101,79 @@ class AssignmentMatchingStore:
             ORDER BY op.id
             """,
             (source_id, position_code),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def find_candidate_inicio_curso_offered_positions(
+        self,
+        *,
+        document_date_iso: str | None,
+        position_code: str,
+    ) -> list[dict[str, Any]]:
+        if document_date_iso:
+            rows = self.connection.execute(
+                """
+                WITH target_document AS (
+                    SELECT d.id
+                    FROM documents d
+                    WHERE d.doc_family = 'offered_positions'
+                      AND d.list_scope = 'inicio_curso'
+                      AND d.document_date_iso IS NOT NULL
+                      AND d.document_date_iso <= %s
+                    ORDER BY d.document_date_iso DESC, d.id DESC
+                    LIMIT 1
+                )
+                SELECT
+                    op.id,
+                    op.document_id,
+                    op.source_type,
+                    op.position_code,
+                    op.locality,
+                    op.center_code,
+                    op.center_name,
+                    op.specialty_code,
+                    op.specialty_name,
+                    d.document_date_iso
+                FROM offered_positions op
+                JOIN documents d
+                    ON d.id = op.document_id
+                WHERE op.document_id = (SELECT id FROM target_document)
+                  AND op.position_code = %s
+                ORDER BY op.id
+                """,
+                (document_date_iso, position_code),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+        rows = self.connection.execute(
+            """
+            WITH target_document AS (
+                SELECT d.id
+                FROM documents d
+                WHERE d.doc_family = 'offered_positions'
+                  AND d.list_scope = 'inicio_curso'
+                ORDER BY d.document_date_iso DESC NULLS LAST, d.id DESC
+                LIMIT 1
+            )
+            SELECT
+                op.id,
+                op.document_id,
+                op.source_type,
+                op.position_code,
+                op.locality,
+                op.center_code,
+                op.center_name,
+                op.specialty_code,
+                op.specialty_name,
+                d.document_date_iso
+            FROM offered_positions op
+            JOIN documents d
+                ON d.id = op.document_id
+            WHERE op.document_id = (SELECT id FROM target_document)
+              AND op.position_code = %s
+            ORDER BY op.id
+            """,
+            (position_code,),
         ).fetchall()
         return [dict(row) for row in rows]
 
