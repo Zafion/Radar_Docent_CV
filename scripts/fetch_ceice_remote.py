@@ -213,7 +213,7 @@ def main() -> int:
         follow_redirects=True,
     )
 
-    has_failures = False
+    has_source_failures = False
 
     try:
         for adapter in adapters:
@@ -339,7 +339,6 @@ def main() -> int:
                                 time.sleep(args.download_delay)
 
                         except Exception as exc:
-                            has_failures = True
                             result = {
                                 "asset": asset_dict,
                                 "status": "download_error",
@@ -378,7 +377,7 @@ def main() -> int:
                 print(f"Errores descarga:     {source_summary['counts']['download_error_count']}")
 
             except Exception as exc:
-                has_failures = True
+                has_source_failures = True
                 source_summary["finished_at"] = utc_now_iso()
                 source_summary["status"] = "failed"
                 source_summary["error_message"] = str(exc)
@@ -406,7 +405,7 @@ def main() -> int:
     print(f"Files:    {current_files_dir}")
     print(f"State:    {state_path}")
 
-    return 1 if has_failures else 0
+    return 1 if has_source_failures else 0
 
 
 if __name__ == "__main__":
