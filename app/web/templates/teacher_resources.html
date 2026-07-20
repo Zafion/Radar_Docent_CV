@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">
+      {% if current_lang == 'va' %}
+      Guies pràctiques per a personal docent interí
+      {% else %}
+      Guías prácticas para personal docente interino
+      {% endif %}
+    </p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="/">
+      {% if current_lang == 'va' %}Inici{% else %}Inicio{% endif %}
+    </a>
+    <span>›</span>
+    {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+  </div>
+
+  <section class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>
+          {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+        </h1>
+        <p>
+          {% if current_lang == 'va' %}
+          Guies de Funkcionario.com sobre organització, material, tecnologia i desplaçaments.
+          {% else %}
+          Guías de Funkcionario.com sobre organización, material, tecnología y desplazamientos.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <p class="panel-card__hint">
+      {% if current_lang == 'va' %}
+      Aquesta secció reunirà contingut pràctic pensat especialment per a personal docent interí. Les guies es publicaran de manera progressiva.
+      {% else %}
+      Esta sección reunirá contenido práctico pensado especialmente para personal docente interino. Las guías se publicarán de forma progresiva.
+      {% endif %}
+    </p>
+
+    <div class="module-grid">
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🗂️</span>
+          <h2>
+            {% if current_lang == 'va' %}
+            Què portar el primer dia com a docent interí
+            {% else %}
+            Qué llevar el primer día como docente interino
+            {% endif %}
+          </h2>
+        </div>
+        <p class="panel-card__hint">
+          {% if current_lang == 'va' %}
+          Documentació, material bàsic i accessoris útils per a incorporar-se a un centre nou sense carregar coses innecessàries.
+          {% else %}
+          Documentación, material básico y accesorios útiles para incorporarse a un centro nuevo sin cargar cosas innecesarias.
+          {% endif %}
+        </p>
+        <div class="stack-actions">
+          <a
+            class="button button--secondary button--full"
+            href="{% if current_lang == 'va' %}/va/recursos-docentes/primer-dia-docente-interino{% else %}/recursos-docentes/primer-dia-docente-interino{% endif %}"
+          >
+            {% if current_lang == 'va' %}Llegir guia{% else %}Leer guía{% endif %}
+          </a>
+        </div>
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🎒</span>
+          <h2>
+            {% if current_lang == 'va' %}
+            Motxilles, bosses i organitzadors per a docents
+            {% else %}
+            Mochilas, bolsas y organizadores para docentes
+            {% endif %}
+          </h2>
+        </div>
+        <p class="panel-card__hint">
+          {% if current_lang == 'va' %}
+          Criteris per a triar com transportar portàtil, documents i material segons el tipus de centre i de desplaçament.
+          {% else %}
+          Criterios para elegir cómo transportar portátil, documentos y material según el tipo de centro y de desplazamiento.
+          {% endif %}
+        </p>
+        <div class="stack-actions">
+          <a
+            class="button button--secondary button--full"
+            href="{% if current_lang == 'va' %}/va/recursos-docentes/mochilas-organizadores-docentes{% else %}/recursos-docentes/mochilas-organizadores-docentes{% endif %}"
+          >
+            {% if current_lang == 'va' %}Llegir guia{% else %}Leer guía{% endif %}
+          </a>
+        </div>
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🧰</span>
+          <h2>
+            {% if current_lang == 'va' %}
+            Kit pràctic per a docents itinerants
+            {% else %}
+            Kit práctico para docentes itinerantes
+            {% endif %}
+          </h2>
+        </div>
+        <p class="panel-card__hint">
+          {% if current_lang == 'va' %}
+          Una selecció de material transportable per a qui canvia d'aula, de centre o combina diverses ubicacions.
+          {% else %}
+          Una selección de material transportable para quien cambia de aula, de centro o combina varias ubicaciones.
+          {% endif %}
+        </p>
+        <div class="stack-actions">
+          <a
+            class="button button--secondary button--full"
+            href="{% if current_lang == 'va' %}/va/recursos-docentes/kit-docente-itinerante{% else %}/recursos-docentes/kit-docente-itinerante{% endif %}"
+          >
+            {% if current_lang == 'va' %}Llegir guia{% else %}Leer guía{% endif %}
+          </a>
+        </div>
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🗃️</span>
+          <h2>
+            {% if current_lang == 'va' %}
+            Com organitzar oposicions, borses i documentació docent
+            {% else %}
+            Cómo organizar oposiciones, bolsas y documentación docente
+            {% endif %}
+          </h2>
+        </div>
+        <p class="panel-card__hint">
+          {% if current_lang == 'va' %}
+          Sistemes senzills per a ordenar convocatòries, justificants, mèrits, certificats i terminis importants.
+          {% else %}
+          Sistemas sencillos para ordenar convocatorias, justificantes, méritos, certificados y plazos importantes.
+          {% endif %}
+        </p>
+        <div class="stack-actions">
+          <a
+            class="button button--secondary button--full"
+            href="{% if current_lang == 'va' %}/va/recursos-docentes/organizacion-oposiciones-bolsas{% else %}/recursos-docentes/organizacion-oposiciones-bolsas{% endif %}"
+          >
+            {% if current_lang == 'va' %}Llegir guia{% else %}Leer guía{% endif %}
+          </a>
+        </div>
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">💻</span>
+          <h2>
+            {% if current_lang == 'va' %}
+            Tecnologia útil per a preparar classes i corregir treballs
+            {% else %}
+            Tecnología útil para preparar clases y corregir trabajos
+            {% endif %}
+          </h2>
+        </div>
+        <p class="panel-card__hint">
+          {% if current_lang == 'va' %}
+          Accessoris que poden millorar la preparació de classes, la connexió a pantalles i l'organització del treball digital.
+          {% else %}
+          Accesorios que pueden mejorar la preparación de clases, la conexión a pantallas y la organización del trabajo digital.
+          {% endif %}
+        </p>
+        <div class="stack-actions">
+          <a
+            class="button button--secondary button--full"
+            href="{% if current_lang == 'va' %}/va/recursos-docentes/tecnologia-preparar-clases{% else %}/recursos-docentes/tecnologia-preparar-clases{% endif %}"
+          >
+            {% if current_lang == 'va' %}Llegir guia{% else %}Leer guía{% endif %}
+          </a>
+        </div>
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🚗</span>
+          <h2>
+            {% if current_lang == 'va' %}
+            Recursos per a docents desplaçats a una altra localitat
+            {% else %}
+            Recursos para docentes desplazados a otra localidad
+            {% endif %}
+          </h2>
+        </div>
+        <p class="panel-card__hint">
+          {% if current_lang == 'va' %}
+          Idees per a preparar desplaçaments diaris, menjars, càrrega de dispositius i material personal sense sobrecarregar-se.
+          {% else %}
+          Ideas para preparar desplazamientos diarios, comidas, carga de dispositivos y material personal sin sobrecargarse.
+          {% endif %}
+        </p>
+        <div class="stack-actions">
+          <a
+            class="button button--secondary button--full"
+            href="{% if current_lang == 'va' %}/va/recursos-docentes/desplazamientos-docentes{% else %}/recursos-docentes/desplazamientos-docentes{% endif %}"
+          >
+            {% if current_lang == 'va' %}Llegir guia{% else %}Leer guía{% endif %}
+          </a>
+        </div>
+      </article>
+    </div>
+  </section>
+</section>
+{% endblock %}

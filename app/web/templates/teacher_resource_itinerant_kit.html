@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">
+      {% if current_lang == 'va' %}
+      Guia pràctica per a personal docent itinerant
+      {% else %}
+      Guía práctica para personal docente itinerante
+      {% endif %}
+    </p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="{% if current_lang == 'va' %}/va{% else %}/{% endif %}">
+      {% if current_lang == 'va' %}Inici{% else %}Inicio{% endif %}
+    </a>
+    <span>›</span>
+    <a href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}">
+      {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+    </a>
+    <span>›</span>
+    {% if current_lang == 'va' %}Kit per a docents itinerants{% else %}Kit para docentes itinerantes{% endif %}
+  </div>
+
+  <article class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>
+          {% if current_lang == 'va' %}
+          Kit pràctic per a docents itinerants
+          {% else %}
+          Kit práctico para docentes itinerantes
+          {% endif %}
+        </h1>
+        <p>
+          {% if current_lang == 'va' %}
+          Una manera lleugera i modular d'organitzar el material quan canvies d'aula, d'edifici o de centre durant la jornada.
+          {% else %}
+          Una forma ligera y modular de organizar el material cuando cambias de aula, edificio o centro durante la jornada.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <p class="panel-card__meta">
+      {% if current_lang == 'va' %}Publicat el 21 de juliol de 2026{% else %}Publicado el 21 de julio de 2026{% endif %}
+    </p>
+
+    <p class="panel-card__hint">
+      {% if current_lang == 'va' %}
+      Un bon kit itinerant no intenta cobrir qualsevol situació. Ha de resoldre les necessitats habituals, poder-se adaptar a cada dia i continuar sent còmode després de diverses hores de desplaçaments.
+      {% else %}
+      Un buen kit itinerante no intenta cubrir cualquier situación. Debe resolver las necesidades habituales, poder adaptarse a cada día y seguir siendo cómodo después de varias horas de desplazamientos.
+      {% endif %}
+    </p>
+  </article>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Què significa treballar de manera itinerant{% else %}Qué significa trabajar de forma itinerante{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>No tots els docents itinerants tenen la mateixa rutina. Pots canviar d'aula en cada sessió, treballar en edificis separats, atendre diversos centres o compartir espais i materials amb altres professionals.</p>
+    <p>Abans de preparar el kit, identifica els desplaçaments reals:</p>
+    <ul>
+      <li>Quantes vegades canvies d'espai durant una jornada normal.</li>
+      <li>Quina distància recorres a peu i si hi ha escales.</li>
+      <li>Si pots deixar material de manera segura en algun centre.</li>
+      <li>Quins dispositius i connexions necessites en cada ubicació.</li>
+      <li>Quin material és imprescindible en totes les sessions i quin és ocasional.</li>
+    </ul>
+    {% else %}
+    <p>No todos los docentes itinerantes tienen la misma rutina. Puedes cambiar de aula en cada sesión, trabajar en edificios separados, atender varios centros o compartir espacios y materiales con otros profesionales.</p>
+    <p>Antes de preparar el kit, identifica los desplazamientos reales:</p>
+    <ul>
+      <li>Cuántas veces cambias de espacio durante una jornada normal.</li>
+      <li>Qué distancia recorres a pie y si hay escaleras.</li>
+      <li>Si puedes dejar material de forma segura en algún centro.</li>
+      <li>Qué dispositivos y conexiones necesitas en cada ubicación.</li>
+      <li>Qué material es imprescindible en todas las sesiones y cuál es ocasional.</li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}La base: un sistema modular{% else %}La base: un sistema modular{% endif %}</h2>
+        <p>
+          {% if current_lang == 'va' %}
+          Organitza el material en mòduls menuts que pugues afegir o retirar segons l'horari.
+          {% else %}
+          Organiza el material en módulos pequeños que puedas añadir o retirar según el horario.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <div class="module-grid">
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🗂️</span>
+          <h3>{% if current_lang == 'va' %}Documentació i planificació{% else %}Documentación y planificación{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Carpeta fina o portadocuments per als papers del dia.</li>
+          <li>Horari accessible en paper o al telèfon.</li>
+          <li>Quadern menut o agenda per a incidències i recordatoris.</li>
+          <li>Identificació i claus sempre en el mateix lloc.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Carpeta fina o portadocumentos para los papeles del día.</li>
+          <li>Horario accesible en papel o en el teléfono.</li>
+          <li>Cuaderno pequeño o agenda para incidencias y recordatorios.</li>
+          <li>Identificación y llaves siempre en el mismo lugar.</li>
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">✏️</span>
+          <h3>{% if current_lang == 'va' %}Escriptura i aula{% else %}Escritura y aula{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Dos bolígrafs i un llapis o portamines.</li>
+          <li>Un marcador i un retolador de pissarra de reserva.</li>
+          <li>Notes adhesives o targetes menudes.</li>
+          <li>Un temporitzador senzill quan siga útil per a les activitats.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Dos bolígrafos y un lápiz o portaminas.</li>
+          <li>Un marcador y un rotulador de pizarra de reserva.</li>
+          <li>Notas adhesivas o tarjetas pequeñas.</li>
+          <li>Un temporizador sencillo cuando resulte útil para las actividades.</li>
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🔌</span>
+          <h3>{% if current_lang == 'va' %}Tecnologia i connexions{% else %}Tecnología y conexiones{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Carregador compacte compatible amb els dispositius habituals.</li>
+          <li>Cable de recanvi curt i identificat.</li>
+          <li>Adaptador de vídeo que corresponga al teu equip.</li>
+          <li>Memòria USB només quan el centre o la tasca la requerisca.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Cargador compacto compatible con los dispositivos habituales.</li>
+          <li>Cable de repuesto corto e identificado.</li>
+          <li>Adaptador de vídeo que corresponda a tu equipo.</li>
+          <li>Memoria USB solo cuando el centro o la tarea la requiera.</li>
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🧴</span>
+          <h3>{% if current_lang == 'va' %}Objectes personals{% else %}Objetos personales{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Aigua en un recipient ben tancat.</li>
+          <li>Mocadors i medicació personal necessària.</li>
+          <li>Una peça lleugera d'abric si canvies entre edificis.</li>
+          <li>Una bossa menuda per a separar residus o material humit.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Agua en un recipiente bien cerrado.</li>
+          <li>Pañuelos y medicación personal necesaria.</li>
+          <li>Una prenda ligera de abrigo si cambias entre edificios.</li>
+          <li>Una bolsa pequeña para separar residuos o material húmedo.</li>
+        </ul>
+        {% endif %}
+      </article>
+    </div>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Tres nivells de kit segons la jornada{% else %}Tres niveles de kit según la jornada{% endif %}</h2>
+      </div>
+    </div>
+
+    <div class="module-grid">
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">1️⃣</span>
+          <h3>{% if current_lang == 'va' %}Kit mínim{% else %}Kit mínimo{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <p>Per a dies amb material disponible al centre o poques sessions.</p>
+        <ul>
+          <li>Identificació, claus i telèfon.</li>
+          <li>Carpeta del dia.</li>
+          <li>Estoig menut.</li>
+          <li>Aigua i objectes personals.</li>
+        </ul>
+        {% else %}
+        <p>Para días con material disponible en el centro o pocas sesiones.</p>
+        <ul>
+          <li>Identificación, llaves y teléfono.</li>
+          <li>Carpeta del día.</li>
+          <li>Estuche pequeño.</li>
+          <li>Agua y objetos personales.</li>
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">2️⃣</span>
+          <h3>{% if current_lang == 'va' %}Kit digital{% else %}Kit digital{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <p>Afig només el necessari quan treballes amb portàtil o tauleta.</p>
+        <ul>
+          <li>Dispositiu amb funda.</li>
+          <li>Carregador i cable.</li>
+          <li>Adaptador de pantalla comprovat.</li>
+          <li>Ratolí compacte si realment l'utilitzes.</li>
+        </ul>
+        {% else %}
+        <p>Añade solo lo necesario cuando trabajas con portátil o tableta.</p>
+        <ul>
+          <li>Dispositivo con funda.</li>
+          <li>Cargador y cable.</li>
+          <li>Adaptador de pantalla comprobado.</li>
+          <li>Ratón compacto si realmente lo utilizas.</li>
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">3️⃣</span>
+          <h3>{% if current_lang == 'va' %}Kit de sessió específica{% else %}Kit de sesión específica{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <p>Un mòdul independent per al material que només necessites en una classe concreta.</p>
+        <ul>
+          <li>Fitxes o material manipulatiu.</li>
+          <li>Retoladors o recursos especials.</li>
+          <li>Cables o dispositius poc habituals.</li>
+          <li>Una etiqueta amb el grup o la sessió.</li>
+        </ul>
+        {% else %}
+        <p>Un módulo independiente para el material que solo necesitas en una clase concreta.</p>
+        <ul>
+          <li>Fichas o material manipulativo.</li>
+          <li>Rotuladores o recursos especiales.</li>
+          <li>Cables o dispositivos poco habituales.</li>
+          <li>Una etiqueta con el grupo o la sesión.</li>
+        </ul>
+        {% endif %}
+      </article>
+    </div>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Què convé duplicar{% else %}Qué conviene duplicar{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Quan treballes habitualment en dos centres, pot ser més còmode deixar alguns objectes econòmics i no personals en cada ubicació, sempre que disposes d'un espai segur i autoritzat.</p>
+    <ul>
+      <li>Bolígrafs, llapis i retoladors de pissarra.</li>
+      <li>Carregadors senzills, si són compatibles i poden quedar guardats.</li>
+      <li>Material d'higiene o una botella buida.</li>
+      <li>Carpetes o fundes per a documents interns de cada centre.</li>
+    </ul>
+    <p class="panel-card__hint">No deixes documentació personal, dispositius, claus, medicació ni informació sensible en espais compartits.</p>
+    {% else %}
+    <p>Cuando trabajas habitualmente en dos centros, puede resultar más cómodo dejar algunos objetos económicos y no personales en cada ubicación, siempre que dispongas de un espacio seguro y autorizado.</p>
+    <ul>
+      <li>Bolígrafos, lápices y rotuladores de pizarra.</li>
+      <li>Cargadores sencillos, si son compatibles y pueden quedar guardados.</li>
+      <li>Material de higiene o una botella vacía.</li>
+      <li>Carpetas o fundas para documentos internos de cada centro.</li>
+    </ul>
+    <p class="panel-card__hint">No dejes documentación personal, dispositivos, llaves, medicación ni información sensible en espacios compartidos.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Organitza el kit per dies, no per setmanes{% else %}Organiza el kit por días, no por semanas{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ol>
+      <li>Revisa l'horari del dia següent.</li>
+      <li>Parteix del kit mínim.</li>
+      <li>Afig el mòdul digital només si el necessites.</li>
+      <li>Incorpora el material específic de cada sessió.</li>
+      <li>Retira papers, cables i objectes que ja no utilitzaràs.</li>
+    </ol>
+    <p>Una revisió de dos minuts al final de la jornada evita transportar durant tota la setmana materials que només s'utilitzen un dia.</p>
+    {% else %}
+    <ol>
+      <li>Revisa el horario del día siguiente.</li>
+      <li>Parte del kit mínimo.</li>
+      <li>Añade el módulo digital solo si lo necesitas.</li>
+      <li>Incorpora el material específico de cada sesión.</li>
+      <li>Retira papeles, cables y objetos que ya no utilizarás.</li>
+    </ol>
+    <p>Una revisión de dos minutos al final de la jornada evita transportar durante toda la semana materiales que solo se utilizan un día.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Seguretat i informació sensible{% else %}Seguridad e información sensible{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ul>
+      <li>No guardes dades personals de l'alumnat en memòries USB sense protecció.</li>
+      <li>Bloqueja el portàtil o la tauleta quan t'allunyes, encara que siga durant pocs minuts.</li>
+      <li>No deixes el kit complet visible dins del cotxe.</li>
+      <li>Identifica cables i accessoris sense escriure dades personals innecessàries.</li>
+      <li>Utilitza els sistemes i procediments autoritzats pel centre per a compartir documentació.</li>
+    </ul>
+    {% else %}
+    <ul>
+      <li>No guardes datos personales del alumnado en memorias USB sin protección.</li>
+      <li>Bloquea el portátil o la tableta cuando te alejes, aunque sea durante pocos minutos.</li>
+      <li>No dejes el kit completo visible dentro del coche.</li>
+      <li>Identifica cables y accesorios sin escribir datos personales innecesarios.</li>
+      <li>Utiliza los sistemas y procedimientos autorizados por el centro para compartir documentación.</li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Llista de comprovació abans d'eixir{% else %}Lista de comprobación antes de salir{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ul>
+      <li>☐ He revisat els centres, aules i horaris del dia.</li>
+      <li>☐ Porte identificació, claus i telèfon.</li>
+      <li>☐ La carpeta conté només la documentació necessària.</li>
+      <li>☐ He afegit el mòdul digital si correspon.</li>
+      <li>☐ Porte els adaptadors compatibles amb els espais que utilitzaré.</li>
+      <li>☐ El material específic està separat i etiquetat.</li>
+      <li>☐ Els dispositius estan carregats.</li>
+      <li>☐ L'aigua està separada de la tecnologia.</li>
+      <li>☐ No porte dades sensibles en dispositius no protegits.</li>
+      <li>☐ El pes total continua sent còmode per als desplaçaments previstos.</li>
+    </ul>
+    {% else %}
+    <ul>
+      <li>☐ He revisado los centros, aulas y horarios del día.</li>
+      <li>☐ Llevo identificación, llaves y teléfono.</li>
+      <li>☐ La carpeta contiene solo la documentación necesaria.</li>
+      <li>☐ He añadido el módulo digital si corresponde.</li>
+      <li>☐ Llevo los adaptadores compatibles con los espacios que utilizaré.</li>
+      <li>☐ El material específico está separado y etiquetado.</li>
+      <li>☐ Los dispositivos están cargados.</li>
+      <li>☐ El agua está separada de la tecnología.</li>
+      <li>☐ No llevo datos sensibles en dispositivos sin proteger.</li>
+      <li>☐ El peso total sigue siendo cómodo para los desplazamientos previstos.</li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Continua amb les guies{% else %}Continúa con las guías{% endif %}</h2>
+        <p>
+          {% if current_lang == 'va' %}
+          Consulta les altres guies sobre incorporació, motxilles, organització, tecnologia i desplaçaments.
+          {% else %}
+          Consulta las demás guías sobre incorporación, mochilas, organización, tecnología y desplazamientos.
+          {% endif %}
+        </p>
+      </div>
+      <a
+        class="button button--secondary"
+        href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}"
+      >
+        {% if current_lang == 'va' %}Veure tots els recursos{% else %}Ver todos los recursos{% endif %}
+      </a>
+    </div>
+  </section>
+</section>
+{% endblock %}

@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">
+      {% if current_lang == 'va' %}
+      Guia pràctica d'organització documental docent
+      {% else %}
+      Guía práctica de organización documental docente
+      {% endif %}
+    </p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="{% if current_lang == 'va' %}/va{% else %}/{% endif %}">
+      {% if current_lang == 'va' %}Inici{% else %}Inicio{% endif %}
+    </a>
+    <span>›</span>
+    <a href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}">
+      {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+    </a>
+    <span>›</span>
+    {% if current_lang == 'va' %}Organització d'oposicions i borses{% else %}Organización de oposiciones y bolsas{% endif %}
+  </div>
+
+  <article class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>
+          {% if current_lang == 'va' %}
+          Com organitzar oposicions, borses i documentació docent
+          {% else %}
+          Cómo organizar oposiciones, bolsas y documentación docente
+          {% endif %}
+        </h1>
+        <p>
+          {% if current_lang == 'va' %}
+          Un sistema senzill per a controlar convocatòries, terminis, mèrits, certificats i justificants sense dependre de la memòria.
+          {% else %}
+          Un sistema sencillo para controlar convocatorias, plazos, méritos, certificados y justificantes sin depender de la memoria.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <p class="panel-card__meta">
+      {% if current_lang == 'va' %}Publicat el 22 de juliol de 2026{% else %}Publicado el 22 de julio de 2026{% endif %}
+    </p>
+
+    <p class="panel-card__hint">
+      {% if current_lang == 'va' %}
+      L'objectiu no és guardar molts arxius, sinó poder localitzar en pocs minuts la versió correcta de cada document i saber què està pendent abans que acabe un termini.
+      {% else %}
+      El objetivo no es guardar muchos archivos, sino poder localizar en pocos minutos la versión correcta de cada documento y saber qué está pendiente antes de que termine un plazo.
+      {% endif %}
+    </p>
+  </article>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Comença amb un únic registre mestre{% else %}Empieza con un único registro maestro{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Abans de crear carpetes, prepara una taula o full de càlcul que actue com a índex de tots els procediments. Cada fila representa una convocatòria, una actualització de borsa o un tràmit concret.</p>
+    <p>Com a mínim, anota:</p>
+    <ul>
+      <li>Nom breu del procediment.</li>
+      <li>Administració o organisme responsable.</li>
+      <li>Especialitat, cos o borsa afectada.</li>
+      <li>Data de publicació.</li>
+      <li>Data i hora límit.</li>
+      <li>Enllaç a la font oficial.</li>
+      <li>Estat: pendent, en preparació, presentat, esmenat o tancat.</li>
+      <li>Ubicació de la carpeta digital corresponent.</li>
+      <li>Número de registre o justificant, quan existisca.</li>
+    </ul>
+    <p class="panel-card__hint">Utilitza sempre la publicació oficial per a confirmar terminis, requisits i canals de presentació. El registre mestre és una ajuda d'organització, no la font administrativa.</p>
+    {% else %}
+    <p>Antes de crear carpetas, prepara una tabla u hoja de cálculo que actúe como índice de todos los procedimientos. Cada fila representa una convocatoria, una actualización de bolsa o un trámite concreto.</p>
+    <p>Como mínimo, anota:</p>
+    <ul>
+      <li>Nombre corto del procedimiento.</li>
+      <li>Administración u organismo responsable.</li>
+      <li>Especialidad, cuerpo o bolsa afectada.</li>
+      <li>Fecha de publicación.</li>
+      <li>Fecha y hora límite.</li>
+      <li>Enlace a la fuente oficial.</li>
+      <li>Estado: pendiente, en preparación, presentado, subsanado o cerrado.</li>
+      <li>Ubicación de la carpeta digital correspondiente.</li>
+      <li>Número de registro o justificante, cuando exista.</li>
+    </ul>
+    <p class="panel-card__hint">Utiliza siempre la publicación oficial para confirmar plazos, requisitos y canales de presentación. El registro maestro es una ayuda de organización, no la fuente administrativa.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Una estructura digital que es puga mantindre{% else %}Una estructura digital que se pueda mantener{% endif %}</h2>
+        <p>
+          {% if current_lang == 'va' %}
+          Separa els documents permanents dels expedients que només corresponen a una convocatòria.
+          {% else %}
+          Separa los documentos permanentes de los expedientes que solo corresponden a una convocatoria.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <div class="module-grid">
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🪪</span>
+          <h3>{% if current_lang == 'va' %}01. Dades personals{% else %}01. Datos personales{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Documentació identificativa vigent.</li>
+          <li>Dades de contacte i domicili.</li>
+          <li>Documents bancaris només quan siguen necessaris.</li>
+          <li>Representació o autoritzacions, si corresponen.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Documentación identificativa vigente.</li>
+          <li>Datos de contacto y domicilio.</li>
+          <li>Documentos bancarios solo cuando sean necesarios.</li>
+          <li>Representación o autorizaciones, si corresponden.</li>
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🎓</span>
+          <h3>{% if current_lang == 'va' %}02. Titulacions i requisits{% else %}02. Titulaciones y requisitos{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Títols acadèmics i resguards.</li>
+          <li>Certificats lingüístics.</li>
+          <li>Formació pedagògica o habilitacions.</li>
+          <li>Equivalències i homologacions.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Títulos académicos y resguardos.</li>
+          <li>Certificados lingüísticos.</li>
+          <li>Formación pedagógica o habilitaciones.</li>
+          <li>Equivalencias y homologaciones.</li>
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🏅</span>
+          <h3>{% if current_lang == 'va' %}03. Mèrits{% else %}03. Méritos{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Experiència docent.</li>
+          <li>Cursos i formació permanent.</li>
+          <li>Idiomes, publicacions o altres mèrits.</li>
+          <li>Certificats amb la informació necessària per a baremar-los.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Experiencia docente.</li>
+          <li>Cursos y formación permanente.</li>
+          <li>Idiomas, publicaciones u otros méritos.</li>
+          <li>Certificados con la información necesaria para baremarlos.</li>
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">📁</span>
+          <h3>{% if current_lang == 'va' %}04. Procediments{% else %}04. Procedimientos{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Una subcarpeta per convocatòria.</li>
+          <li>Bases, annexos i instruccions oficials.</li>
+          <li>Documents preparats per a presentar.</li>
+          <li>Justificants, esmenes i resolucions.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Una subcarpeta por convocatoria.</li>
+          <li>Bases, anexos e instrucciones oficiales.</li>
+          <li>Documentos preparados para presentar.</li>
+          <li>Justificantes, subsanaciones y resoluciones.</li>
+        </ul>
+        {% endif %}
+      </article>
+    </div>
+
+    <p class="panel-card__hint">
+      {% if current_lang == 'va' %}
+      Evita crear una carpeta nova per a cada document. Una estructura massa profunda obliga a recordar on vas guardar cada cosa i acaba duplicant arxius.
+      {% else %}
+      Evita crear una carpeta nueva para cada documento. Una estructura demasiado profunda obliga a recordar dónde guardaste cada cosa y termina duplicando archivos.
+      {% endif %}
+    </p>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Posa noms que expliquen què conté cada arxiu{% else %}Pon nombres que expliquen qué contiene cada archivo{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Un nom consistent permet ordenar cronològicament i trobar documents sense obrir-los. Pots seguir aquest patró:</p>
+    <p><strong>AAAA-MM-DD_tipus_document_descripció.pdf</strong></p>
+    <ul>
+      <li><strong>2026-07-22_certificat_curs_inclusio.pdf</strong></li>
+      <li><strong>2026-07-22_justificant_registre_borsa_secundaria.pdf</strong></li>
+      <li><strong>2026-07-22_resolucio_provisional_oposicions.pdf</strong></li>
+    </ul>
+    <p>Quan prepares una versió nova, evita noms com <em>final</em>, <em>final2</em> o <em>definitiu_bo</em>. Afig una data o un número de versió:</p>
+    <ul>
+      <li><strong>sollicitud_v01.pdf</strong></li>
+      <li><strong>sollicitud_v02_revisada.pdf</strong></li>
+      <li><strong>sollicitud_presentada_2026-07-22.pdf</strong></li>
+    </ul>
+    {% else %}
+    <p>Un nombre consistente permite ordenar cronológicamente y encontrar documentos sin abrirlos. Puedes seguir este patrón:</p>
+    <p><strong>AAAA-MM-DD_tipo_documento_descripción.pdf</strong></p>
+    <ul>
+      <li><strong>2026-07-22_certificado_curso_inclusion.pdf</strong></li>
+      <li><strong>2026-07-22_justificante_registro_bolsa_secundaria.pdf</strong></li>
+      <li><strong>2026-07-22_resolucion_provisional_oposiciones.pdf</strong></li>
+    </ul>
+    <p>Cuando prepares una versión nueva, evita nombres como <em>final</em>, <em>final2</em> o <em>definitivo_bueno</em>. Añade una fecha o un número de versión:</p>
+    <ul>
+      <li><strong>solicitud_v01.pdf</strong></li>
+      <li><strong>solicitud_v02_revisada.pdf</strong></li>
+      <li><strong>solicitud_presentada_2026-07-22.pdf</strong></li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Controla els terminis amb tres recordatoris{% else %}Controla los plazos con tres recordatorios{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>No depengues d'un únic avís el dia que acaba el termini. Per a cada tràmit important, crea tres recordatoris:</p>
+    <ol>
+      <li><strong>Inici del treball:</strong> quan convé llegir les bases i reunir la documentació.</li>
+      <li><strong>Revisió:</strong> almenys uns dies abans per a comprovar requisits, arxius i formularis.</li>
+      <li><strong>Límit intern:</strong> una data anterior al termini oficial per a presentar sense presses.</li>
+    </ol>
+    <p>En el registre mestre, diferencia clarament la data oficial de la teua data interna. Si hi ha una hora límit, anota-la també.</p>
+    {% else %}
+    <p>No dependas de un único aviso el día que termina el plazo. Para cada trámite importante, crea tres recordatorios:</p>
+    <ol>
+      <li><strong>Inicio del trabajo:</strong> cuándo conviene leer las bases y reunir la documentación.</li>
+      <li><strong>Revisión:</strong> al menos unos días antes para comprobar requisitos, archivos y formularios.</li>
+      <li><strong>Límite interno:</strong> una fecha anterior al plazo oficial para presentar sin prisas.</li>
+    </ol>
+    <p>En el registro maestro, diferencia claramente la fecha oficial de tu fecha interna. Si existe una hora límite, anótala también.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Crea un inventari de mèrits{% else %}Crea un inventario de méritos{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>La carpeta de mèrits guarda els certificats; l'inventari explica què tens. En una taula separada, registra:</p>
+    <ul>
+      <li>Nom del mèrit.</li>
+      <li>Entitat emissora.</li>
+      <li>Data d'inici i finalització.</li>
+      <li>Duració en hores o crèdits, quan conste.</li>
+      <li>Categoria aproximada segons el procediment.</li>
+      <li>Nom i ubicació de l'arxiu acreditatiu.</li>
+      <li>Observacions: firma, codi de verificació, traducció o document pendent.</li>
+    </ul>
+    <p class="panel-card__hint">No dones per fet que un mèrit serà baremable en qualsevol convocatòria. Els criteris poden variar; comprova sempre les bases del procediment concret.</p>
+    {% else %}
+    <p>La carpeta de méritos guarda los certificados; el inventario explica qué tienes. En una tabla separada, registra:</p>
+    <ul>
+      <li>Nombre del mérito.</li>
+      <li>Entidad emisora.</li>
+      <li>Fecha de inicio y finalización.</li>
+      <li>Duración en horas o créditos, cuando conste.</li>
+      <li>Categoría aproximada según el procedimiento.</li>
+      <li>Nombre y ubicación del archivo acreditativo.</li>
+      <li>Observaciones: firma, código de verificación, traducción o documento pendiente.</li>
+    </ul>
+    <p class="panel-card__hint">No des por hecho que un mérito será baremable en cualquier convocatoria. Los criterios pueden variar; comprueba siempre las bases del procedimiento concreto.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Guarda el justificant al mateix moment{% else %}Guarda el justificante en el mismo momento{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Un tràmit no està complet només perquè el formulari haja desaparegut de la pantalla. En acabar:</p>
+    <ol>
+      <li>Descarrega el justificant o rebut de registre.</li>
+      <li>Comprova que identifica el procediment i la persona interessada.</li>
+      <li>Revisa la data, hora i número de registre.</li>
+      <li>Guarda'l en la carpeta de la convocatòria.</li>
+      <li>Anota el número en el registre mestre.</li>
+      <li>Conserva també la sol·licitud exacta que s'ha presentat, quan siga possible.</li>
+    </ol>
+    <p>Si el procediment permet esmenes, crea una subcarpeta específica amb la notificació, els documents aportats i el nou justificant.</p>
+    {% else %}
+    <p>Un trámite no está completo solo porque el formulario haya desaparecido de la pantalla. Al terminar:</p>
+    <ol>
+      <li>Descarga el justificante o recibo de registro.</li>
+      <li>Comprueba que identifica el procedimiento y a la persona interesada.</li>
+      <li>Revisa la fecha, hora y número de registro.</li>
+      <li>Guárdalo en la carpeta de la convocatoria.</li>
+      <li>Anota el número en el registro maestro.</li>
+      <li>Conserva también la solicitud exacta que se ha presentado, cuando sea posible.</li>
+    </ol>
+    <p>Si el procedimiento permite subsanaciones, crea una subcarpeta específica con la notificación, los documentos aportados y el nuevo justificante.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Paper: conserva només el que aporta valor{% else %}Papel: conserva solo lo que aporta valor{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>No cal imprimir cada PDF. Reserva l'arxiu físic per als originals que necessites conservar, còpies compulsades, documents que hages de presentar presencialment o materials que revises millor en paper.</p>
+    <p>Una organització senzilla pot utilitzar:</p>
+    <ul>
+      <li>Un arxivador per a titulacions i certificats permanents.</li>
+      <li>Separadors per tipus de mèrit.</li>
+      <li>Una carpeta temporal per al procediment actiu.</li>
+      <li>Fundes només per a originals o documents delicats.</li>
+    </ul>
+    <p>Quan finalitze una convocatòria, retira duplicats, esborranys i còpies que ja no siguen necessàries.</p>
+    {% else %}
+    <p>No es necesario imprimir cada PDF. Reserva el archivo físico para los originales que necesites conservar, copias compulsadas, documentos que debas presentar presencialmente o materiales que revises mejor en papel.</p>
+    <p>Una organización sencilla puede utilizar:</p>
+    <ul>
+      <li>Un archivador para titulaciones y certificados permanentes.</li>
+      <li>Separadores por tipo de mérito.</li>
+      <li>Una carpeta temporal para el procedimiento activo.</li>
+      <li>Fundas solo para originales o documentos delicados.</li>
+    </ul>
+    <p>Cuando termine una convocatoria, retira duplicados, borradores y copias que ya no sean necesarias.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Còpies de seguretat i protecció de dades{% else %}Copias de seguridad y protección de datos{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ul>
+      <li>Mantín una còpia principal ordenada i almenys una còpia de seguretat separada.</li>
+      <li>No depengues únicament d'una memòria USB o del disc d'un portàtil.</li>
+      <li>Protegeix els dispositius amb contrasenya i bloqueig automàtic.</li>
+      <li>Evita compartir carpetes completes quan només necessites enviar un document.</li>
+      <li>Revisa els permisos dels serveis en el núvol que utilitzes.</li>
+      <li>No guardes contrasenyes, certificats digitals o claus privades juntament amb còpies accessibles dels documents personals.</li>
+    </ul>
+    <p class="panel-card__hint">La còpia de seguretat ha de poder recuperar-se. Comprova de tant en tant que els arxius s'obrin i que la còpia està actualitzada.</p>
+    {% else %}
+    <ul>
+      <li>Mantén una copia principal ordenada y al menos una copia de seguridad separada.</li>
+      <li>No dependas únicamente de una memoria USB o del disco de un portátil.</li>
+      <li>Protege los dispositivos con contraseña y bloqueo automático.</li>
+      <li>Evita compartir carpetas completas cuando solo necesites enviar un documento.</li>
+      <li>Revisa los permisos de los servicios en la nube que utilices.</li>
+      <li>No guardes contraseñas, certificados digitales o claves privadas junto a copias accesibles de los documentos personales.</li>
+    </ul>
+    <p class="panel-card__hint">La copia de seguridad debe poder recuperarse. Comprueba de vez en cuando que los archivos se abren y que la copia está actualizada.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Revisió mensual de quinze minuts{% else %}Revisión mensual de quince minutos{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ol>
+      <li>Comprova si hi ha convocatòries o terminis pròxims.</li>
+      <li>Actualitza l'estat dels procediments tancats.</li>
+      <li>Afig els nous cursos, certificats o serveis prestats.</li>
+      <li>Revisa documents que caduquen o que convé renovar.</li>
+      <li>Elimina duplicats i mou esborranys antics a una carpeta temporal.</li>
+      <li>Actualitza la còpia de seguretat.</li>
+    </ol>
+    <p>Una revisió curta i regular és més efectiva que reorganitzar tot l'arxiu quan s'obri una convocatòria important.</p>
+    {% else %}
+    <ol>
+      <li>Comprueba si existen convocatorias o plazos próximos.</li>
+      <li>Actualiza el estado de los procedimientos cerrados.</li>
+      <li>Añade los nuevos cursos, certificados o servicios prestados.</li>
+      <li>Revisa documentos que caducan o que conviene renovar.</li>
+      <li>Elimina duplicados y mueve borradores antiguos a una carpeta temporal.</li>
+      <li>Actualiza la copia de seguridad.</li>
+    </ol>
+    <p>Una revisión corta y regular es más efectiva que reorganizar todo el archivo cuando se abre una convocatoria importante.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Llista de comprovació per a cada convocatòria{% else %}Lista de comprobación para cada convocatoria{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ul>
+      <li>☐ He guardat les bases i els annexos oficials.</li>
+      <li>☐ He anotat la data i l'hora límit.</li>
+      <li>☐ He comprovat requisits, especialitats i forma de presentació.</li>
+      <li>☐ He creat la carpeta específica del procediment.</li>
+      <li>☐ He preparat només els documents que se sol·liciten.</li>
+      <li>☐ He revisat noms, formats, grandàries i firmes dels arxius.</li>
+      <li>☐ He presentat abans del meu límit intern.</li>
+      <li>☐ He descarregat la sol·licitud presentada i el justificant.</li>
+      <li>☐ He anotat el número de registre.</li>
+      <li>☐ He programat una revisió de llistes provisionals, esmenes i resolucions.</li>
+    </ul>
+    {% else %}
+    <ul>
+      <li>☐ He guardado las bases y los anexos oficiales.</li>
+      <li>☐ He anotado la fecha y la hora límite.</li>
+      <li>☐ He comprobado requisitos, especialidades y forma de presentación.</li>
+      <li>☐ He creado la carpeta específica del procedimiento.</li>
+      <li>☐ He preparado solo los documentos que se solicitan.</li>
+      <li>☐ He revisado nombres, formatos, tamaños y firmas de los archivos.</li>
+      <li>☐ He presentado antes de mi límite interno.</li>
+      <li>☐ He descargado la solicitud presentada y el justificante.</li>
+      <li>☐ He anotado el número de registro.</li>
+      <li>☐ He programado una revisión de listas provisionales, subsanaciones y resoluciones.</li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Continua amb les guies{% else %}Continúa con las guías{% endif %}</h2>
+        <p>
+          {% if current_lang == 'va' %}
+          Consulta les altres guies sobre incorporació, motxilles, itinerància, tecnologia i desplaçaments.
+          {% else %}
+          Consulta las demás guías sobre incorporación, mochilas, itinerancia, tecnología y desplazamientos.
+          {% endif %}
+        </p>
+      </div>
+      <a
+        class="button button--secondary"
+        href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}"
+      >
+        {% if current_lang == 'va' %}Veure tots els recursos{% else %}Ver todos los recursos{% endif %}
+      </a>
+    </div>
+  </section>
+</section>
+{% endblock %}

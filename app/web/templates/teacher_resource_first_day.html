@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">
+      {% if current_lang == 'va' %}
+      Guia pràctica per a personal docent interí
+      {% else %}
+      Guía práctica para personal docente interino
+      {% endif %}
+    </p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="{% if current_lang == 'va' %}/va{% else %}/{% endif %}">
+      {% if current_lang == 'va' %}Inici{% else %}Inicio{% endif %}
+    </a>
+    <span>›</span>
+    <a href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}">
+      {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+    </a>
+    <span>›</span>
+    {% if current_lang == 'va' %}Primer dia{% else %}Primer día{% endif %}
+  </div>
+
+  <article class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>
+          {% if current_lang == 'va' %}
+          Què portar el primer dia com a docent interí
+          {% else %}
+          Qué llevar el primer día como docente interino
+          {% endif %}
+        </h1>
+        <p>
+          {% if current_lang == 'va' %}
+          Una llista pràctica per a arribar preparat al centre sense carregar material que probablement no necessitaràs.
+          {% else %}
+          Una lista práctica para llegar preparado al centro sin cargar material que probablemente no necesitarás.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <p class="panel-card__meta">
+      {% if current_lang == 'va' %}Publicat el 19 de juliol de 2026{% else %}Publicado el 19 de julio de 2026{% endif %}
+    </p>
+
+    <p class="panel-card__hint">
+      {% if current_lang == 'va' %}
+      Aquesta guia és orientativa. Confirma sempre amb el centre quina documentació has de presentar i si existeix algun procediment específic d'incorporació.
+      {% else %}
+      Esta guía es orientativa. Confirma siempre con el centro qué documentación debes presentar y si existe algún procedimiento específico de incorporación.
+      {% endif %}
+    </p>
+  </article>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}La idea principal{% else %}La idea principal{% endif %}</h2>
+      </div>
+    </div>
+    <p>
+      {% if current_lang == 'va' %}
+      El primer dia no necessites muntar una aula portàtil. El més important és poder identificar-te, prendre notes, consultar la informació del nomenament i adaptar-te a la manera de treballar del centre. Porta un equip lleuger i deixa les compres específiques per a després de conéixer l'horari, les aules i els recursos disponibles.
+      {% else %}
+      El primer día no necesitas montar un aula portátil. Lo más importante es poder identificarte, tomar notas, consultar la información del nombramiento y adaptarte a la forma de trabajar del centro. Lleva un equipo ligero y deja las compras específicas para después de conocer el horario, las aulas y los recursos disponibles.
+      {% endif %}
+    </p>
+  </section>
+
+  <div class="module-grid">
+    <section class="panel-card">
+      <div class="panel-card__title">
+        <span class="panel-card__emoji">🪪</span>
+        <h2>{% if current_lang == 'va' %}1. Documentació i informació{% else %}1. Documentación e información{% endif %}</h2>
+      </div>
+      {% if current_lang == 'va' %}
+      <ul>
+        <li>DNI, NIE o document identificatiu.</li>
+        <li>Credencial, nomenament o justificant d'adjudicació disponible.</li>
+        <li>Dades de contacte del centre i nom de la persona amb qui has parlat.</li>
+        <li>Adreça exacta, hora d'arribada i ruta revisada amb antelació.</li>
+        <li>Qualsevol document que el centre t'haja demanat expressament.</li>
+      </ul>
+      <p class="panel-card__hint">Porta els documents importants també en format digital, però evita guardar dades sensibles en dispositius sense protecció.</p>
+      {% else %}
+      <ul>
+        <li>DNI, NIE o documento identificativo.</li>
+        <li>Credencial, nombramiento o justificante de adjudicación disponible.</li>
+        <li>Datos de contacto del centro y nombre de la persona con la que has hablado.</li>
+        <li>Dirección exacta, hora de llegada y ruta revisada con antelación.</li>
+        <li>Cualquier documento que el centro te haya pedido expresamente.</li>
+      </ul>
+      <p class="panel-card__hint">Lleva los documentos importantes también en formato digital, pero evita guardar datos sensibles en dispositivos sin protección.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel-card">
+      <div class="panel-card__title">
+        <span class="panel-card__emoji">🗂️</span>
+        <h2>{% if current_lang == 'va' %}2. Material bàsic{% else %}2. Material básico{% endif %}</h2>
+      </div>
+      {% if current_lang == 'va' %}
+      <ul>
+        <li>Una carpeta rígida o portadocuments.</li>
+        <li>Un quadern o agenda per a horaris, noms i instruccions.</li>
+        <li>Dos bolígrafs i un llapis.</li>
+        <li>Un estoig menut amb el material que uses habitualment.</li>
+        <li>Algunes fundes transparents per a documents.</li>
+      </ul>
+      <p class="panel-card__hint">No cal portar una gran quantitat de material escolar. Primer comprova què proporciona el centre i què exigeix realment el lloc.</p>
+      {% else %}
+      <ul>
+        <li>Una carpeta rígida o portadocumentos.</li>
+        <li>Un cuaderno o agenda para horarios, nombres e instrucciones.</li>
+        <li>Dos bolígrafos y un lápiz.</li>
+        <li>Un estuche pequeño con el material que utilizas habitualmente.</li>
+        <li>Algunas fundas transparentes para documentos.</li>
+      </ul>
+      <p class="panel-card__hint">No hace falta llevar una gran cantidad de material escolar. Primero comprueba qué proporciona el centro y qué exige realmente el puesto.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel-card">
+      <div class="panel-card__title">
+        <span class="panel-card__emoji">🔌</span>
+        <h2>{% if current_lang == 'va' %}3. Tecnologia útil{% else %}3. Tecnología útil{% endif %}</h2>
+      </div>
+      {% if current_lang == 'va' %}
+      <ul>
+        <li>Telèfon carregat i carregador.</li>
+        <li>Bateria externa si tens un desplaçament llarg.</li>
+        <li>Portàtil o tauleta només si saps que et resultarà útil.</li>
+        <li>Carregador del portàtil i adaptador HDMI o USB-C si ja en disposes.</li>
+        <li>Memòria USB només quan siga necessària i sense dades personals de l'alumnat.</li>
+      </ul>
+      <p class="panel-card__hint">No dones per fet que podràs connectar qualsevol dispositiu a la xarxa o als equips del centre. Pregunta abans i respecta les normes de seguretat i protecció de dades.</p>
+      {% else %}
+      <ul>
+        <li>Teléfono cargado y cargador.</li>
+        <li>Batería externa si tienes un desplazamiento largo.</li>
+        <li>Portátil o tableta solo si sabes que te resultará útil.</li>
+        <li>Cargador del portátil y adaptador HDMI o USB-C si ya dispones de ellos.</li>
+        <li>Memoria USB solo cuando sea necesaria y sin datos personales del alumnado.</li>
+      </ul>
+      <p class="panel-card__hint">No des por hecho que podrás conectar cualquier dispositivo a la red o a los equipos del centro. Pregunta antes y respeta las normas de seguridad y protección de datos.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel-card">
+      <div class="panel-card__title">
+        <span class="panel-card__emoji">🚗</span>
+        <h2>{% if current_lang == 'va' %}4. Desplaçament i jornada{% else %}4. Desplazamiento y jornada{% endif %}</h2>
+      </div>
+      {% if current_lang == 'va' %}
+      <ul>
+        <li>Aigua i algun aliment fàcil de transportar.</li>
+        <li>Targeta de transport, combustible o aparcament revisats.</li>
+        <li>Una peça lleugera d'abric si no coneixes la temperatura de les aules.</li>
+        <li>Medicació personal que necessites durant la jornada.</li>
+        <li>Un marge de temps suficient per a trobar l'entrada i secretaria.</li>
+      </ul>
+      {% else %}
+      <ul>
+        <li>Agua y algún alimento fácil de transportar.</li>
+        <li>Tarjeta de transporte, combustible o aparcamiento revisados.</li>
+        <li>Una prenda ligera de abrigo si no conoces la temperatura de las aulas.</li>
+        <li>Medicación personal que necesites durante la jornada.</li>
+        <li>Un margen de tiempo suficiente para encontrar la entrada y secretaría.</li>
+      </ul>
+      {% endif %}
+    </section>
+  </div>
+
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Criteris per a triar el material{% else %}Criterios para elegir el material{% endif %}</h2>
+      </div>
+    </div>
+    <div class="module-grid">
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}Carpeta o portadocuments{% else %}Carpeta o portadocumentos{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Ha de protegir documents, cabre en la motxilla i poder-se obrir sense buidar tot el contingut.{% else %}Debe proteger documentos, caber en la mochila y poder abrirse sin vaciar todo el contenido.{% endif %}</p>
+      </article>
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}Carregador i bateria externa{% else %}Cargador y batería externa{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Prioritza compatibilitat, pes reduït i potència suficient per als dispositius que realment portaràs.{% else %}Prioriza compatibilidad, peso reducido y potencia suficiente para los dispositivos que realmente llevarás.{% endif %}</p>
+      </article>
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}Motxilla o bossa{% else %}Mochila o bolsa{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Comprova la grandària del portàtil, la comoditat en el trajecte i la protecció contra la pluja abans de valorar compartiments addicionals.{% else %}Comprueba el tamaño del portátil, la comodidad en el trayecto y la protección frente a la lluvia antes de valorar compartimentos adicionales.{% endif %}</p>
+      </article>
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}Adaptadors{% else %}Adaptadores{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}És millor un adaptador senzill i compatible amb el teu equip que un hub gran amb connexions que no utilitzaràs.{% else %}Es mejor un adaptador sencillo y compatible con tu equipo que un hub grande con conexiones que no utilizarás.{% endif %}</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Llista per a la nit anterior{% else %}Lista para la noche anterior{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ul>
+      <li>☐ He confirmat l'hora i el lloc d'incorporació.</li>
+      <li>☐ Tinc preparada la identificació i la documentació disponible.</li>
+      <li>☐ He guardat el telèfon i l'adreça del centre.</li>
+      <li>☐ He revisat la ruta, el transport i l'aparcament.</li>
+      <li>☐ Porte quadern, carpeta i bolígrafs.</li>
+      <li>☐ El telèfon i els dispositius estan carregats.</li>
+      <li>☐ He preparat aigua, menjar i medicació personal.</li>
+      <li>☐ He deixat marge per a arribar amb calma.</li>
+    </ul>
+    {% else %}
+    <ul>
+      <li>☐ He confirmado la hora y el lugar de incorporación.</li>
+      <li>☐ Tengo preparada la identificación y la documentación disponible.</li>
+      <li>☐ He guardado el teléfono y la dirección del centro.</li>
+      <li>☐ He revisado la ruta, el transporte y el aparcamiento.</li>
+      <li>☐ Llevo cuaderno, carpeta y bolígrafos.</li>
+      <li>☐ El teléfono y los dispositivos están cargados.</li>
+      <li>☐ He preparado agua, comida y medicación personal.</li>
+      <li>☐ He dejado margen para llegar con calma.</li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Continua amb les guies{% else %}Continúa con las guías{% endif %}</h2>
+        <p>
+          {% if current_lang == 'va' %}
+          Consulta les pròximes guies sobre motxilles, organització, tecnologia i desplaçaments.
+          {% else %}
+          Consulta las próximas guías sobre mochilas, organización, tecnología y desplazamientos.
+          {% endif %}
+        </p>
+      </div>
+      <a
+        class="button button--secondary"
+        href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}"
+      >
+        {% if current_lang == 'va' %}Veure tots els recursos{% else %}Ver todos los recursos{% endif %}
+      </a>
+    </div>
+  </section>
+</section>
+{% endblock %}

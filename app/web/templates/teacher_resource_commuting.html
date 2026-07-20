@@ -1,0 +1,498 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">
+      {% if current_lang == 'va' %}
+      Guia pràctica per a desplaçaments docents
+      {% else %}
+      Guía práctica para desplazamientos docentes
+      {% endif %}
+    </p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="{% if current_lang == 'va' %}/va{% else %}/{% endif %}">
+      {% if current_lang == 'va' %}Inici{% else %}Inicio{% endif %}
+    </a>
+    <span>›</span>
+    <a href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}">
+      {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+    </a>
+    <span>›</span>
+    {% if current_lang == 'va' %}Desplaçaments docents{% else %}Desplazamientos docentes{% endif %}
+  </div>
+
+  <article class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>
+          {% if current_lang == 'va' %}
+          Recursos per a docents desplaçats a una altra localitat
+          {% else %}
+          Recursos para docentes desplazados a otra localidad
+          {% endif %}
+        </h1>
+        <p>
+          {% if current_lang == 'va' %}
+          Com organitzar trajectes, menjars, material personal, tecnologia i possibles estades temporals sense carregar més del necessari.
+          {% else %}
+          Cómo organizar trayectos, comidas, material personal, tecnología y posibles estancias temporales sin cargar más de lo necesario.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <p class="panel-card__meta">
+      {% if current_lang == 'va' %}Publicat el 24 de juliol de 2026{% else %}Publicado el 24 de julio de 2026{% endif %}
+    </p>
+
+    <p class="panel-card__hint">
+      {% if current_lang == 'va' %}
+      Un desplaçament docent no es mesura només en quilòmetres. També importen l'horari, l'aparcament, els transbords, el cansament, el cost real i la possibilitat de transportar el material amb comoditat.
+      {% else %}
+      Un desplazamiento docente no se mide solo en kilómetros. También importan el horario, el aparcamiento, los transbordos, el cansancio, el coste real y la posibilidad de transportar el material con comodidad.
+      {% endif %}
+    </p>
+  </article>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Calcula el trajecte real{% else %}Calcula el trayecto real{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Abans d'organitzar material o comprar accessoris, comprova com serà una jornada completa. La distància del mapa és només una part del desplaçament.</p>
+    <ul>
+      <li>Hora real d'eixida per a arribar amb marge.</li>
+      <li>Trànsit habitual en l'horari d'entrada i eixida.</li>
+      <li>Temps des de l'aparcament o la parada fins al centre.</li>
+      <li>Possibles transbords i freqüència del transport públic.</li>
+      <li>Peatges, combustible, aparcament o abonaments.</li>
+      <li>Condicions de la carretera i canvis estacionals.</li>
+      <li>Temps necessari per a recollir, guardar material i tornar.</li>
+    </ul>
+    <p>Fes una prova del trajecte quan siga possible, especialment si l'entrada és primerenca, hi ha zones escolars congestionades o el centre està en una localitat que no coneixes.</p>
+    {% else %}
+    <p>Antes de organizar material o comprar accesorios, comprueba cómo será una jornada completa. La distancia del mapa es solo una parte del desplazamiento.</p>
+    <ul>
+      <li>Hora real de salida para llegar con margen.</li>
+      <li>Tráfico habitual en el horario de entrada y salida.</li>
+      <li>Tiempo desde el aparcamiento o la parada hasta el centro.</li>
+      <li>Posibles transbordos y frecuencia del transporte público.</li>
+      <li>Peajes, combustible, aparcamiento o abonos.</li>
+      <li>Condiciones de la carretera y cambios estacionales.</li>
+      <li>Tiempo necesario para recoger, guardar material y volver.</li>
+    </ul>
+    <p>Haz una prueba del trayecto cuando sea posible, especialmente si la entrada es temprana, hay zonas escolares congestionadas o el centro está en una localidad que no conoces.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Prepara un sistema, no una bossa enorme{% else %}Prepara un sistema, no una bolsa enorme{% endif %}</h2>
+        <p>
+          {% if current_lang == 'va' %}
+          Separa el que necessites cada dia del material ocasional.
+          {% else %}
+          Separa lo que necesitas a diario del material ocasional.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <div class="module-grid">
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🎒</span>
+          <h3>{% if current_lang == 'va' %}Mòdul diari{% else %}Módulo diario{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Documentació personal imprescindible.</li>
+          <li>Claus, cartera i telèfon.</li>
+          <li>Agenda o sistema de planificació.</li>
+          <li>Material d'escriptura bàsic.</li>
+          <li>Dispositiu i carregador, només si els utilitzaràs.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Documentación personal imprescindible.</li>
+          <li>Llaves, cartera y teléfono.</li>
+          <li>Agenda o sistema de planificación.</li>
+          <li>Material de escritura básico.</li>
+          <li>Dispositivo y cargador, solo si los utilizarás.</li>
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">📚</span>
+          <h3>{% if current_lang == 'va' %}Mòdul de classe{% else %}Módulo de clase{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Materials de les sessions del dia.</li>
+          <li>Adaptadors o cables necessaris.</li>
+          <li>Recursos específics de l'activitat.</li>
+          <li>Còpia local dels arxius importants.</li>
+          <li>Carpeta per a documents que tornen a casa.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Materiales de las sesiones del día.</li>
+          <li>Adaptadores o cables necesarios.</li>
+          <li>Recursos específicos de la actividad.</li>
+          <li>Copia local de los archivos importantes.</li>
+          <li>Carpeta para documentos que vuelven a casa.</li>
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🧥</span>
+          <h3>{% if current_lang == 'va' %}Mòdul personal{% else %}Módulo personal{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Aigua i menjar segons la jornada.</li>
+          <li>Roba d'abric o protecció per a la pluja.</li>
+          <li>Medicació personal necessària.</li>
+          <li>Articles d'higiene de mida reduïda.</li>
+          <li>Ulleres de recanvi, si són imprescindibles.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Agua y comida según la jornada.</li>
+          <li>Ropa de abrigo o protección para la lluvia.</li>
+          <li>Medicación personal necesaria.</li>
+          <li>Artículos de higiene de tamaño reducido.</li>
+          <li>Gafas de repuesto, si son imprescindibles.</li>
+        </ul>
+        {% endif %}
+      </article>
+    </div>
+
+    {% if current_lang == 'va' %}
+    <p class="panel-card__hint">Revisa l'horari la nit anterior i incorpora només els mòduls necessaris. Una estructura modular evita transportar tota la setmana cada dia.</p>
+    {% else %}
+    <p class="panel-card__hint">Revisa el horario la noche anterior e incorpora solo los módulos necesarios. Una estructura modular evita transportar toda la semana cada día.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Menjar i hidratació{% else %}Comida e hidratación{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Comprova si el centre disposa de frigorífic, microones, cafeteria o una zona adequada per a menjar. No dones per fet que podràs conservar o calfar aliments.</p>
+    <ul>
+      <li>Utilitza recipients que tanquen bé i que siguen fàcils de netejar.</li>
+      <li>Transporta els aliments que ho necessiten en condicions adequades de temperatura.</li>
+      <li>Porta una botella reutilitzable que no perda dins de la motxilla.</li>
+      <li>Inclou una opció senzilla per a dies en què la jornada s'allargue.</li>
+      <li>Evita recipients pesats si has de caminar o usar transport públic.</li>
+      <li>No deixes menjar perible durant hores dins d'un vehicle calent.</li>
+    </ul>
+    <p>La millor solució depén de la duració de la jornada, de les instal·lacions i de la possibilitat de tornar a casa. Durant els primers dies, prepara opcions simples fins que conegues la rutina del centre.</p>
+    {% else %}
+    <p>Comprueba si el centro dispone de frigorífico, microondas, cafetería o una zona adecuada para comer. No des por hecho que podrás conservar o calentar alimentos.</p>
+    <ul>
+      <li>Utiliza recipientes que cierren bien y que sean fáciles de limpiar.</li>
+      <li>Transporta los alimentos que lo necesiten en condiciones adecuadas de temperatura.</li>
+      <li>Lleva una botella reutilizable que no pierda dentro de la mochila.</li>
+      <li>Incluye una opción sencilla para días en los que la jornada se alargue.</li>
+      <li>Evita recipientes pesados si tienes que caminar o usar transporte público.</li>
+      <li>No dejes comida perecedera durante horas dentro de un vehículo caliente.</li>
+    </ul>
+    <p>La mejor solución depende de la duración de la jornada, de las instalaciones y de la posibilidad de volver a casa. Durante los primeros días, prepara opciones simples hasta que conozcas la rutina del centro.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Si et desplaces en cotxe{% else %}Si te desplazas en coche{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ul>
+      <li>Localitza amb antelació les zones d'aparcament i les restriccions.</li>
+      <li>Guarda una ruta alternativa per si hi ha incidències.</li>
+      <li>Mantín el vehicle amb combustible o càrrega suficient.</li>
+      <li>Reserva un espai estable per a la bossa i evita objectes solts.</li>
+      <li>Porta un cable de càrrega compatible amb el telèfon.</li>
+      <li>Revisa pneumàtics, llums i líquids si el trajecte serà freqüent.</li>
+      <li>Inclou una peça reflectant o l'equip obligatori corresponent.</li>
+    </ul>
+    <p>No utilitzes el maleter com un magatzem permanent de documents, tecnologia o materials sensibles. La calor, la humitat i els robatoris poden convertir una comoditat aparent en un problema.</p>
+    <p class="panel-card__hint">Configura la ruta i la música abans de començar. No manipules el telèfon durant la conducció.</p>
+    {% else %}
+    <ul>
+      <li>Localiza con antelación las zonas de aparcamiento y las restricciones.</li>
+      <li>Guarda una ruta alternativa por si hay incidencias.</li>
+      <li>Mantén el vehículo con combustible o carga suficiente.</li>
+      <li>Reserva un espacio estable para la bolsa y evita objetos sueltos.</li>
+      <li>Lleva un cable de carga compatible con el teléfono.</li>
+      <li>Revisa neumáticos, luces y líquidos si el trayecto será frecuente.</li>
+      <li>Incluye una prenda reflectante o el equipo obligatorio correspondiente.</li>
+    </ul>
+    <p>No utilices el maletero como un almacén permanente de documentos, tecnología o materiales sensibles. El calor, la humedad y los robos pueden convertir una comodidad aparente en un problema.</p>
+    <p class="panel-card__hint">Configura la ruta y la música antes de empezar. No manipules el teléfono durante la conducción.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Si uses transport públic{% else %}Si utilizas transporte público{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ul>
+      <li>Comprova la freqüència real i els horaris de tornada.</li>
+      <li>Identifica una alternativa si perds l'última connexió útil.</li>
+      <li>Utilitza una motxilla o bossa que pugues mantindre controlada.</li>
+      <li>Protegix l'ordinador de colps i de la pluja.</li>
+      <li>Evita mostrar documents personals o dades de l'alumnat durant el trajecte.</li>
+      <li>Descarrega bitllets, mapes o materials que necessites sense connexió.</li>
+      <li>Porta una bateria externa només si la duració del trajecte ho justifica.</li>
+    </ul>
+    <p>Si has de caminar una part important del trajecte, el pes i la distribució de la càrrega són més importants que la capacitat total. El material amb rodes només és pràctic quan el recorregut té paviment adequat, ascensors i pocs desnivells.</p>
+    {% else %}
+    <ul>
+      <li>Comprueba la frecuencia real y los horarios de vuelta.</li>
+      <li>Identifica una alternativa si pierdes la última conexión útil.</li>
+      <li>Utiliza una mochila o bolsa que puedas mantener controlada.</li>
+      <li>Protege el ordenador de golpes y de la lluvia.</li>
+      <li>Evita mostrar documentos personales o datos del alumnado durante el trayecto.</li>
+      <li>Descarga billetes, mapas o materiales que necesites sin conexión.</li>
+      <li>Lleva una batería externa solo si la duración del trayecto lo justifica.</li>
+    </ul>
+    <p>Si tienes que caminar una parte importante del trayecto, el peso y la distribución de la carga son más importantes que la capacidad total. El material con ruedas solo es práctico cuando el recorrido tiene pavimento adecuado, ascensores y pocos desniveles.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Tecnologia i càrrega de dispositius{% else %}Tecnología y carga de dispositivos{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>En un desplaçament llarg convé reduir el nombre de carregadors i cables, però sense dependre d'un únic element fràgil.</p>
+    <ul>
+      <li>Comprova si un carregador compatible pot alimentar diversos dispositius.</li>
+      <li>Etiqueta adaptadors i cables per a identificar-los ràpidament.</li>
+      <li>Porta un cable curt de reserva per al telèfon.</li>
+      <li>Carrega els dispositius la nit anterior.</li>
+      <li>Activa modes d'estalvi si no tindràs accés a un endoll.</li>
+      <li>Guarda una còpia local dels materials essencials.</li>
+      <li>Evita deixar bateries o dispositius exposats a temperatures extremes.</li>
+    </ul>
+    <p>Una bateria externa és útil quan resol una necessitat habitual. Si torna sempre carregada a casa, potser és pes que no necessites transportar.</p>
+    {% else %}
+    <p>En un desplazamiento largo conviene reducir el número de cargadores y cables, pero sin depender de un único elemento frágil.</p>
+    <ul>
+      <li>Comprueba si un cargador compatible puede alimentar varios dispositivos.</li>
+      <li>Etiqueta adaptadores y cables para identificarlos rápidamente.</li>
+      <li>Lleva un cable corto de reserva para el teléfono.</li>
+      <li>Carga los dispositivos la noche anterior.</li>
+      <li>Activa modos de ahorro si no tendrás acceso a un enchufe.</li>
+      <li>Guarda una copia local de los materiales esenciales.</li>
+      <li>Evita dejar baterías o dispositivos expuestos a temperaturas extremas.</li>
+    </ul>
+    <p>Una batería externa es útil cuando resuelve una necesidad habitual. Si vuelve siempre cargada a casa, quizá sea peso que no necesitas transportar.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Quan el desplaçament requereix quedar-se fora{% else %}Cuando el desplazamiento exige quedarse fuera{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Si el trajecte diari no és viable i necessites una estada temporal, separa l'equip de treball de l'equipatge personal. Així podràs portar només la bossa docent al centre.</p>
+    <ul>
+      <li>Documentació, medicació i objectes personals imprescindibles.</li>
+      <li>Roba combinable per a diversos dies.</li>
+      <li>Necesser compacte i fàcil de reposar.</li>
+      <li>Carregadors i adaptadors revisats abans d'eixir.</li>
+      <li>Bossa separada per a roba usada.</li>
+      <li>Una còpia segura de les claus i dades de l'allotjament.</li>
+      <li>Informació sobre comerços, transport i serveis pròxims.</li>
+    </ul>
+    <p>Durant els primers dies evita traslladar massa objectes. Espera a conéixer la duració real de l'adjudicació, l'espai disponible i les necessitats de la jornada.</p>
+    {% else %}
+    <p>Si el trayecto diario no es viable y necesitas una estancia temporal, separa el equipo de trabajo del equipaje personal. Así podrás llevar solo la bolsa docente al centro.</p>
+    <ul>
+      <li>Documentación, medicación y objetos personales imprescindibles.</li>
+      <li>Ropa combinable para varios días.</li>
+      <li>Neceser compacto y fácil de reponer.</li>
+      <li>Cargadores y adaptadores revisados antes de salir.</li>
+      <li>Bolsa separada para ropa usada.</li>
+      <li>Una copia segura de las llaves y datos del alojamiento.</li>
+      <li>Información sobre comercios, transporte y servicios cercanos.</li>
+    </ul>
+    <p>Durante los primeros días evita trasladar demasiados objetos. Espera a conocer la duración real de la adjudicación, el espacio disponible y las necesidades de la jornada.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Controla el cost i el temps{% else %}Controla el coste y el tiempo{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Registra durant unes setmanes el cost real del desplaçament. Inclou combustible, peatges, aparcament, transport públic, menjars fora i possibles pernoctacions.</p>
+    <p>També convé anotar el temps total des que ixes de casa fins que tornes. Aquesta informació permet comparar alternatives amb dades reals i detectar si una opció aparentment barata genera massa cansament o hores improductives.</p>
+    <ul>
+      <li>Cost diari i mensual aproximat.</li>
+      <li>Temps d'anada i tornada.</li>
+      <li>Dies amb incidències o retards.</li>
+      <li>Despesa extraordinària per mal temps o canvis d'horari.</li>
+      <li>Possibilitat de compartir trajecte quan siga segur i viable.</li>
+    </ul>
+    {% else %}
+    <p>Registra durante unas semanas el coste real del desplazamiento. Incluye combustible, peajes, aparcamiento, transporte público, comidas fuera y posibles pernoctaciones.</p>
+    <p>También conviene anotar el tiempo total desde que sales de casa hasta que vuelves. Esta información permite comparar alternativas con datos reales y detectar si una opción aparentemente barata genera demasiado cansancio u horas improductivas.</p>
+    <ul>
+      <li>Coste diario y mensual aproximado.</li>
+      <li>Tiempo de ida y vuelta.</li>
+      <li>Días con incidencias o retrasos.</li>
+      <li>Gasto extraordinario por mal tiempo o cambios de horario.</li>
+      <li>Posibilidad de compartir trayecto cuando sea seguro y viable.</li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Cansament i seguretat{% else %}Cansancio y seguridad{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>La fatiga forma part del cost del desplaçament. Si el trajecte és llarg, evita acumular tasques que pugues fer en un altre moment i planifica pauses quan siguen necessàries.</p>
+    <ul>
+      <li>No conduïsques si notes somnolència o falta de concentració.</li>
+      <li>Adapta l'eixida a les condicions meteorològiques.</li>
+      <li>Informa una persona de confiança si el recorregut és nou o especialment llarg.</li>
+      <li>Mantín el telèfon amb bateria per a incidències.</li>
+      <li>No publiques rutines, horaris o allotjaments amb detall en xarxes obertes.</li>
+      <li>Protegix les dades personals i professionals que portes amb tu.</li>
+    </ul>
+    {% else %}
+    <p>La fatiga forma parte del coste del desplazamiento. Si el trayecto es largo, evita acumular tareas que puedas hacer en otro momento y planifica descansos cuando sean necesarios.</p>
+    <ul>
+      <li>No conduzcas si notas somnolencia o falta de concentración.</li>
+      <li>Adapta la salida a las condiciones meteorológicas.</li>
+      <li>Informa a una persona de confianza si el recorrido es nuevo o especialmente largo.</li>
+      <li>Mantén el teléfono con batería para incidencias.</li>
+      <li>No publiques rutinas, horarios o alojamientos con detalle en redes abiertas.</li>
+      <li>Protege los datos personales y profesionales que llevas contigo.</li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Llista de comprovació la nit anterior{% else %}Lista de comprobación la noche anterior{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ul>
+      <li>Has revisat l'horari i les sessions del dia.</li>
+      <li>La ruta i l'hora d'eixida estan comprovades.</li>
+      <li>El vehicle té combustible o càrrega suficient, o tens el bitllet preparat.</li>
+      <li>Els dispositius estan carregats.</li>
+      <li>Portes només els materials necessaris.</li>
+      <li>El menjar i l'aigua estan preparats.</li>
+      <li>Has revisat la previsió meteorològica.</li>
+      <li>La documentació sensible està protegida.</li>
+      <li>Tens una alternativa davant d'una incidència de transport.</li>
+    </ul>
+    {% else %}
+    <ul>
+      <li>Has revisado el horario y las sesiones del día.</li>
+      <li>La ruta y la hora de salida están comprobadas.</li>
+      <li>El vehículo tiene combustible o carga suficiente, o tienes el billete preparado.</li>
+      <li>Los dispositivos están cargados.</li>
+      <li>Llevas solo los materiales necesarios.</li>
+      <li>La comida y el agua están preparadas.</li>
+      <li>Has revisado la previsión meteorológica.</li>
+      <li>La documentación sensible está protegida.</li>
+      <li>Tienes una alternativa ante una incidencia de transporte.</li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Abans d'eixir del centre{% else %}Antes de salir del centro{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ul>
+      <li>Recull carregadors, adaptadors, claus i documentació.</li>
+      <li>Comprova que no deixes dades personals visibles.</li>
+      <li>Separa els documents que han de tornar a casa.</li>
+      <li>Revisa el material necessari per a l'endemà.</li>
+      <li>Consulta possibles canvis d'horari o reunions.</li>
+      <li>Guarda els dispositius abans de començar el trajecte.</li>
+    </ul>
+    {% else %}
+    <ul>
+      <li>Recoge cargadores, adaptadores, llaves y documentación.</li>
+      <li>Comprueba que no dejas datos personales visibles.</li>
+      <li>Separa los documentos que deben volver a casa.</li>
+      <li>Revisa el material necesario para el día siguiente.</li>
+      <li>Consulta posibles cambios de horario o reuniones.</li>
+      <li>Guarda los dispositivos antes de comenzar el trayecto.</li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Criteri final{% else %}Criterio final{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Una bona organització reduïx decisions repetides. Prepara una base estable, adapta-la a l'horari de cada dia i elimina el que no utilitzes després d'unes setmanes.</p>
+    <p>El millor recurs no és el que permet portar més coses, sinó el que ajuda a arribar amb temps, treballar amb seguretat i tornar amb una càrrega física i mental assumible.</p>
+    {% else %}
+    <p>Una buena organización reduce decisiones repetidas. Prepara una base estable, adáptala al horario de cada día y elimina lo que no utilizas después de unas semanas.</p>
+    <p>El mejor recurso no es el que permite llevar más cosas, sino el que ayuda a llegar con tiempo, trabajar con seguridad y volver con una carga física y mental asumible.</p>
+    {% endif %}
+
+    <div class="stack-actions">
+      <a
+        class="button button--ghost"
+        href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}"
+      >
+        {% if current_lang == 'va' %}Tornar a recursos per a docents{% else %}Volver a recursos para docentes{% endif %}
+      </a>
+    </div>
+  </section>
+</section>
+{% endblock %}

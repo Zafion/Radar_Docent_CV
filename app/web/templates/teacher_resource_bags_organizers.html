@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">
+      {% if current_lang == 'va' %}
+      Guia pràctica per a personal docent
+      {% else %}
+      Guía práctica para personal docente
+      {% endif %}
+    </p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="{% if current_lang == 'va' %}/va{% else %}/{% endif %}">
+      {% if current_lang == 'va' %}Inici{% else %}Inicio{% endif %}
+    </a>
+    <span>›</span>
+    <a href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}">
+      {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+    </a>
+    <span>›</span>
+    {% if current_lang == 'va' %}Motxilles i organitzadors{% else %}Mochilas y organizadores{% endif %}
+  </div>
+
+  <article class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>
+          {% if current_lang == 'va' %}
+          Motxilles, bosses i organitzadors per a docents
+          {% else %}
+          Mochilas, bolsas y organizadores para docentes
+          {% endif %}
+        </h1>
+        <p>
+          {% if current_lang == 'va' %}
+          Com triar una opció còmoda i pràctica segons el material que transportes, la grandària del portàtil i la manera d'arribar al centre.
+          {% else %}
+          Cómo elegir una opción cómoda y práctica según el material que transportas, el tamaño del portátil y la forma de llegar al centro.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <p class="panel-card__meta">
+      {% if current_lang == 'va' %}Publicat el 20 de juliol de 2026{% else %}Publicado el 20 de julio de 2026{% endif %}
+    </p>
+
+    <p class="panel-card__hint">
+      {% if current_lang == 'va' %}
+      La millor opció no és necessàriament la que té més capacitat o compartiments. Ha de permetre transportar el que utilitzes de veritat sense afegir pes ni volum innecessari.
+      {% else %}
+      La mejor opción no es necesariamente la que tiene más capacidad o compartimentos. Debe permitir transportar lo que utilizas de verdad sin añadir peso ni volumen innecesario.
+      {% endif %}
+    </p>
+  </article>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Abans de triar: revisa què transportes{% else %}Antes de elegir: revisa qué transportas{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Durant uns dies, anota què portes realment al centre. Això evita comprar una motxilla massa gran o una bossa que no admeta el pes habitual.</p>
+    <ul>
+      <li>Portàtil o tauleta i grandària exacta de la pantalla.</li>
+      <li>Carregador, ratolí, adaptadors i bateria externa.</li>
+      <li>Carpetes, quaderns, agenda i documents en format A4.</li>
+      <li>Estoig, claus, identificació i objectes personals.</li>
+      <li>Aigua, menjar o roba lleugera quan la jornada ho requerisca.</li>
+    </ul>
+    <p class="panel-card__hint">Mesura el portàtil amb la funda posada. Una bossa anunciada per a 15,6 polzades pot quedar ajustada si l'equip és gros o porta una protecció addicional.</p>
+    {% else %}
+    <p>Durante unos días, anota qué llevas realmente al centro. Esto evita comprar una mochila demasiado grande o una bolsa que no admita el peso habitual.</p>
+    <ul>
+      <li>Portátil o tableta y tamaño exacto de la pantalla.</li>
+      <li>Cargador, ratón, adaptadores y batería externa.</li>
+      <li>Carpetas, cuadernos, agenda y documentos en formato A4.</li>
+      <li>Estuche, llaves, identificación y objetos personales.</li>
+      <li>Agua, comida o ropa ligera cuando la jornada lo requiera.</li>
+    </ul>
+    <p class="panel-card__hint">Mide el portátil con la funda puesta. Una bolsa anunciada para 15,6 pulgadas puede quedar ajustada si el equipo es grueso o lleva una protección adicional.</p>
+    {% endif %}
+  </section>
+
+  <div class="module-grid">
+    <section class="panel-card">
+      <div class="panel-card__title">
+        <span class="panel-card__emoji">🎒</span>
+        <h2>{% if current_lang == 'va' %}Motxilla{% else %}Mochila{% endif %}</h2>
+      </div>
+      {% if current_lang == 'va' %}
+      <p>Reparteix millor el pes i deixa les mans lliures. Sol ser la millor opció per a caminar, usar transport públic o portar un portàtil cada dia.</p>
+      <h3>Convé quan</h3>
+      <ul>
+        <li>El trajecte a peu és llarg.</li>
+        <li>Transportes més d'un quilo de manera habitual.</li>
+        <li>Necessites espai separat per a tecnologia i documents.</li>
+      </ul>
+      <h3>Revisa</h3>
+      <ul>
+        <li>Tirants amples i regulables.</li>
+        <li>Esquena amb una estructura mínima.</li>
+        <li>Base estable i compartiment protegit per al portàtil.</li>
+      </ul>
+      {% else %}
+      <p>Reparte mejor el peso y deja las manos libres. Suele ser la mejor opción para caminar, usar transporte público o llevar un portátil cada día.</p>
+      <h3>Conviene cuando</h3>
+      <ul>
+        <li>El trayecto a pie es largo.</li>
+        <li>Transportas más de un kilo de forma habitual.</li>
+        <li>Necesitas espacio separado para tecnología y documentos.</li>
+      </ul>
+      <h3>Revisa</h3>
+      <ul>
+        <li>Tirantes anchos y regulables.</li>
+        <li>Espalda con una estructura mínima.</li>
+        <li>Base estable y compartimento protegido para el portátil.</li>
+      </ul>
+      {% endif %}
+    </section>
+
+    <section class="panel-card">
+      <div class="panel-card__title">
+        <span class="panel-card__emoji">💼</span>
+        <h2>{% if current_lang == 'va' %}Bossa o maletí{% else %}Bolsa o maletín{% endif %}</h2>
+      </div>
+      {% if current_lang == 'va' %}
+      <p>Permet accedir ràpidament als documents i pot resultar còmode quan el trajecte és curt o la càrrega és lleugera.</p>
+      <h3>Convé quan</h3>
+      <ul>
+        <li>Portes principalment una carpeta i un dispositiu lleuger.</li>
+        <li>Et desplaces en cotxe i camines poca distància.</li>
+        <li>Necessites obrir i guardar documents amb freqüència.</li>
+      </ul>
+      <h3>Revisa</h3>
+      <ul>
+        <li>Bandolera ampla i desmuntable.</li>
+        <li>Nanses resistents i cremalleres accessibles.</li>
+        <li>Que no concentre massa pes en un sol muscle.</li>
+      </ul>
+      {% else %}
+      <p>Permite acceder rápidamente a los documentos y puede resultar cómoda cuando el trayecto es corto o la carga es ligera.</p>
+      <h3>Conviene cuando</h3>
+      <ul>
+        <li>Llevas principalmente una carpeta y un dispositivo ligero.</li>
+        <li>Te desplazas en coche y caminas poca distancia.</li>
+        <li>Necesitas abrir y guardar documentos con frecuencia.</li>
+      </ul>
+      <h3>Revisa</h3>
+      <ul>
+        <li>Bandolera ancha y desmontable.</li>
+        <li>Asas resistentes y cremalleras accesibles.</li>
+        <li>Que no concentre demasiado peso en un solo hombro.</li>
+      </ul>
+      {% endif %}
+    </section>
+
+    <section class="panel-card">
+      <div class="panel-card__title">
+        <span class="panel-card__emoji">🛞</span>
+        <h2>{% if current_lang == 'va' %}Carro{% else %}Carro{% endif %}</h2>
+      </div>
+      {% if current_lang == 'va' %}
+      <p>Evita carregar el pes a l'esquena, però només compensa quan transportes molt de material i el recorregut és accessible.</p>
+      <h3>Convé quan</h3>
+      <ul>
+        <li>Portes llibres, dossiers o material pesant de manera habitual.</li>
+        <li>El centre té ascensor i accessos sense escales.</li>
+        <li>No necessites pujar sovint al transport públic.</li>
+      </ul>
+      <h3>Revisa</h3>
+      <ul>
+        <li>Pes del carro buit.</li>
+        <li>Grandària de les rodes i estabilitat.</li>
+        <li>Comportament en voreres, escales i dies de pluja.</li>
+      </ul>
+      {% else %}
+      <p>Evita cargar el peso en la espalda, pero solo compensa cuando transportas mucho material y el recorrido es accesible.</p>
+      <h3>Conviene cuando</h3>
+      <ul>
+        <li>Llevas libros, dosieres o material pesado de forma habitual.</li>
+        <li>El centro tiene ascensor y accesos sin escaleras.</li>
+        <li>No necesitas subir con frecuencia al transporte público.</li>
+      </ul>
+      <h3>Revisa</h3>
+      <ul>
+        <li>Peso del carro vacío.</li>
+        <li>Tamaño de las ruedas y estabilidad.</li>
+        <li>Comportamiento en aceras, escaleras y días de lluvia.</li>
+      </ul>
+      {% endif %}
+    </section>
+
+    <section class="panel-card">
+      <div class="panel-card__title">
+        <span class="panel-card__emoji">🧩</span>
+        <h2>{% if current_lang == 'va' %}Organitzadors interiors{% else %}Organizadores interiores{% endif %}</h2>
+      </div>
+      {% if current_lang == 'va' %}
+      <p>Permeten adaptar una motxilla o bossa senzilla i traslladar el material entre diferents equipatges sense reorganitzar-ho tot.</p>
+      <h3>Resulten útils per a</h3>
+      <ul>
+        <li>Separar carregadors i adaptadors.</li>
+        <li>Protegir documents i certificats.</li>
+        <li>Agrupar material d'escriptura.</li>
+        <li>Mantindre menjar i líquids lluny de l'electrònica.</li>
+      </ul>
+      <p class="panel-card__hint">Evita omplir cada buit amb un estoig. Massa organitzadors també augmenten el pes i dificulten trobar les coses.</p>
+      {% else %}
+      <p>Permiten adaptar una mochila o bolsa sencilla y trasladar el material entre distintos equipajes sin reorganizarlo todo.</p>
+      <h3>Resultan útiles para</h3>
+      <ul>
+        <li>Separar cargadores y adaptadores.</li>
+        <li>Proteger documentos y certificados.</li>
+        <li>Agrupar material de escritura.</li>
+        <li>Mantener comida y líquidos lejos de la electrónica.</li>
+      </ul>
+      <p class="panel-card__hint">Evita llenar cada hueco con un estuche. Demasiados organizadores también aumentan el peso y dificultan encontrar las cosas.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Set criteris que sí importen{% else %}Siete criterios que sí importan{% endif %}</h2>
+      </div>
+    </div>
+    <div class="module-grid">
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}1. Pes en buit{% else %}1. Peso en vacío{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Una motxilla robusta però pesada pot resultar incòmoda abans d'afegir el portàtil i els documents.{% else %}Una mochila robusta pero pesada puede resultar incómoda antes de añadir el portátil y los documentos.{% endif %}</p>
+      </article>
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}2. Grandària real{% else %}2. Tamaño real{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Comprova dimensions interiors, no sols les polzades anunciades per al portàtil.{% else %}Comprueba dimensiones interiores, no solo las pulgadas anunciadas para el portátil.{% endif %}</p>
+      </article>
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}3. Comoditat{% else %}3. Comodidad{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Valora tirants, nanses i repartiment de la càrrega amb el pes que utilitzaràs cada dia.{% else %}Valora tirantes, asas y reparto de la carga con el peso que utilizarás cada día.{% endif %}</p>
+      </article>
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}4. Protecció{% else %}4. Protección{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}El portàtil no ha de descansar directament sobre la base ni compartir compartiment amb objectes durs.{% else %}El portátil no debe descansar directamente sobre la base ni compartir compartimento con objetos duros.{% endif %}</p>
+      </article>
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}5. Accés{% else %}5. Acceso{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Els objectes d'ús freqüent han de poder-se guardar sense obrir tot l'equipatge.{% else %}Los objetos de uso frecuente deben poder guardarse sin abrir todo el equipaje.{% endif %}</p>
+      </article>
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}6. Pluja i neteja{% else %}6. Lluvia y limpieza{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Busca un teixit fàcil de netejar i una protecció raonable; impermeable no sempre significa que les cremalleres també ho siguen.{% else %}Busca un tejido fácil de limpiar y una protección razonable; impermeable no siempre significa que las cremalleras también lo sean.{% endif %}</p>
+      </article>
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}7. Durabilitat reparable{% else %}7. Durabilidad reparable{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Cremalleres comunes, costures accessibles i peces senzilles poden allargar més la vida útil que molts accessoris decoratius.{% else %}Cremalleras comunes, costuras accesibles y piezas sencillas pueden alargar más la vida útil que muchos accesorios decorativos.{% endif %}</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Quina configuració encaixa amb cada situació{% else %}Qué configuración encaja con cada situación{% endif %}</h2>
+      </div>
+    </div>
+    <div class="module-grid">
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}Mateix centre i càrrega lleugera{% else %}Mismo centro y carga ligera{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Bossa compacta o motxilla lleugera, carpeta fina i un únic estoig per a accessoris.{% else %}Bolsa compacta o mochila ligera, carpeta fina y un único estuche para accesorios.{% endif %}</p>
+      </article>
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}Portàtil i documents cada dia{% else %}Portátil y documentos cada día{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Motxilla amb compartiment elevat per al portàtil, espai A4 i un organitzador tecnològic menut.{% else %}Mochila con compartimento elevado para el portátil, espacio A4 y un organizador tecnológico pequeño.{% endif %}</p>
+      </article>
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}Diverses aules o centres{% else %}Varias aulas o centros{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Motxilla còmoda amb mòduls separats que permeten agafar només el material necessari per a cada sessió.{% else %}Mochila cómoda con módulos separados que permitan coger solo el material necesario para cada sesión.{% endif %}</p>
+      </article>
+      <article class="panel-card">
+        <h3>{% if current_lang == 'va' %}Desplaçament habitual en cotxe{% else %}Desplazamiento habitual en coche{% endif %}</h3>
+        <p>{% if current_lang == 'va' %}Bossa o motxilla principal per als objectes valuosos i una caixa estable al maleter per al material menys sensible.{% else %}Bolsa o mochila principal para los objetos valiosos y una caja estable en el maletero para el material menos sensible.{% endif %}</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Prova abans de decidir{% else %}Prueba antes de decidir{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ol>
+      <li>Col·loca dins tot el que transportes en un dia habitual.</li>
+      <li>Comprova que el portàtil entra i ix sense forçar la cremallera.</li>
+      <li>Camina almenys deu minuts amb la càrrega completa.</li>
+      <li>Seu, puja escales i simula l'accés al transport públic o al cotxe.</li>
+      <li>Obri la carpeta, el carregador i les claus sense buidar la resta.</li>
+    </ol>
+    <p>Una opció adequada ha de continuar sent còmoda quan està plena. La sensació amb la motxilla buida aporta poca informació.</p>
+    {% else %}
+    <ol>
+      <li>Coloca dentro todo lo que transportas en un día habitual.</li>
+      <li>Comprueba que el portátil entra y sale sin forzar la cremallera.</li>
+      <li>Camina al menos diez minutos con la carga completa.</li>
+      <li>Siéntate, sube escaleras y simula el acceso al transporte público o al coche.</li>
+      <li>Abre la carpeta, el cargador y las llaves sin vaciar el resto.</li>
+    </ol>
+    <p>Una opción adecuada debe seguir siendo cómoda cuando está llena. La sensación con la mochila vacía aporta poca información.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Llista ràpida de comprovació{% else %}Lista rápida de comprobación{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ul>
+      <li>☐ El portàtil cap amb la seua funda.</li>
+      <li>☐ Els documents A4 no es dobleguen.</li>
+      <li>☐ El pes buit és raonable.</li>
+      <li>☐ La càrrega queda estable i ben repartida.</li>
+      <li>☐ Puc separar líquids i menjar de l'electrònica.</li>
+      <li>☐ Arribe a les claus i a la identificació amb facilitat.</li>
+      <li>☐ El material exterior es pot netejar.</li>
+      <li>☐ La grandària encaixa amb el meu transport habitual.</li>
+    </ul>
+    {% else %}
+    <ul>
+      <li>☐ El portátil cabe con su funda.</li>
+      <li>☐ Los documentos A4 no se doblan.</li>
+      <li>☐ El peso vacío es razonable.</li>
+      <li>☐ La carga queda estable y bien repartida.</li>
+      <li>☐ Puedo separar líquidos y comida de la electrónica.</li>
+      <li>☐ Llego a las llaves y a la identificación con facilidad.</li>
+      <li>☐ El material exterior se puede limpiar.</li>
+      <li>☐ El tamaño encaja con mi transporte habitual.</li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Continua amb les guies{% else %}Continúa con las guías{% endif %}</h2>
+        <p>
+          {% if current_lang == 'va' %}
+          Consulta la guia del primer dia i les pròximes guies sobre material, organització i tecnologia.
+          {% else %}
+          Consulta la guía del primer día y las próximas guías sobre material, organización y tecnología.
+          {% endif %}
+        </p>
+      </div>
+      <a
+        class="button button--secondary"
+        href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}"
+      >
+        {% if current_lang == 'va' %}Veure tots els recursos{% else %}Ver todos los recursos{% endif %}
+      </a>
+    </div>
+  </section>
+</section>
+{% endblock %}

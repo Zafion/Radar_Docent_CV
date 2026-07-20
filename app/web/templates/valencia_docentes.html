@@ -105,6 +105,29 @@
       </article>
     </div>
   </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <p class="eyebrow">
+          {% if current_lang == 'va' %}Guies pràctiques{% else %}Guías prácticas{% endif %}
+        </p>
+        <h2>
+          {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+        </h2>
+        <p>
+          {% if current_lang == 'va' %}
+          Consulta guies sobre organització, material, tecnologia i desplaçaments per a personal docent interí.
+          {% else %}
+          Consulta guías sobre organización, material, tecnología y desplazamientos para personal docente interino.
+          {% endif %}
+        </p>
+      </div>
+      <a class="button button--secondary" href="/recursos-docentes">
+        {% if current_lang == 'va' %}Explorar recursos{% else %}Explorar recursos{% endif %}
+      </a>
+    </div>
+  </section>
 </section>
 {% endblock %}
 

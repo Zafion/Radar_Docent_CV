@@ -41,6 +41,32 @@
       </div>
     </section>
 
+    <section
+      class="public-alerts-entry"
+      aria-label="{% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}"
+    >
+      <div>
+        <p class="eyebrow">
+          {% if current_lang == 'va' %}Guies pràctiques{% else %}Guías prácticas{% endif %}
+        </p>
+        <h2>
+          {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+        </h2>
+        <p>
+          {% if current_lang == 'va' %}
+          Guies sobre organització, material, tecnologia i desplaçaments pensades per a personal docent interí.
+          {% else %}
+          Guías sobre organización, material, tecnología y desplazamientos pensadas para personal docente interino.
+          {% endif %}
+        </p>
+      </div>
+      <div class="public-alerts-entry__actions">
+        <a class="button button--secondary" href="/recursos-docentes">
+          {% if current_lang == 'va' %}Veure recursos{% else %}Ver recursos{% endif %}
+        </a>
+      </div>
+    </section>
+
   </div>
 </section>
 {% endblock %}

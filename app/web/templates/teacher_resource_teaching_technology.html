@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">
+      {% if current_lang == 'va' %}
+      Guia pràctica de tecnologia per al treball docent
+      {% else %}
+      Guía práctica de tecnología para el trabajo docente
+      {% endif %}
+    </p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="{% if current_lang == 'va' %}/va{% else %}/{% endif %}">
+      {% if current_lang == 'va' %}Inici{% else %}Inicio{% endif %}
+    </a>
+    <span>›</span>
+    <a href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}">
+      {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+    </a>
+    <span>›</span>
+    {% if current_lang == 'va' %}Tecnologia per a preparar classes{% else %}Tecnología para preparar clases{% endif %}
+  </div>
+
+  <article class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>
+          {% if current_lang == 'va' %}
+          Tecnologia útil per a preparar classes i corregir treballs
+          {% else %}
+          Tecnología útil para preparar clases y corregir trabajos
+          {% endif %}
+        </h1>
+        <p>
+          {% if current_lang == 'va' %}
+          Eines i accessoris que poden facilitar la preparació, la correcció i el treball a l'aula sense convertir la motxilla en una botiga d'electrònica.
+          {% else %}
+          Herramientas y accesorios que pueden facilitar la preparación, la corrección y el trabajo en el aula sin convertir la mochila en una tienda de electrónica.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <p class="panel-card__meta">
+      {% if current_lang == 'va' %}Publicat el 23 de juliol de 2026{% else %}Publicado el 23 de julio de 2026{% endif %}
+    </p>
+
+    <p class="panel-card__hint">
+      {% if current_lang == 'va' %}
+      La tecnologia útil és la que resol un problema repetit: connectar-se a una pantalla, treballar amb comoditat, recuperar un arxiu o evitar quedar-se sense bateria. No cal comprar-ho tot ni portar-ho cada dia.
+      {% else %}
+      La tecnología útil es la que resuelve un problema repetido: conectarse a una pantalla, trabajar con comodidad, recuperar un archivo o evitar quedarse sin batería. No hace falta comprarlo todo ni llevarlo cada día.
+      {% endif %}
+    </p>
+  </article>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Comença per les tasques, no pels dispositius{% else %}Empieza por las tareas, no por los dispositivos{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Abans de triar cap accessori, anota quines tasques fas de manera habitual i on apareixen les dificultats. Per exemple:</p>
+    <ul>
+      <li>Preparar presentacions, fitxes o materials a casa.</li>
+      <li>Corregir documents, formularis o treballs digitals.</li>
+      <li>Projectar contingut en aules amb connexions diferents.</li>
+      <li>Escanejar o fotografiar exercicis i documents.</li>
+      <li>Moure arxius entre ordinadors sense perdre versions.</li>
+      <li>Treballar en una sala de professorat amb poc espai.</li>
+      <li>Continuar treballant quan no hi ha una connexió estable.</li>
+    </ul>
+    <p>Una compra té sentit quan elimina una dificultat concreta i recurrent. Si només resol una situació excepcional, pot ser millor demanar el material al centre o utilitzar una alternativa temporal.</p>
+    {% else %}
+    <p>Antes de elegir ningún accesorio, anota qué tareas haces de forma habitual y dónde aparecen las dificultades. Por ejemplo:</p>
+    <ul>
+      <li>Preparar presentaciones, fichas o materiales en casa.</li>
+      <li>Corregir documentos, formularios o trabajos digitales.</li>
+      <li>Proyectar contenido en aulas con conexiones diferentes.</li>
+      <li>Escanear o fotografiar ejercicios y documentos.</li>
+      <li>Mover archivos entre ordenadores sin perder versiones.</li>
+      <li>Trabajar en una sala de profesores con poco espacio.</li>
+      <li>Continuar trabajando cuando no hay una conexión estable.</li>
+    </ul>
+    <p>Una compra tiene sentido cuando elimina una dificultad concreta y recurrente. Si solo resuelve una situación excepcional, puede ser mejor pedir el material al centro o utilizar una alternativa temporal.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Per a preparar classes amb comoditat{% else %}Para preparar clases con comodidad{% endif %}</h2>
+        <p>
+          {% if current_lang == 'va' %}
+          Una postura millor i un espai ordenat solen aportar més que un dispositiu nou.
+          {% else %}
+          Una postura mejor y un espacio ordenado suelen aportar más que un dispositivo nuevo.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <div class="module-grid">
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">💻</span>
+          <h3>{% if current_lang == 'va' %}Suport per a portàtil{% else %}Soporte para portátil{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <p>Elevar la pantalla pot reduir la inclinació del coll durant sessions llargues. Per a aprofitar-lo bé, combina'l amb teclat i ratolí externs.</p>
+        <p class="panel-card__hint">Un suport plegable és més fàcil de transportar; un model estable i regulable és millor per a un lloc de treball fix.</p>
+        {% else %}
+        <p>Elevar la pantalla puede reducir la inclinación del cuello durante sesiones largas. Para aprovecharlo bien, combínalo con teclado y ratón externos.</p>
+        <p class="panel-card__hint">Un soporte plegable es más fácil de transportar; un modelo estable y regulable es mejor para un puesto de trabajo fijo.</p>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">⌨️</span>
+          <h3>{% if current_lang == 'va' %}Teclat i ratolí{% else %}Teclado y ratón{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <p>Són especialment útils quan redactes informes, prepares materials o corregeixes durant moltes hores. Prioritza una connexió fiable i un format que no ocupe massa espai.</p>
+        <p class="panel-card__hint">Si els utilitzes en diversos equips, comprova com canvien de dispositiu i si depenen d'un receptor USB que pugues perdre.</p>
+        {% else %}
+        <p>Son especialmente útiles cuando redactas informes, preparas materiales o corriges durante muchas horas. Prioriza una conexión fiable y un formato que no ocupe demasiado espacio.</p>
+        <p class="panel-card__hint">Si los utilizas en varios equipos, comprueba cómo cambian de dispositivo y si dependen de un receptor USB que puedas perder.</p>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🖥️</span>
+          <h3>{% if current_lang == 'va' %}Segona pantalla{% else %}Segunda pantalla{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <p>En un espai de treball fix permet consultar fonts en una pantalla i editar el material en l'altra. És útil per a comparar documents, corregir rúbriques o preparar presentacions.</p>
+        <p class="panel-card__hint">Una pantalla portàtil només compensa si realment treballes sovint fora de casa i disposes d'espai per a utilitzar-la.</p>
+        {% else %}
+        <p>En un espacio de trabajo fijo permite consultar fuentes en una pantalla y editar el material en la otra. Es útil para comparar documentos, corregir rúbricas o preparar presentaciones.</p>
+        <p class="panel-card__hint">Una pantalla portátil solo compensa si realmente trabajas a menudo fuera de casa y dispones de espacio para utilizarla.</p>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🔌</span>
+          <h3>{% if current_lang == 'va' %}Carregador en el lloc de treball{% else %}Cargador en el puesto de trabajo{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <p>Disposar d'un segon carregador compatible en el lloc on treballes habitualment evita muntar i desmuntar cables cada dia.</p>
+        <p class="panel-card__hint">Comprova potència, connector i compatibilitat. Un carregador amb poca potència pot carregar lentament o no mantindre el dispositiu durant l'ús.</p>
+        {% else %}
+        <p>Disponer de un segundo cargador compatible en el lugar donde trabajas habitualmente evita montar y desmontar cables cada día.</p>
+        <p class="panel-card__hint">Comprueba potencia, conector y compatibilidad. Un cargador con poca potencia puede cargar lentamente o no mantener el dispositivo durante el uso.</p>
+        {% endif %}
+      </article>
+    </div>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Connexió a pantalles i projectors{% else %}Conexión a pantallas y proyectores{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Els centres poden tindre projectors, monitors o pissarres digitals de generacions diferents. El primer pas és identificar les eixides del teu ordinador i les entrades que utilitza el centre.</p>
+    <ul>
+      <li><strong>HDMI:</strong> és la connexió més habitual per a imatge i so.</li>
+      <li><strong>USB-C:</strong> no tots els ports USB-C transmeten vídeo; comprova les especificacions del dispositiu.</li>
+      <li><strong>DisplayPort o Mini DisplayPort:</strong> apareixen en alguns equips i monitors.</li>
+      <li><strong>VGA:</strong> encara pot trobar-se en instal·lacions antigues i només transmet imatge.</li>
+    </ul>
+    <p>Un adaptador o concentrador pot resoldre diverses connexions, però convé provar-lo abans d'una classe important. Porta també una còpia local de la presentació i, quan siga possible, una versió en PDF.</p>
+    <p class="panel-card__hint">No connectes un adaptador desconegut per primera vegada just abans d'una sessió. Prova imatge, so, resolució i reproducció de vídeo amb antelació.</p>
+    {% else %}
+    <p>Los centros pueden tener proyectores, monitores o pizarras digitales de generaciones diferentes. El primer paso es identificar las salidas de tu ordenador y las entradas que utiliza el centro.</p>
+    <ul>
+      <li><strong>HDMI:</strong> es la conexión más habitual para imagen y sonido.</li>
+      <li><strong>USB-C:</strong> no todos los puertos USB-C transmiten vídeo; comprueba las especificaciones del dispositivo.</li>
+      <li><strong>DisplayPort o Mini DisplayPort:</strong> aparecen en algunos equipos y monitores.</li>
+      <li><strong>VGA:</strong> todavía puede encontrarse en instalaciones antiguas y solo transmite imagen.</li>
+    </ul>
+    <p>Un adaptador o concentrador puede resolver varias conexiones, pero conviene probarlo antes de una clase importante. Lleva también una copia local de la presentación y, cuando sea posible, una versión en PDF.</p>
+    <p class="panel-card__hint">No conectes un adaptador desconocido por primera vez justo antes de una sesión. Prueba imagen, sonido, resolución y reproducción de vídeo con antelación.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Per a corregir treballs i anotar documents{% else %}Para corregir trabajos y anotar documentos{% endif %}</h2>
+      </div>
+    </div>
+
+    <div class="module-grid">
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🖊️</span>
+          <h3>{% if current_lang == 'va' %}Tauleta amb llapis{% else %}Tableta con lápiz{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <p>Pot agilitzar anotacions sobre PDF, rúbriques, esquemes i correccions manuscrites. Té més sentit quan ja treballes amb documents digitals i el llapis s'integra en el teu flux habitual.</p>
+        <p class="panel-card__hint">Comprova que el llapis és compatible, que ofereix una escriptura precisa i que les aplicacions poden exportar el resultat en un format accessible.</p>
+        {% else %}
+        <p>Puede agilizar anotaciones sobre PDF, rúbricas, esquemas y correcciones manuscritas. Tiene más sentido cuando ya trabajas con documentos digitales y el lápiz se integra en tu flujo habitual.</p>
+        <p class="panel-card__hint">Comprueba que el lápiz es compatible, que ofrece una escritura precisa y que las aplicaciones pueden exportar el resultado en un formato accesible.</p>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">✍️</span>
+          <h3>{% if current_lang == 'va' %}Tauleta gràfica sense pantalla{% else %}Tableta gráfica sin pantalla{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <p>És una alternativa més econòmica per a escriure fórmules, dibuixar o anotar des de l'ordinador. Requereix un període d'adaptació perquè la mà treballa en una superfície i la mirada està en la pantalla.</p>
+        <p class="panel-card__hint">Resulta especialment útil en matèries que necessiten notació, esquemes o resolució de problemes en directe.</p>
+        {% else %}
+        <p>Es una alternativa más económica para escribir fórmulas, dibujar o anotar desde el ordenador. Requiere un periodo de adaptación porque la mano trabaja en una superficie y la mirada está en la pantalla.</p>
+        <p class="panel-card__hint">Resulta especialmente útil en materias que necesitan notación, esquemas o resolución de problemas en directo.</p>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🎧</span>
+          <h3>{% if current_lang == 'va' %}Auriculars amb micròfon{% else %}Auriculares con micrófono{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <p>Poden ajudar en tutories en línia, gravacions, reunions o correcció de treballs audiovisuals. Prioritza la claredat del micròfon i la comoditat durant sessions llargues.</p>
+        <p class="panel-card__hint">En espais compartits, comprova que no aïllen tant que impedisquen percebre avisos o persones pròximes.</p>
+        {% else %}
+        <p>Pueden ayudar en tutorías en línea, grabaciones, reuniones o corrección de trabajos audiovisuales. Prioriza la claridad del micrófono y la comodidad durante sesiones largas.</p>
+        <p class="panel-card__hint">En espacios compartidos, comprueba que no aíslan tanto que impidan percibir avisos o personas próximas.</p>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">⏱️</span>
+          <h3>{% if current_lang == 'va' %}Dreceres i automatització{% else %}Atajos y automatización{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <p>Abans de comprar un dispositiu, revisa si pots accelerar la correcció amb plantilles, comentaris reutilitzables, rúbriques, dreceres de teclat o formularis.</p>
+        <p class="panel-card__hint">Una millora de procés pot estalviar més temps que un accessori nou i funciona en qualsevol equip.</p>
+        {% else %}
+        <p>Antes de comprar un dispositivo, revisa si puedes acelerar la corrección con plantillas, comentarios reutilizables, rúbricas, atajos de teclado o formularios.</p>
+        <p class="panel-card__hint">Una mejora de proceso puede ahorrar más tiempo que un accesorio nuevo y funciona en cualquier equipo.</p>
+        {% endif %}
+      </article>
+    </div>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Digitalitzar apunts, exercicis i documents{% else %}Digitalizar apuntes, ejercicios y documentos{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Per a un ús ocasional, la càmera del telèfon i una aplicació d'escaneig poden ser suficients. Busca bona llum, col·loca el document pla i revisa que el text siga llegible abans d'eliminar l'original.</p>
+    <p>Un escàner dedicat pot tindre sentit quan digitalitzes moltes pàgines de manera repetida, necessites alimentació automàtica o vols un resultat homogeni. Un escàner portàtil només compensa si la mobilitat és una necessitat real.</p>
+    <ul>
+      <li>Exporta preferentment a PDF quan el document té diverses pàgines.</li>
+      <li>Utilitza noms d'arxiu descriptius i una estructura de carpetes coherent.</li>
+      <li>Comprova l'orientació, els marges i l'ordre de les pàgines.</li>
+      <li>Evita digitalitzar o guardar dades personals de l'alumnat en aplicacions no autoritzades.</li>
+    </ul>
+    {% else %}
+    <p>Para un uso ocasional, la cámara del teléfono y una aplicación de escaneo pueden ser suficientes. Busca buena luz, coloca el documento plano y revisa que el texto sea legible antes de eliminar el original.</p>
+    <p>Un escáner dedicado puede tener sentido cuando digitalizas muchas páginas de forma repetida, necesitas alimentación automática o quieres un resultado homogéneo. Un escáner portátil solo compensa si la movilidad es una necesidad real.</p>
+    <ul>
+      <li>Exporta preferentemente a PDF cuando el documento tiene varias páginas.</li>
+      <li>Utiliza nombres de archivo descriptivos y una estructura de carpetas coherente.</li>
+      <li>Comprueba la orientación, los márgenes y el orden de las páginas.</li>
+      <li>Evita digitalizar o guardar datos personales del alumnado en aplicaciones no autorizadas.</li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Bateria i alimentació{% else %}Batería y alimentación{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ul>
+      <li><strong>Carregador principal:</strong> porta'l quan no saps si tindràs accés a un endoll durant la jornada.</li>
+      <li><strong>Segon carregador:</strong> és útil si treballes habitualment en dos llocs i vols evitar oblits.</li>
+      <li><strong>Bateria externa:</strong> adequada per al telèfon, la tauleta o alguns portàtils compatibles, sempre que tinga prou potència.</li>
+      <li><strong>Cable curt de reserva:</strong> ocupa poc i resol fallades o oblits freqüents.</li>
+      <li><strong>Regleta compacta:</strong> pot ajudar en espais amb pocs endolls, però només si està en bon estat i el centre permet utilitzar-la.</li>
+    </ul>
+    <p>No deixes bateries externes exposades a temperatures altes dins del vehicle. Retira qualsevol carregador, cable o bateria que presente deformacions, olor estranya o sobrecalfament.</p>
+    {% else %}
+    <ul>
+      <li><strong>Cargador principal:</strong> llévalo cuando no sabes si tendrás acceso a un enchufe durante la jornada.</li>
+      <li><strong>Segundo cargador:</strong> es útil si trabajas habitualmente en dos lugares y quieres evitar olvidos.</li>
+      <li><strong>Batería externa:</strong> adecuada para el teléfono, la tableta o algunos portátiles compatibles, siempre que tenga suficiente potencia.</li>
+      <li><strong>Cable corto de reserva:</strong> ocupa poco y resuelve fallos u olvidos frecuentes.</li>
+      <li><strong>Regleta compacta:</strong> puede ayudar en espacios con pocos enchufes, pero solo si está en buen estado y el centro permite utilizarla.</li>
+    </ul>
+    <p>No dejes baterías externas expuestas a temperaturas altas dentro del vehículo. Retira cualquier cargador, cable o batería que presente deformaciones, olor extraño o sobrecalentamiento.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Arxius, còpies de seguretat i treball sense connexió{% else %}Archivos, copias de seguridad y trabajo sin conexión{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>La millor protecció no és portar moltes memòries, sinó saber on està la còpia principal i com recuperar-la. Utilitza un sistema coherent:</p>
+    <ol>
+      <li>Una carpeta principal ordenada per cursos, grups o projectes.</li>
+      <li>Una còpia de seguretat separada i actualitzada.</li>
+      <li>Sincronització només dels arxius que necessites en diversos dispositius.</li>
+      <li>Versions locals dels materials imprescindibles per a la classe.</li>
+      <li>Una exportació en PDF de presentacions o documents que puguen canviar de format.</li>
+    </ol>
+    <p>Una memòria USB pot ser una còpia de transport, però no ha de ser l'únic lloc on guardes el material. Xifra o evita portar informació sensible, i no connectes dispositius desconeguts als equips del centre.</p>
+    {% else %}
+    <p>La mejor protección no es llevar muchas memorias, sino saber dónde está la copia principal y cómo recuperarla. Utiliza un sistema coherente:</p>
+    <ol>
+      <li>Una carpeta principal ordenada por cursos, grupos o proyectos.</li>
+      <li>Una copia de seguridad separada y actualizada.</li>
+      <li>Sincronización solo de los archivos que necesitas en varios dispositivos.</li>
+      <li>Versiones locales de los materiales imprescindibles para la clase.</li>
+      <li>Una exportación en PDF de presentaciones o documentos que puedan cambiar de formato.</li>
+    </ol>
+    <p>Una memoria USB puede ser una copia de transporte, pero no debe ser el único lugar donde guardas el material. Cifra o evita llevar información sensible, y no conectes dispositivos desconocidos a los equipos del centro.</p>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Tres configuracions possibles{% else %}Tres configuraciones posibles{% endif %}</h2>
+      </div>
+    </div>
+
+    <div class="module-grid">
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🌱</span>
+          <h3>{% if current_lang == 'va' %}Configuració mínima{% else %}Configuración mínima{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Portàtil o tauleta que ja utilitzes.</li>
+          <li>Carregador i cable de reserva.</li>
+          <li>Adaptador de vídeo comprovat.</li>
+          <li>Còpia local dels materials.</li>
+          <li>Ratolí compacte, si et resulta més còmode.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Portátil o tableta que ya utilizas.</li>
+          <li>Cargador y cable de reserva.</li>
+          <li>Adaptador de vídeo comprobado.</li>
+          <li>Copia local de los materiales.</li>
+          <li>Ratón compacto, si te resulta más cómodo.</li>
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🏠</span>
+          <h3>{% if current_lang == 'va' %}Treball habitual a casa{% else %}Trabajo habitual en casa{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Suport estable per al portàtil.</li>
+          <li>Teclat i ratolí externs.</li>
+          <li>Monitor, si compares o edites molts documents.</li>
+          <li>Còpia de seguretat automàtica.</li>
+          <li>Auriculars amb micròfon, si fas reunions o gravacions.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Soporte estable para el portátil.</li>
+          <li>Teclado y ratón externos.</li>
+          <li>Monitor, si comparas o editas muchos documentos.</li>
+          <li>Copia de seguridad automática.</li>
+          <li>Auriculares con micrófono, si haces reuniones o grabaciones.</li>
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">✍️</span>
+          <h3>{% if current_lang == 'va' %}Correcció i anotació digital{% else %}Corrección y anotación digital{% endif %}</h3>
+        </div>
+        {% if current_lang == 'va' %}
+        <ul>
+          <li>Tauleta amb llapis o tauleta gràfica.</li>
+          <li>Aplicació que exporte a PDF.</li>
+          <li>Plantilles i rúbriques reutilitzables.</li>
+          <li>Organització clara de versions.</li>
+          <li>Protecció adequada de les dades de l'alumnat.</li>
+        </ul>
+        {% else %}
+        <ul>
+          <li>Tableta con lápiz o tableta gráfica.</li>
+          <li>Aplicación que exporte a PDF.</li>
+          <li>Plantillas y rúbricas reutilizables.</li>
+          <li>Organización clara de versiones.</li>
+          <li>Protección adecuada de los datos del alumnado.</li>
+        </ul>
+        {% endif %}
+      </article>
+    </div>
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Llista de comprovació abans d'una classe amb tecnologia{% else %}Lista de comprobación antes de una clase con tecnología{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <ul>
+      <li>El dispositiu té bateria suficient o portes el carregador.</li>
+      <li>L'adaptador correspon al port del teu equip i a la connexió de l'aula.</li>
+      <li>Has provat la presentació, el vídeo i el so.</li>
+      <li>Els arxius imprescindibles estan disponibles sense connexió.</li>
+      <li>Disposes d'una versió alternativa en PDF.</li>
+      <li>Has desactivat notificacions personals que puguen aparéixer en pantalla.</li>
+      <li>No mostraràs dades personals o documents que no corresponen a la sessió.</li>
+      <li>Tens una activitat alternativa si falla la connexió o l'equipament.</li>
+    </ul>
+    {% else %}
+    <ul>
+      <li>El dispositivo tiene batería suficiente o llevas el cargador.</li>
+      <li>El adaptador corresponde al puerto de tu equipo y a la conexión del aula.</li>
+      <li>Has probado la presentación, el vídeo y el sonido.</li>
+      <li>Los archivos imprescindibles están disponibles sin conexión.</li>
+      <li>Dispones de una versión alternativa en PDF.</li>
+      <li>Has desactivado notificaciones personales que puedan aparecer en pantalla.</li>
+      <li>No mostrarás datos personales o documentos que no correspondan a la sesión.</li>
+      <li>Tienes una actividad alternativa si falla la conexión o el equipamiento.</li>
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Criteri final{% else %}Criterio final{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>La millor configuració és la més senzilla que et permet treballar de manera fiable. Afig un accessori quan resolga una dificultat real, utilitza'l durant unes setmanes i revisa si ha reduït temps, errors o càrrega física.</p>
+    <p>Evita duplicar funcions que ja cobreix el teu equip i no bases una classe completa en una única connexió, aplicació o servei en línia. La tecnologia ha de donar suport al treball docent, no convertir-se en una dependència fràgil.</p>
+    {% else %}
+    <p>La mejor configuración es la más sencilla que te permite trabajar de forma fiable. Añade un accesorio cuando resuelva una dificultad real, utilízalo durante unas semanas y revisa si ha reducido tiempo, errores o carga física.</p>
+    <p>Evita duplicar funciones que ya cubre tu equipo y no bases una clase completa en una única conexión, aplicación o servicio en línea. La tecnología debe apoyar el trabajo docente, no convertirse en una dependencia frágil.</p>
+    {% endif %}
+
+    <div class="stack-actions">
+      <a
+        class="button button--ghost"
+        href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}"
+      >
+        {% if current_lang == 'va' %}Tornar a recursos per a docents{% else %}Volver a recursos para docentes{% endif %}
+      </a>
+    </div>
+  </section>
+</section>
+{% endblock %}
