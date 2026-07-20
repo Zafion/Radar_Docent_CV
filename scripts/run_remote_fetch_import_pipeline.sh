@@ -46,6 +46,19 @@ fi
   python run_update_position_lifecycle.py
 
   echo
+  if [[ "${ENABLE_NOTIFICATIONS:-0}" == "1" ]]; then
+    echo "5) Send notifications"
+    python run_send_notifications.py
+
+    echo
+    echo "6) Publish notifications"
+    python run_publish_notifications.py
+  else
+    echo "5) Notifications disabled"
+    echo "ENABLE_NOTIFICATIONS=${ENABLE_NOTIFICATIONS:-0}"
+  fi
+
+  echo
   echo "============================================================"
   echo "Finished at: $(date -Is)"
   echo "OK"

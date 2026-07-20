@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import argparse
 import hashlib
 import json
@@ -12,7 +12,6 @@ import re
 import shutil
 import sys
 import time
-from urllib.parse import urlparse
 
 import httpx
 
@@ -49,6 +48,28 @@ def read_json(path: Path, default: dict) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def should_retry_error(error_info: dict, retry_after: timedelta) -> bool:
+    last_error_at = parse_iso_datetime(error_info.get("last_error_at"))
+
+    if last_error_at is None:
+        return True
+
+    if last_error_at.tzinfo is None:
+        last_error_at = last_error_at.replace(tzinfo=timezone.utc)
+
+    return datetime.now(timezone.utc) - last_error_at >= retry_after
+
+
 def slugify(value: str) -> str:
     value = value.lower().strip()
     value = re.sub(r"[^\w\s-]", "", value, flags=re.UNICODE)
@@ -77,11 +98,6 @@ def hardlink_or_copy(source: Path, destination: Path) -> None:
         os.link(source, destination)
     except OSError:
         shutil.copy2(source, destination)
-
-
-def is_safe_relative_path(path_value: str) -> bool:
-    path = Path(path_value)
-    return not path.is_absolute() and ".." not in path.parts
 
 
 def download_asset(
@@ -169,6 +185,12 @@ def main() -> int:
         action="store_true",
         help="Redescarga URLs ya conocidas en la cache local.",
     )
+    parser.add_argument(
+        "--retry-download-errors-after-hours",
+        type=float,
+        default=24.0,
+        help="Horas antes de reintentar un PDF que falló al descargarse. Default: 24.",
+    )
 
     args = parser.parse_args()
 
@@ -190,12 +212,19 @@ def main() -> int:
         {
             "schema_version": 1,
             "assets_by_canonical_url": {},
+            "errors_by_canonical_url": {},
         },
     )
+
     assets_by_canonical_url: dict[str, dict] = state.setdefault(
         "assets_by_canonical_url",
         {},
     )
+    errors_by_canonical_url: dict[str, dict] = state.setdefault(
+        "errors_by_canonical_url",
+        {},
+    )
+    retry_error_after = timedelta(hours=args.retry_download_errors_after_hours)
 
     adapters = select_adapters(args.source_key)
 
@@ -272,6 +301,32 @@ def main() -> int:
                         source_summary["results"].append(result)
                         continue
 
+                    cached_error = errors_by_canonical_url.get(canonical_url)
+                    if (
+                        cached_error
+                        and not args.redownload_known
+                        and not should_retry_error(cached_error, retry_error_after)
+                    ):
+                        result = {
+                            "asset": asset_dict,
+                            "status": "download_error_cached",
+                            "sha256": None,
+                            "original_filename": cached_error.get(
+                                "original_filename",
+                                filename_from_url(canonical_url),
+                            ),
+                            "stored_filename": None,
+                            "relative_file_path": None,
+                            "content_type": None,
+                            "size_bytes": None,
+                            "downloaded_at": None,
+                            "error_message": cached_error.get("error_message"),
+                            "last_error_at": cached_error.get("last_error_at"),
+                        }
+                        processed_urls[canonical_url] = result
+                        source_summary["results"].append(result)
+                        continue
+
                     cached = assets_by_canonical_url.get(canonical_url)
                     cached_file_ok = False
 
@@ -321,6 +376,7 @@ def main() -> int:
                                 "size_bytes": downloaded["size_bytes"],
                                 "downloaded_at": downloaded["downloaded_at"],
                             }
+                            errors_by_canonical_url.pop(canonical_url, None)
 
                             result = {
                                 "asset": asset_dict,
@@ -339,6 +395,15 @@ def main() -> int:
                                 time.sleep(args.download_delay)
 
                         except Exception as exc:
+                            error_message = str(exc)
+                            errors_by_canonical_url[canonical_url] = {
+                                "last_error_at": utc_now_iso(),
+                                "error_message": error_message,
+                                "original_filename": filename_from_url(canonical_url),
+                                "title": asset.title,
+                                "url": asset.url,
+                            }
+
                             result = {
                                 "asset": asset_dict,
                                 "status": "download_error",
@@ -349,7 +414,7 @@ def main() -> int:
                                 "content_type": None,
                                 "size_bytes": None,
                                 "downloaded_at": None,
-                                "error_message": str(exc),
+                                "error_message": error_message,
                             }
 
                     processed_urls[canonical_url] = result
@@ -367,7 +432,11 @@ def main() -> int:
                     "cached_url_count": sum(1 for item in results if item["status"] == "cached_url"),
                     "same_run_duplicate_count": sum(1 for item in results if item["status"] == "same_run_duplicate"),
                     "non_downloadable_count": sum(1 for item in results if item["status"] == "non_downloadable"),
-                    "download_error_count": sum(1 for item in results if item["status"] == "download_error"),
+                    "download_error_count": sum(
+                        1
+                        for item in results
+                        if item["status"] in {"download_error", "download_error_cached"}
+                    ),
                 }
 
                 print(f"Assets descubiertos: {source_summary['counts']['discovered_assets_count']}")

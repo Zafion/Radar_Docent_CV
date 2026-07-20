@@ -139,7 +139,7 @@ def import_manifest(*, manifest_path: Path, incoming_dir: Path, data_dir: Path) 
                     source_summary["non_downloadable_count"] += 1
                     continue
 
-                if status == "download_error":
+                if status in {"download_error", "download_error_cached"}:
                     source_summary["download_error_count"] += 1
                     source_summary["non_downloadable_count"] += 1
                     continue
