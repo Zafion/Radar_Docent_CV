@@ -209,6 +209,34 @@ def spanish_language_alias(request: Request, full_path: str = ""):
         target = f"{target}?{request.url.query}"
     return RedirectResponse(url=target, status_code=301)
 
+@router.get("/sitemap.xml", include_in_schema=False)
+def sitemap(request: Request) -> Response:
+    urls = []
+
+    for path, priority, changefreq in SITEMAP_PAGES:
+        for lang in LANGUAGES:
+            localized = localized_path(path, lang)
+            url = absolute_url(request, localized)
+
+            urls.append(
+                "  <url>\n"
+                f"    <loc>{escape(url)}</loc>\n"
+                f"    <changefreq>{escape(changefreq)}</changefreq>\n"
+                f"    <priority>{escape(priority)}</priority>\n"
+                "  </url>"
+            )
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(urls)
+        + "\n</urlset>\n"
+    )
+
+    return Response(
+        content=xml,
+        media_type="application/xml; charset=utf-8",
+    )
 
 @router.get("/va", response_class=HTMLResponse)
 @router.get("/va/", response_class=HTMLResponse)
