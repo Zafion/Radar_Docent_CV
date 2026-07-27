@@ -209,35 +209,6 @@ def spanish_language_alias(request: Request, full_path: str = ""):
         target = f"{target}?{request.url.query}"
     return RedirectResponse(url=target, status_code=301)
 
-@router.get("/sitemap.xml", include_in_schema=False)
-def sitemap(request: Request) -> Response:
-    urls = []
-
-    for path, priority, changefreq in SITEMAP_PAGES:
-        for lang in LANGUAGES:
-            localized = localized_path(path, lang)
-            url = absolute_url(request, localized)
-
-            urls.append(
-                "  <url>\n"
-                f"    <loc>{escape(url)}</loc>\n"
-                f"    <changefreq>{escape(changefreq)}</changefreq>\n"
-                f"    <priority>{escape(priority)}</priority>\n"
-                "  </url>"
-            )
-
-    xml = (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        + "\n".join(urls)
-        + "\n</urlset>\n"
-    )
-
-    return Response(
-        content=xml,
-        media_type="application/xml; charset=utf-8",
-    )
-
 @router.get("/va", response_class=HTMLResponse)
 @router.get("/va/", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
@@ -889,3 +860,409 @@ def non_docent_awards(request: Request):
     )
     context.update({"official_non_docent_base_url": OFFICIAL_NON_DOCENT_BASE_URL})
     return TEMPLATES.TemplateResponse(request=request, name="non_docent_awards.html", context=context)
+
+
+@router.get("/va/no-docente/publicaciones", response_class=HTMLResponse)
+@router.get("/no-docente/publicaciones", response_class=HTMLResponse)
+def non_docent_publications(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-no-docentes",
+        page_title="Publicaciones personal no docente Valencia | Funkcionario.com",
+        page_description=(
+            "Consulta publicaciones oficiales de personal no docente de atención educativa "
+            "detectadas y procesadas desde fuentes de Conselleria."
+        ),
+        path="/no-docente/publicaciones",
+        breadcrumbs=[("Inicio", "/"), ("Consulta no docentes", "/valencia-no-docentes"), ("Publicaciones", "/no-docente/publicaciones")],
+    )
+    context.update({"official_non_docent_base_url": OFFICIAL_NON_DOCENT_BASE_URL})
+    return TEMPLATES.TemplateResponse(request=request, name="non_docent_publications.html", context=context)
+
+
+@router.get("/va/no-docente/consulta-persona", response_class=HTMLResponse)
+@router.get("/no-docente/consulta-persona", response_class=HTMLResponse)
+def non_docent_person_search(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-no-docentes",
+        page_title="Consulta personal no docente por persona | Funkcionario.com",
+        page_description=(
+            "Busca una persona en adjudicaciones y bolsas no docentes de atención educativa."
+        ),
+        path="/no-docente/consulta-persona",
+        breadcrumbs=[("Inicio", "/"), ("Consulta no docentes", "/valencia-no-docentes"), ("Consulta por persona", "/no-docente/consulta-persona")],
+    )
+    context.update({"official_non_docent_base_url": OFFICIAL_NON_DOCENT_BASE_URL})
+    return TEMPLATES.TemplateResponse(request=request, name="non_docent_person_search.html", context=context)
+
+
+@router.get("/va/no-docente/resultado-persona", response_class=HTMLResponse)
+@router.get("/no-docente/resultado-persona", response_class=HTMLResponse)
+def non_docent_person_detail(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-no-docentes",
+        page_title="funkcionario.com | Resultado no docente por persona",
+        page_description="Resultado individual de consulta no docente por persona en Funkcionario.com.",
+        path="/no-docente/resultado-persona",
+        robots_meta="noindex,nofollow",
+        breadcrumbs=[("Inicio", "/"), ("Consulta no docentes", "/valencia-no-docentes"), ("Resultado", "/no-docente/resultado-persona")],
+    )
+    context.update({"official_non_docent_base_url": OFFICIAL_NON_DOCENT_BASE_URL})
+    return TEMPLATES.TemplateResponse(request=request, name="non_docent_person_detail.html", context=context)
+
+
+@router.get("/va/plazas-ofertadas", response_class=HTMLResponse)
+@router.get("/plazas-ofertadas", response_class=HTMLResponse)
+def offered_positions(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-docentes",
+        page_title="Plazas docentes ofertadas Comunidad Valenciana | Funkcionario.com",
+        page_description=(
+            "Consulta las últimas plazas docentes ofertadas en la Comunitat Valenciana, "
+            "con filtros por fecha, localidad, centro, especialidad y distancia aproximada."
+        ),
+        path="/plazas-ofertadas",
+        breadcrumbs=[("Inicio", "/"), ("Consulta docentes", "/valencia-docentes"), ("Plazas ofertadas", "/plazas-ofertadas")],
+    )
+    context.update({"official_adjudicaciones_url": OFFICIAL_ADJUDICACIONES_URL})
+    return TEMPLATES.TemplateResponse(request=request, name="offered_positions.html", context=context)
+
+
+@router.get("/va/consulta-persona", response_class=HTMLResponse)
+@router.get("/consulta-persona", response_class=HTMLResponse)
+def person_search(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-docentes",
+        page_title="Consulta adjudicaciones docentes por persona | Funkcionario.com",
+        page_description=(
+            "Busca coincidencias por nombre para consultar una ficha de adjudicaciones docentes, "
+            "participación en procedimientos y difícil cobertura."
+        ),
+        path="/consulta-persona",
+        breadcrumbs=[("Inicio", "/"), ("Consulta docentes", "/valencia-docentes"), ("Consulta por persona", "/consulta-persona")],
+    )
+    context.update(
+        {
+            "official_resolucion_url": OFFICIAL_RESOLUCION_URL,
+            "official_adjudicaciones_url": OFFICIAL_ADJUDICACIONES_URL,
+            "official_adjudicaciones_continuas_url": OFFICIAL_ADJUDICACIONES_CONTINUAS_URL,
+        }
+    )
+    return TEMPLATES.TemplateResponse(request=request, name="person_search.html", context=context)
+
+
+@router.get("/va/resultado-persona", response_class=HTMLResponse)
+@router.get("/resultado-persona", response_class=HTMLResponse)
+def person_detail(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-docentes",
+        page_title="funkcionario.com | Resultado por persona",
+        page_description="Resultado individual de consulta por persona en Funkcionario.com.",
+        path="/resultado-persona",
+        robots_meta="noindex,nofollow",
+        breadcrumbs=[("Inicio", "/"), ("Consulta por persona", "/consulta-persona"), ("Resultado", "/resultado-persona")],
+    )
+    context.update(
+        {
+            "official_resolucion_url": OFFICIAL_RESOLUCION_URL,
+            "official_adjudicaciones_url": OFFICIAL_ADJUDICACIONES_URL,
+            "official_adjudicaciones_continuas_url": OFFICIAL_ADJUDICACIONES_CONTINUAS_URL,
+        }
+    )
+    return TEMPLATES.TemplateResponse(request=request, name="person_detail.html", context=context)
+
+
+@router.get("/va/quienes-somos", response_class=HTMLResponse)
+@router.get("/quienes-somos", response_class=HTMLResponse)
+def quienes_somos(request: Request):
+    context = seo_context(
+        request,
+        active_page="quienes-somos",
+        page_title="funkcionario.com | Quiénes somos",
+        page_description=(
+            "Información sobre Funkcionario.com, proyecto de consulta y seguimiento de "
+            "adjudicaciones docentes e interinos en la Comunitat Valenciana."
+        ),
+        path="/quienes-somos",
+        breadcrumbs=[("Inicio", "/"), ("Quiénes somos", "/quienes-somos")],
+    )
+    context.update({"project_owner": PROJECT_OWNER})
+    return TEMPLATES.TemplateResponse(request=request, name="quienes_somos.html", context=context)
+
+
+@router.get("/va/contacto", response_class=HTMLResponse)
+@router.get("/contacto", response_class=HTMLResponse)
+def contacto(request: Request):
+    context = seo_context(
+        request,
+        active_page="contacto",
+        page_title="funkcionario.com | Contacto",
+        page_description="Contacta con Funkcionario.com para consultas, avisos o incidencias relacionadas con la web.",
+        path="/contacto",
+        breadcrumbs=[("Inicio", "/"), ("Contacto", "/contacto")],
+    )
+    context.update(
+        {
+            "project_email": PROJECT_EMAIL,
+            "project_owner": PROJECT_OWNER,
+            "project_linkedin": PROJECT_LINKEDIN,
+        }
+    )
+    return TEMPLATES.TemplateResponse(request=request, name="contacto.html", context=context)
+
+
+@router.get("/va/centros", response_class=HTMLResponse)
+@router.get("/centros", response_class=HTMLResponse)
+def center_search(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="center_search.html",
+        context={
+            **seo_context(
+                request,
+                active_page="centros",
+                page_title="Buscador de centros educativos Comunidad Valenciana | Funkcionario.com",
+                page_description="Busca centros educativos de la Comunitat Valenciana por nombre, código, localidad o provincia y consulta mapa, ruta y distancia aproximada.",
+                path="/centros",
+                breadcrumbs=[("Inicio", "/"), ("Centros", "/centros")],
+            ),
+        },
+    )
+
+
+@router.get("/va/centros/{center_code}", response_class=HTMLResponse)
+@router.get("/centros/{center_code}", response_class=HTMLResponse)
+def center_detail(request: Request, center_code: str):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="center_detail.html",
+        context={
+            **seo_context(
+                request,
+                active_page="valencia-docentes",
+                page_title=f"funkcionario.com | Centro {center_code}",
+                page_description="Ficha técnica de centro docente consultada desde Funkcionario.com.",
+                path=f"/centros/{center_code}",
+                robots_meta="noindex,follow",
+            ),
+            "center_code": center_code,
+        },
+    )
+
+
+@router.get("/va/adjudicaciones/{award_result_id}", response_class=HTMLResponse)
+@router.get("/adjudicaciones/{award_result_id}", response_class=HTMLResponse)
+def award_detail(request: Request, award_result_id: int):
+    context = seo_context(
+        request,
+        active_page="valencia-docentes",
+        page_title=f"funkcionario.com | Adjudicación {award_result_id}",
+        page_description="Detalle de adjudicación docente consultado desde Funkcionario.com.",
+        path=f"/adjudicaciones/{award_result_id}",
+        robots_meta="noindex,follow",
+    )
+    context.update(
+        {
+            "award_result_id": award_result_id,
+            "official_adjudicaciones_url": OFFICIAL_ADJUDICACIONES_URL,
+        }
+    )
+    return TEMPLATES.TemplateResponse(request=request, name="award_detail.html", context=context)
+
+
+@router.get("/va/dificil-cobertura", response_class=HTMLResponse)
+@router.get("/dificil-cobertura", response_class=HTMLResponse)
+def difficult_coverage(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-docentes",
+        page_title="Difícil cobertura docentes Comunidad Valenciana | Funkcionario.com",
+        page_description=(
+            "Consulta puestos docentes de difícil cobertura en la Comunitat Valenciana, "
+            "con filtros por especialidad, centro, localidad, fecha y distancia."
+        ),
+        path="/dificil-cobertura",
+        breadcrumbs=[("Inicio", "/"), ("Consulta docentes", "/valencia-docentes"), ("Difícil cobertura", "/dificil-cobertura")],
+    )
+    context.update({"official_adjudicaciones_continuas_url": OFFICIAL_ADJUDICACIONES_CONTINUAS_URL})
+    return TEMPLATES.TemplateResponse(request=request, name="difficult_coverage.html", context=context)
+
+
+@router.get("/va/resultado-dificil-cobertura", response_class=HTMLResponse)
+@router.get("/resultado-dificil-cobertura", response_class=HTMLResponse)
+def difficult_coverage_candidates_result(request: Request):
+    context = seo_context(
+        request,
+        active_page="valencia-docentes",
+        page_title="funkcionario.com | Candidatos de difícil cobertura",
+        page_description="Resultado de candidatos para un puesto de difícil cobertura consultado desde Funkcionario.com.",
+        path="/resultado-dificil-cobertura",
+        robots_meta="noindex,nofollow",
+        breadcrumbs=[("Inicio", "/"), ("Difícil cobertura", "/dificil-cobertura"), ("Resultado", "/resultado-dificil-cobertura")],
+    )
+    context.update({"official_adjudicaciones_continuas_url": OFFICIAL_ADJUDICACIONES_CONTINUAS_URL})
+    return TEMPLATES.TemplateResponse(request=request, name="difficult_coverage_candidates.html", context=context)
+
+
+@router.get("/va/404", response_class=HTMLResponse)
+@router.get("/404", response_class=HTMLResponse)
+def custom_404_preview(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="404.html",
+        context=seo_context(
+            request,
+            active_page="not-found",
+            page_title="funkcionario.com | Funk not found",
+            page_description="Página no encontrada en Funkcionario.com.",
+            path="/404",
+            robots_meta="noindex,nofollow",
+        ),
+        status_code=404,
+    )
+
+
+@router.get("/sw.js", include_in_schema=False)
+def service_worker():
+    return FileResponse(BASE_DIR / "static" / "js" / "sw.js", media_type="application/javascript")
+
+
+@router.get("/robots.txt", response_class=PlainTextResponse, include_in_schema=False)
+def robots_txt(request: Request) -> PlainTextResponse:
+    base_url = get_public_base_url(request)
+    content = "\n".join(
+        [
+            "User-agent: *",
+            "Allow: /",
+            "Disallow: /api/",
+            "Disallow: /resultado-persona",
+            "Disallow: /resultado-dificil-cobertura",
+            "Disallow: /no-docente/resultado-persona",
+            "Disallow: /404",
+            "Disallow: /va/resultado-persona",
+            "Disallow: /va/resultado-dificil-cobertura",
+            "Disallow: /va/no-docente/resultado-persona",
+            "Disallow: /va/404",
+            f"Sitemap: {base_url}/sitemap.xml",
+            "",
+        ]
+    )
+    return PlainTextResponse(content)
+
+
+@router.get("/sitemap.xml", include_in_schema=False)
+def sitemap_xml(request: Request) -> Response:
+    base_url = get_public_base_url(request)
+    urls = []
+    for path, priority, changefreq in SITEMAP_PAGES:
+        for lang in ("es", "va"):
+            loc_path = localized_path(path, lang)
+            alternates = "\n".join(
+                f'    <xhtml:link rel="alternate" hreflang="{LANGUAGES[alt_lang].hreflang}" href="{escape(base_url + localized_path(path, alt_lang))}" />'
+                for alt_lang in ("es", "va")
+            )
+            x_default = f'    <xhtml:link rel="alternate" hreflang="x-default" href="{escape(base_url + localized_path(path, "es"))}" />'
+            urls.append(
+                "  <url>\n"
+                f"    <loc>{escape(base_url + loc_path)}</loc>\n"
+                f"{alternates}\n"
+                f"{x_default}\n"
+                f"    <changefreq>{changefreq}</changefreq>\n"
+                f"    <priority>{priority}</priority>\n"
+                "  </url>"
+            )
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+        'xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+        + "\n".join(urls)
+        + "\n</urlset>\n"
+    )
+    return Response(content=xml, media_type="application/xml")
+
+
+@router.get("/llms.txt", response_class=PlainTextResponse, include_in_schema=False)
+def llms_txt(request: Request) -> PlainTextResponse:
+    base_url = get_public_base_url(request)
+    content = f"""# Funkcionario.com
+
+Funkcionario.com es una aplicación web de consulta sobre plazas ofertadas, adjudicaciones docentes y puestos de difícil cobertura para personal interino docente en la Comunitat Valenciana.
+
+URL principal: {base_url}
+
+## Qué ofrece
+
+- Consulta de plazas ofertadas docentes.
+- Consulta por persona mediante coincidencias de nombre.
+- Consulta de puestos de difícil cobertura.
+- Consulta de candidatos de difícil cobertura.
+- Consulta de plazas, adjudicaciones y bolsas de personal no docente de atención educativa.
+- Enlaces a fuentes oficiales de la Conselleria cuando corresponde.
+- Cálculo opcional de distancia a centros si el usuario permite ubicación.
+
+## Fuentes
+
+Funkcionario.com trabaja a partir de publicaciones oficiales de RRHH Educación de la Generalitat Valenciana y documentos publicados por Conselleria.
+
+## Páginas principales
+
+- {base_url}/
+- {base_url}/valencia-docentes
+- {base_url}/valencia-no-docentes
+- {base_url}/avisos
+- {base_url}/feed.xml
+- {base_url}/feed.json
+- {base_url}/no-docente/plazas
+- {base_url}/no-docente/adjudicaciones
+- {base_url}/no-docente/consulta-persona
+- {base_url}/plazas-ofertadas
+- {base_url}/consulta-persona
+- {base_url}/dificil-cobertura
+- {base_url}/quienes-somos
+- {base_url}/contacto
+- {base_url}/va
+- {base_url}/va/valencia-docentes
+- {base_url}/va/valencia-no-docentes
+- {base_url}/va/avisos
+- {base_url}/va/plazas-ofertadas
+- {base_url}/va/consulta-persona
+- {base_url}/va/dificil-cobertura
+
+## Limitaciones
+
+Funkcionario.com no sustituye a la publicación oficial. Los datos deben verificarse siempre con la fuente oficial de Conselleria para trámites, plazos o decisiones administrativas.
+"""
+    return PlainTextResponse(content)
+
+
+@router.get("/va/politica-privacidad", response_class=HTMLResponse)
+@router.get("/politica-privacidad", response_class=HTMLResponse)
+def politica_privacidad(request: Request):
+    context = seo_context(
+        request,
+        active_page="legal",
+        page_title="Política de Privacidad y Cookies | Funkcionario.com",
+        page_description="Política de privacidad de Funkcionario.com.",
+        path="/politica-privacidad",
+        breadcrumbs=[("Inicio", "/"), ("Privacidad", "/politica-privacidad")],
+    )
+    context.update(
+        {
+            "project_email": PROJECT_EMAIL,
+            "project_owner": PROJECT_OWNER,
+        }
+    )
+    return TEMPLATES.TemplateResponse(request=request, name="politica_privacidad.html", context=context)
+
+
+@router.get("/va/politica-cookies", include_in_schema=False)
+@router.get("/politica-cookies", include_in_schema=False)
+def politica_cookies_redirect(request: Request):
+    target = "/va/politica-privacidad" if get_language_from_path(request.url.path) == "va" else "/politica-privacidad"
+    return RedirectResponse(url=target, status_code=301)
