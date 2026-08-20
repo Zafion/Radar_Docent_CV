@@ -61,6 +61,7 @@ SITEMAP_PAGES: tuple[tuple[str, str, str], ...] = (
     ("/recursos-docentes/organizacion-oposiciones-bolsas", "0.7", "monthly"),
     ("/recursos-docentes/tecnologia-preparar-clases", "0.7", "monthly"),
     ("/recursos-docentes/desplazamientos-docentes", "0.7", "monthly"),
+    ("/recursos-docentes/sustitucion-docente-corta", "0.7", "monthly"),
     ("/quienes-somos", "0.5", "monthly"),
     ("/contacto", "0.4", "monthly"),
     ("/politica-privacidad", "0.3", "yearly"),
@@ -685,6 +686,71 @@ def teacher_resource_commuting(request: Request):
     return TEMPLATES.TemplateResponse(
         request=request,
         name="teacher_resource_commuting.html",
+        context=context,
+    )
+
+
+@router.get("/va/recursos-docentes/sustitucion-docente-corta", response_class=HTMLResponse)
+@router.get("/recursos-docentes/sustitucion-docente-corta", response_class=HTMLResponse)
+def teacher_resource_short_substitution(request: Request):
+    lang = get_language_from_path(request.url.path)
+
+    if lang == "va":
+        page_title = "Com preparar una substitució docent de curta duració | Funkcionario.com"
+        page_description = (
+            "Guia pràctica per a preparar una substitució docent curta, recopilar informació essencial, organitzar les primeres classes i deixar un traspàs útil."
+        )
+        breadcrumbs = [
+            ("Inici", "/"),
+            ("Recursos per a docents", "/recursos-docentes"),
+            ("Com preparar una substitució docent de curta duració", "/recursos-docentes/sustitucion-docente-corta"),
+        ]
+        headline = "Com preparar una substitució docent de curta duració"
+    else:
+        page_title = "Cómo preparar una sustitución docente de corta duración | Funkcionario.com"
+        page_description = (
+            "Guía práctica para preparar una sustitución docente corta, recopilar información esencial, organizar las primeras clases y dejar un traspaso útil."
+        )
+        breadcrumbs = [
+            ("Inicio", "/"),
+            ("Recursos para docentes", "/recursos-docentes"),
+            ("Cómo preparar una sustitución docente de corta duración", "/recursos-docentes/sustitucion-docente-corta"),
+        ]
+        headline = "Cómo preparar una sustitución docente de corta duración"
+
+    article_path = "/recursos-docentes/sustitucion-docente-corta"
+    context = seo_context(
+        request,
+        active_page="recursos-docentes",
+        page_title=page_title,
+        page_description=page_description,
+        path=article_path,
+        breadcrumbs=breadcrumbs,
+        page_type="article",
+        extra_json_ld=[
+            {
+                "@context": "https://schema.org",
+                "@type": "Article",
+                "headline": headline,
+                "description": page_description,
+                "mainEntityOfPage": absolute_url(request, localized_path(article_path, lang)),
+                "author": {
+                    "@type": "Person",
+                    "name": PROJECT_OWNER,
+                },
+                "publisher": {
+                    "@type": "Organization",
+                    "name": "Funkcionario.com",
+                    "url": get_public_base_url(request),
+                },
+                "datePublished": "2026-08-16",
+                "dateModified": "2026-08-16",
+            }
+        ],
+    )
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="teacher_resource_short_substitution.html",
         context=context,
     )
 

@@ -219,6 +219,34 @@
           </a>
         </div>
       </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">⏳</span>
+          <h2>
+            {% if current_lang == 'va' %}
+            Com preparar una substitució docent de curta duració
+            {% else %}
+            Cómo preparar una sustitución docente de corta duración
+            {% endif %}
+          </h2>
+        </div>
+        <p class="panel-card__hint">
+          {% if current_lang == 'va' %}
+          Un sistema pràctic per a incorporar-se ràpid, donar continuïtat a les classes i deixar un traspàs clar en finalitzar.
+          {% else %}
+          Un sistema práctico para incorporarse rápido, dar continuidad a las clases y dejar un traspaso claro al finalizar.
+          {% endif %}
+        </p>
+        <div class="stack-actions">
+          <a
+            class="button button--secondary button--full"
+            href="{% if current_lang == 'va' %}/va/recursos-docentes/sustitucion-docente-corta{% else %}/recursos-docentes/sustitucion-docente-corta{% endif %}"
+          >
+            {% if current_lang == 'va' %}Llegir guia{% else %}Leer guía{% endif %}
+          </a>
+        </div>
+      </article>
     </div>
   </section>
 </section>

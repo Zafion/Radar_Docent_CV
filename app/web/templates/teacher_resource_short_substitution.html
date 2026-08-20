@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">
+      {% if current_lang == 'va' %}
+      Guia pràctica per a incorporacions ràpides
+      {% else %}
+      Guía práctica para incorporaciones rápidas
+      {% endif %}
+    </p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="{% if current_lang == 'va' %}/va{% else %}/{% endif %}">
+      {% if current_lang == 'va' %}Inici{% else %}Inicio{% endif %}
+    </a>
+    <span>›</span>
+    <a href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}">
+      {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+    </a>
+    <span>›</span>
+    {% if current_lang == 'va' %}Com preparar una substitució docent de curta duració{% else %}Cómo preparar una sustitución docente de corta duración{% endif %}
+  </div>
+
+  <article class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>
+          {% if current_lang == 'va' %}
+          Com preparar una substitució docent de curta duració
+          {% else %}
+          Cómo preparar una sustitución docente de corta duración
+          {% endif %}
+        </h1>
+        <p>
+          {% if current_lang == 'va' %}
+          Un sistema pràctic per a incorporar-se ràpid, donar continuïtat a les classes i deixar un traspàs clar en finalitzar.
+          {% else %}
+          Un sistema práctico para incorporarse rápido, dar continuidad a las clases y dejar un traspaso claro al finalizar.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <p class="panel-card__meta">
+      {% if current_lang == 'va' %}Publicat el 16 d'agost de 2026{% else %}Publicado el 16 de agosto de 2026{% endif %}
+    </p>
+
+    <p class="panel-card__hint">
+      {% if current_lang == 'va' %}
+      En una substitució breu no necessites reconstruir tot el curs. La prioritat és entendre el punt en què està cada grup, mantindre les rutines essencials i registrar el que s'ha fet perquè la persona següent puga continuar.
+      {% else %}
+      En una sustitución breve no necesitas reconstruir todo el curso. La prioridad es entender el punto en el que está cada grupo, mantener las rutinas esenciales y registrar lo realizado para que la siguiente persona pueda continuar.
+      {% endif %}
+    </p>
+  </article>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Abans d'acudir al centre{% else %}Antes de acudir al centro{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Reunix únicament la informació que pugues confirmar. La duració prevista pot canviar, per la qual cosa convé preparar una incorporació útil tant per a uns dies com per a diverses setmanes.</p>
+    <p>Anota l'adreça exacta, l'hora d'entrada, el nom del centre, un telèfon de contacte i el mitjà de transport. Calcula marge per a aparcar, localitzar consergeria i completar els tràmits inicials.</p>
+    <ul>
+      <li>Document identificatiu i documentació sol·licitada.</li>
+      <li>Bolígraf, llibreta o sistema de notes.</li>
+      <li>Aigua i una opció senzilla de menjar.</li>
+      <li>Carregador i adaptadors només si portaràs dispositiu.</li>
+      <li>Una carpeta buida per a horaris i documentació.</li>
+    </ul>
+{% else %}
+    <p>Reúne únicamente la información que puedas confirmar. La duración prevista puede cambiar, por lo que conviene preparar una incorporación útil tanto para unos días como para varias semanas.</p>
+    <p>Anota la dirección exacta, la hora de entrada, el nombre del centro, un teléfono de contacto y el medio de transporte. Calcula margen para aparcar, localizar conserjería y completar los trámites iniciales.</p>
+    <ul>
+      <li>Documento identificativo y documentación solicitada.</li>
+      <li>Bolígrafo, libreta o sistema de notas.</li>
+      <li>Agua y una opción sencilla de comida.</li>
+      <li>Cargador y adaptadores solo si llevarás dispositivo.</li>
+      <li>Una carpeta vacía para horarios y documentación.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}La informació mínima de la primera hora{% else %}La información mínima de la primera hora{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>No intentes memoritzar-ho tot. Crea un full de referència breu amb les dades que condicionen el dia.</p>
+    <ul>
+      <li>Horari, aules i grups.</li>
+      <li>Persona de referència de l’equip directiu o departament.</li>
+      <li>Guàrdies, patis, reunions i tasques no lectives.</li>
+      <li>Normes d’accés, claus i ús d’espais.</li>
+      <li>Plataforma educativa i procediment per a registrar assistència.</li>
+      <li>Informació imprescindible sobre adaptacions o suports, pels canals autoritzats.</li>
+      <li>Material que va deixar preparat la persona substituïda.</li>
+    </ul>
+{% else %}
+    <p>No intentes memorizarlo todo. Crea una hoja de referencia breve con los datos que condicionan el día.</p>
+    <ul>
+      <li>Horario, aulas y grupos.</li>
+      <li>Persona de referencia del equipo directivo o departamento.</li>
+      <li>Guardias, recreos, reuniones y tareas no lectivas.</li>
+      <li>Normas de acceso, llaves y uso de espacios.</li>
+      <li>Plataforma educativa y procedimiento para registrar asistencia.</li>
+      <li>Información imprescindible sobre adaptaciones o apoyos, por los canales autorizados.</li>
+      <li>Material que dejó preparado la persona sustituida.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Planifica el primer dia amb marge{% else %}Planifica el primer día con margen{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>El primer objectiu és conéixer el ritme del grup i comprovar quin treball pot continuar. Evita introduir canvis grans abans d’entendre les normes i la programació existent.</p>
+    <p>Prepara una activitat adaptable que permeta observar coneixements previs, hàbits de treball i necessitats del grup sense dependre d’una tecnologia concreta.</p>
+    <ul>
+      <li>Presentació breu i explicació de com es treballarà durant la substitució.</li>
+      <li>Revisió del punt exacte del temari o projecte.</li>
+      <li>Activitat de continuïtat o diagnòstic senzill.</li>
+      <li>Registre de dubtes que hages de consultar al departament.</li>
+      <li>Alternativa sense connexió per si falla la plataforma o el projector.</li>
+    </ul>
+{% else %}
+    <p>El primer objetivo es conocer el ritmo del grupo y comprobar qué trabajo puede continuar. Evita introducir cambios grandes antes de entender las normas y la programación existente.</p>
+    <p>Prepara una actividad adaptable que permita observar conocimientos previos, hábitos de trabajo y necesidades del grupo sin depender de una tecnología concreta.</p>
+    <ul>
+      <li>Presentación breve y explicación de cómo se trabajará durante la sustitución.</li>
+      <li>Revisión del punto exacto del temario o proyecto.</li>
+      <li>Actividad de continuidad o diagnóstico sencillo.</li>
+      <li>Registro de dudas que debas consultar al departamento.</li>
+      <li>Alternativa sin conexión por si falla la plataforma o el proyector.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Crea un registre de continuïtat{% else %}Crea un registro de continuidad{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Dedica uns minuts després de cada sessió a deixar constància del que és important. Un registre breu i constant evita dependre de la memòria.</p>
+    <ul>
+      <li>Data, grup i contingut treballat.</li>
+      <li>Tasques proposades i data prevista de lliurament.</li>
+      <li>Incidències rellevants comunicades pel canal corresponent.</li>
+      <li>Material pendent de corregir o retornar.</li>
+      <li>Canvis respecte de la planificació inicial.</li>
+      <li>Pròxim pas recomanat per a cada grup.</li>
+    </ul>
+{% else %}
+    <p>Dedica unos minutos después de cada sesión a dejar constancia de lo importante. Un registro breve y constante evita depender de la memoria.</p>
+    <ul>
+      <li>Fecha, grupo y contenido trabajado.</li>
+      <li>Tareas propuestas y fecha prevista de entrega.</li>
+      <li>Incidencias relevantes comunicadas por el canal correspondiente.</li>
+      <li>Material pendiente de corregir o devolver.</li>
+      <li>Cambios respecto a la planificación inicial.</li>
+      <li>Próximo paso recomendado para cada grupo.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Material i arxius: treballa amb una estructura xicoteta{% else %}Material y archivos: trabaja con una estructura pequeña{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Crea una carpeta específica per a la substitució i evita barrejar-la amb arxius personals o d’altres centres.</p>
+    <ul>
+      <li>00_Horari_i_contactes</li>
+      <li>01_Programacio_i_material_rebut</li>
+      <li>02_Material_preparat</li>
+      <li>03_Lliuraments_i_correccions</li>
+      <li>04_Registre_de_continuitat</li>
+      <li>05_Traspas_final</li>
+    </ul>
+    <p class="panel-card__hint">Usa únicament comptes, plataformes i sistemes autoritzats pel centre per a tractar informació de l’alumnat.</p>
+{% else %}
+    <p>Crea una carpeta específica para la sustitución y evita mezclarla con archivos personales o de otros centros.</p>
+    <ul>
+      <li>00_Horario_y_contactos</li>
+      <li>01_Programacion_y_material_recibido</li>
+      <li>02_Material_preparado</li>
+      <li>03_Entregas_y_correcciones</li>
+      <li>04_Registro_de_continuidad</li>
+      <li>05_Traspaso_final</li>
+    </ul>
+    <p class="panel-card__hint">Usa únicamente cuentas, plataformas y sistemas autorizados por el centro para tratar información del alumnado.</p>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Coordina’t sense multiplicar missatges{% else %}Coordínate sin multiplicar mensajes{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Identifica una persona de referència i agrupa els dubtes. És més eficient presentar una llista ordenada que interrompre diverses vegades per qüestions menudes.</p>
+    <ul>
+      <li>Dubtes que bloquegen una classe immediata.</li>
+      <li>Decisions que afecten a avaluació o lliuraments.</li>
+      <li>Necessitats específiques de determinats grups.</li>
+      <li>Accés a espais, materials o plataformes.</li>
+      <li>Dates de reunions o activitats ja programades.</li>
+    </ul>
+{% else %}
+    <p>Identifica una persona de referencia y agrupa las dudas. Es más eficiente presentar una lista ordenada que interrumpir varias veces por cuestiones pequeñas.</p>
+    <ul>
+      <li>Dudas que bloquean una clase inmediata.</li>
+      <li>Decisiones que afectan a evaluación o entregas.</li>
+      <li>Necesidades específicas de determinados grupos.</li>
+      <li>Acceso a espacios, materiales o plataformas.</li>
+      <li>Fechas de reuniones o actividades ya programadas.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Prepara el tancament des del primer dia{% else %}Prepara el cierre desde el primer día{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Encara que no conegues la data exacta de finalització, guarda la informació de manera que una altra persona puga comprendre-la sense una explicació llarga.</p>
+    <ul>
+      <li>Resum per grup.</li>
+      <li>Continguts impartits i pròxims continguts.</li>
+      <li>Tasques pendents i correccions realitzades.</li>
+      <li>Material creat i ubicació dels arxius.</li>
+      <li>Incidències ja comunicades.</li>
+      <li>Claus, dispositius o recursos que hages de retornar.</li>
+    </ul>
+{% else %}
+    <p>Aunque no conozcas la fecha exacta de finalización, guarda la información de forma que otra persona pueda comprenderla sin una explicación larga.</p>
+    <ul>
+      <li>Resumen por grupo.</li>
+      <li>Contenidos impartidos y próximos contenidos.</li>
+      <li>Tareas pendientes y correcciones realizadas.</li>
+      <li>Material creado y ubicación de los archivos.</li>
+      <li>Incidencias ya comunicadas.</li>
+      <li>Llaves, dispositivos o recursos que debas devolver.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Llista ràpida d’incorporació{% else %}Lista rápida de incorporación{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <ul>
+      <li>Arribar amb marge i localitzar la persona de referència.</li>
+      <li>Obtindre horari, aules, claus i normes essencials.</li>
+      <li>Confirmar com registrar assistència i comunicats.</li>
+      <li>Localitzar la programació i el material existent.</li>
+      <li>Preparar una primera sessió adaptable.</li>
+      <li>Obrir el registre de continuïtat.</li>
+      <li>Guardar els arxius en una carpeta separada.</li>
+      <li>Revisar al final del dia què has de consultar.</li>
+    </ul>
+{% else %}
+    <ul>
+      <li>Llegar con margen y localizar a la persona de referencia.</li>
+      <li>Obtener horario, aulas, llaves y normas esenciales.</li>
+      <li>Confirmar cómo registrar asistencia y comunicados.</li>
+      <li>Localizar la programación y el material existente.</li>
+      <li>Preparar una primera sesión adaptable.</li>
+      <li>Abrir el registro de continuidad.</li>
+      <li>Guardar los archivos en una carpeta separada.</li>
+      <li>Revisar al final del día qué debes consultar.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Criteri final{% else %}Criterio final{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Comença amb un sistema senzill, comprova si realment et facilita el treball i ajusta’l quan canvien el centre, l’horari o les necessitats. Una organització útil ha de reduir errors i decisions repetides, no crear més manteniment.</p>
+    {% else %}
+    <p>Empieza con un sistema sencillo, comprueba si realmente te facilita el trabajo y ajústalo cuando cambien el centro, el horario o las necesidades. Una organización útil debe reducir errores y decisiones repetidas, no crear más mantenimiento.</p>
+    {% endif %}
+
+    <div class="stack-actions">
+      <a class="button button--ghost" href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}">
+        {% if current_lang == 'va' %}Tornar a recursos per a docents{% else %}Volver a recursos para docentes{% endif %}
+      </a>
+    </div>
+  </section>
+</section>
+{% endblock %}
