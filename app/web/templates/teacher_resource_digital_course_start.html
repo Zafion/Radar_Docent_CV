@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">
+      {% if current_lang == 'va' %}
+      Guia d’organització digital per a l’inici de curs
+      {% else %}
+      Guía de organización digital para el inicio de curso
+      {% endif %}
+    </p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="{% if current_lang == 'va' %}/va{% else %}/{% endif %}">
+      {% if current_lang == 'va' %}Inici{% else %}Inicio{% endif %}
+    </a>
+    <span>›</span>
+    <a href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}">
+      {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+    </a>
+    <span>›</span>
+    {% if current_lang == 'va' %}Organització digital per a començar el curs en un centre nou{% else %}Organización digital para empezar el curso en un centro nuevo{% endif %}
+  </div>
+
+  <article class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>
+          {% if current_lang == 'va' %}
+          Organització digital per a començar el curs en un centre nou
+          {% else %}
+          Organización digital para empezar el curso en un centro nuevo
+          {% endif %}
+        </h1>
+        <p>
+          {% if current_lang == 'va' %}
+          Carpetes, calendaris, comptes, plantilles i còpies locals per a començar el curs sense dispersar la informació.
+          {% else %}
+          Carpetas, calendarios, cuentas, plantillas y copias locales para empezar el curso sin dispersar la información.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <p class="panel-card__meta">
+      {% if current_lang == 'va' %}Publicat el 30 d'agost de 2026{% else %}Publicado el 30 de agosto de 2026{% endif %}
+    </p>
+
+    <p class="panel-card__hint">
+      {% if current_lang == 'va' %}
+      Un curs nou sol començar amb informació repartida entre correus, plataformes, reunions i documents. La meta no és crear un sistema complex, sinó decidir des del principi on guardar cada cosa i com localitzar-la després.
+      {% else %}
+      Un curso nuevo suele empezar con información repartida entre correos, plataformas, reuniones y documentos. La meta no es crear un sistema complejo, sino decidir desde el principio dónde guardar cada cosa y cómo localizarla después.
+      {% endif %}
+    </p>
+  </article>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Separa identitat personal i treball del centre{% else %}Separa identidad personal y trabajo del centro{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Usa el compte corporatiu quan el centre el proporcione i evita reenviar automàticament informació professional a comptes personals.</p>
+    <ul>
+      <li>Compte institucional per a correu i plataformes.</li>
+      <li>Perfil de navegador independent per al centre.</li>
+      <li>Contrasenyes úniques guardades en un gestor fiable.</li>
+      <li>Doble factor d’autenticació quan estiga disponible.</li>
+      <li>Tancament de sessió en equips compartits.</li>
+      <li>Notificacions configurades per a evitar barrejar àmbits.</li>
+    </ul>
+{% else %}
+    <p>Usa la cuenta corporativa cuando el centro la proporcione y evita reenviar automáticamente información profesional a cuentas personales.</p>
+    <ul>
+      <li>Cuenta institucional para correo y plataformas.</li>
+      <li>Perfil de navegador independiente para el centro.</li>
+      <li>Contraseñas únicas guardadas en un gestor fiable.</li>
+      <li>Doble factor de autenticación cuando esté disponible.</li>
+      <li>Cierre de sesión en equipos compartidos.</li>
+      <li>Notificaciones configuradas para evitar mezclar ámbitos.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Crea una estructura de carpetes abans d’acumular arxius{% else %}Crea una estructura de carpetas antes de acumular archivos{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Una estructura curta funciona millor que desenes de carpetes buides. Comença amb categories estables i afig subdivisions només quan siguen necessàries.</p>
+    <ul>
+      <li>00_Centre_i_contactes</li>
+      <li>01_Horaris_i_calendari</li>
+      <li>02_Programacions</li>
+      <li>03_Grups_i_materials</li>
+      <li>04_Avaluacio_i_rubriques</li>
+      <li>05_Reunions_i_actes</li>
+      <li>06_Recursos_compartits</li>
+      <li>99_Arxiu_del_curs</li>
+    </ul>
+    <p class="panel-card__hint">No guardes dades personals de l’alumnat en ubicacions o servicis que no estiguen autoritzats.</p>
+{% else %}
+    <p>Una estructura corta funciona mejor que decenas de carpetas vacías. Empieza con categorías estables y añade subdivisiones solo cuando sean necesarias.</p>
+    <ul>
+      <li>00_Centro_y_contactos</li>
+      <li>01_Horarios_y_calendario</li>
+      <li>02_Programaciones</li>
+      <li>03_Grupos_y_materiales</li>
+      <li>04_Evaluacion_y_rubricas</li>
+      <li>05_Reuniones_y_actas</li>
+      <li>06_Recursos_compartidos</li>
+      <li>99_Archivo_del_curso</li>
+    </ul>
+    <p class="panel-card__hint">No guardes datos personales del alumnado en ubicaciones o servicios que no estén autorizados.</p>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Anomena els arxius per a entendre’ls dins de sis mesos{% else %}Nombra los archivos para entenderlos dentro de seis meses{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Usa noms breus, ordenables i coherents. Una fórmula senzilla evita arxius com definitiu_final_2.</p>
+    <ul>
+      <li>Data en format AAAA-MM-DD quan importe l’ordre.</li>
+      <li>Grup o nivell.</li>
+      <li>Tipus de document.</li>
+      <li>Tema o activitat.</li>
+      <li>Versió només quan existisquen diverses revisions.</li>
+    </ul>
+    <p class="panel-card__hint">Exemple: 2026-09-08_2ESO_Activitat_inicial_v01.pdf</p>
+{% else %}
+    <p>Usa nombres breves, ordenables y coherentes. Una fórmula sencilla evita archivos como definitivo_final_2.</p>
+    <ul>
+      <li>Fecha en formato AAAA-MM-DD cuando importe el orden.</li>
+      <li>Grupo o nivel.</li>
+      <li>Tipo de documento.</li>
+      <li>Tema o actividad.</li>
+      <li>Versión solo cuando existan varias revisiones.</li>
+    </ul>
+    <p class="panel-card__hint">Ejemplo: 2026-09-08_2ESO_Actividad_inicial_v01.pdf</p>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Unifica calendari, tasques i terminis{% else %}Unifica calendario, tareas y plazos{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Les dates poden arribar per correu, reunions, plataforma i missatges. Porta-les a un únic calendari de referència.</p>
+    <ul>
+      <li>Avaluacions, reunions i claustres.</li>
+      <li>Lliuraments de documentació.</li>
+      <li>Activitats complementàries.</li>
+      <li>Dates d’exàmens o projectes.</li>
+      <li>Recordatoris per a preparar materials.</li>
+      <li>Terminis administratius personals.</li>
+    </ul>
+    <p class="panel-card__hint">Distingix esdeveniments amb hora de tasques que requerixen treball previ. Una data límit sense recordatori sol arribar massa tard.</p>
+{% else %}
+    <p>Las fechas pueden llegar por correo, reuniones, plataforma y mensajes. Llévalas a un único calendario de referencia.</p>
+    <ul>
+      <li>Evaluaciones, reuniones y claustros.</li>
+      <li>Entregas de documentación.</li>
+      <li>Actividades complementarias.</li>
+      <li>Fechas de exámenes o proyectos.</li>
+      <li>Recordatorios para preparar materiales.</li>
+      <li>Plazos administrativos personales.</li>
+    </ul>
+    <p class="panel-card__hint">Distingue eventos con hora de tareas que requieren trabajo previo. Una fecha límite sin recordatorio suele llegar demasiado tarde.</p>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Prepara plantilles reutilitzables{% else %}Prepara plantillas reutilizables{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Les plantilles reduïxen decisions repetides i mantenen una presentació coherent. Crea primer les que utilitzaràs de veritat.</p>
+    <ul>
+      <li>Fitxa o activitat amb capçalera comuna.</li>
+      <li>Rúbrica bàsica editable.</li>
+      <li>Registre de reunió.</li>
+      <li>Llista de comprovació per a publicar materials.</li>
+      <li>Presentació amb tipografies i grandàries llegibles.</li>
+      <li>Document de seguiment setmanal.</li>
+    </ul>
+{% else %}
+    <p>Las plantillas reducen decisiones repetidas y mantienen una presentación coherente. Crea primero las que vayas a utilizar de verdad.</p>
+    <ul>
+      <li>Ficha o actividad con cabecera común.</li>
+      <li>Rúbrica básica editable.</li>
+      <li>Registro de reunión.</li>
+      <li>Lista de comprobación para publicar materiales.</li>
+      <li>Presentación con tipografías y tamaños legibles.</li>
+      <li>Documento de seguimiento semanal.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Dissenya un flux per a cada material{% else %}Diseña un flujo para cada material{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Definix què ocorre des que comences un document fins que queda arxivat.</p>
+    <ul>
+      <li>Esborrany en la carpeta de treball.</li>
+      <li>Revisió de contingut i format.</li>
+      <li>Exportació a PDF quan es compartirà.</li>
+      <li>Publicació en la plataforma corresponent.</li>
+      <li>Còpia del material final.</li>
+      <li>Arxiu o eliminació d’esborranys innecessaris.</li>
+    </ul>
+{% else %}
+    <p>Define qué ocurre desde que empiezas un documento hasta que queda archivado.</p>
+    <ul>
+      <li>Borrador en la carpeta de trabajo.</li>
+      <li>Revisión de contenido y formato.</li>
+      <li>Exportación a PDF cuando se vaya a compartir.</li>
+      <li>Publicación en la plataforma correspondiente.</li>
+      <li>Copia del material final.</li>
+      <li>Archivo o eliminación de borradores innecesarios.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Prepara el treball sense connexió{% else %}Prepara el trabajo sin conexión{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>La sincronització no substituïx una còpia local per a la classe del dia. Descarrega el que és imprescindible abans d’eixir.</p>
+    <ul>
+      <li>Presentacions i vídeos que utilitzaràs.</li>
+      <li>PDF alternatiu dels documents.</li>
+      <li>Llista de grups o informació permesa per a treballar.</li>
+      <li>Activitat alternativa sense plataforma.</li>
+      <li>Adaptadors i arxius de controladors si són necessaris.</li>
+    </ul>
+{% else %}
+    <p>La sincronización no sustituye una copia local para la clase del día. Descarga lo imprescindible antes de salir.</p>
+    <ul>
+      <li>Presentaciones y vídeos que vayas a utilizar.</li>
+      <li>PDF alternativo de los documentos.</li>
+      <li>Lista de grupos o información permitida para trabajar.</li>
+      <li>Actividad alternativa sin plataforma.</li>
+      <li>Adaptadores y archivos de controladores si son necesarios.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Revisió setmanal de quinze minuts{% else %}Revisión semanal de quince minutos{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <ul>
+      <li>Buidar descàrregues i escriptori.</li>
+      <li>Moure arxius a la carpeta definitiva.</li>
+      <li>Revisar el calendari de les dos setmanes següents.</li>
+      <li>Actualitzar còpies de seguretat.</li>
+      <li>Tancar pestanyes i sessions innecessàries.</li>
+      <li>Anotar tasques pendents que només estan en correus.</li>
+      <li>Eliminar duplicats evidents.</li>
+    </ul>
+{% else %}
+    <ul>
+      <li>Vaciar descargas y escritorio.</li>
+      <li>Mover archivos a su carpeta definitiva.</li>
+      <li>Revisar el calendario de las dos semanas siguientes.</li>
+      <li>Actualizar copias de seguridad.</li>
+      <li>Cerrar pestañas y sesiones innecesarias.</li>
+      <li>Anotar tareas pendientes que solo están en correos.</li>
+      <li>Eliminar duplicados evidentes.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Llista de la primera setmana{% else %}Lista de la primera semana{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <ul>
+      <li>Activar i protegir els comptes del centre.</li>
+      <li>Crear el perfil de navegador professional.</li>
+      <li>Crear l’estructura de carpetes.</li>
+      <li>Importar dates confirmades al calendari.</li>
+      <li>Guardar contactes i enllaços oficials.</li>
+      <li>Preparar dos o tres plantilles bàsiques.</li>
+      <li>Comprovar accés sense connexió als materials.</li>
+      <li>Configurar una còpia de seguretat.</li>
+      <li>Reservar una revisió setmanal.</li>
+    </ul>
+{% else %}
+    <ul>
+      <li>Activar y proteger las cuentas del centro.</li>
+      <li>Crear el perfil de navegador profesional.</li>
+      <li>Crear la estructura de carpetas.</li>
+      <li>Importar fechas confirmadas al calendario.</li>
+      <li>Guardar contactos y enlaces oficiales.</li>
+      <li>Preparar dos o tres plantillas básicas.</li>
+      <li>Comprobar acceso sin conexión a los materiales.</li>
+      <li>Configurar una copia de seguridad.</li>
+      <li>Reservar una revisión semanal.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Criteri final{% else %}Criterio final{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Comença amb un sistema senzill, comprova si realment et facilita el treball i ajusta’l quan canvien el centre, l’horari o les necessitats. Una organització útil ha de reduir errors i decisions repetides, no crear més manteniment.</p>
+    {% else %}
+    <p>Empieza con un sistema sencillo, comprueba si realmente te facilita el trabajo y ajústalo cuando cambien el centro, el horario o las necesidades. Una organización útil debe reducir errores y decisiones repetidas, no crear más mantenimiento.</p>
+    {% endif %}
+
+    <div class="stack-actions">
+      <a class="button button--ghost" href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}">
+        {% if current_lang == 'va' %}Tornar a recursos per a docents{% else %}Volver a recursos para docentes{% endif %}
+      </a>
+    </div>
+  </section>
+</section>
+{% endblock %}
