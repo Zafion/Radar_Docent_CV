@@ -44,7 +44,18 @@ python run_sync_all.py
 python run_register_documents.py
 python run_parse_documents.py
 python run_update_position_lifecycle.py
-python run_send_notifications.py
-python run_publish_notifications.py
+
+echo
+if [[ "${ENABLE_NOTIFICATIONS:-0}" == "1" ]]; then
+  echo "Send notifications"
+  python run_send_notifications.py
+
+  echo
+  echo "Publish notifications"
+  python run_publish_notifications.py
+else
+  echo "Notifications disabled"
+  echo "ENABLE_NOTIFICATIONS=${ENABLE_NOTIFICATIONS:-0}"
+fi
 
 echo "Fin pipeline: $(date '+%F %T')"
