@@ -62,6 +62,7 @@ SITEMAP_PAGES: tuple[tuple[str, str, str], ...] = (
     ("/recursos-docentes/tecnologia-preparar-clases", "0.7", "monthly"),
     ("/recursos-docentes/desplazamientos-docentes", "0.7", "monthly"),
     ("/recursos-docentes/sustitucion-docente-corta", "0.7", "monthly"),
+    ("/recursos-docentes/organizacion-digital-inicio-curso", "0.7", "monthly"),
     ("/quienes-somos", "0.5", "monthly"),
     ("/contacto", "0.4", "monthly"),
     ("/politica-privacidad", "0.3", "yearly"),
@@ -751,6 +752,71 @@ def teacher_resource_short_substitution(request: Request):
     return TEMPLATES.TemplateResponse(
         request=request,
         name="teacher_resource_short_substitution.html",
+        context=context,
+    )
+
+
+@router.get("/va/recursos-docentes/organizacion-digital-inicio-curso", response_class=HTMLResponse)
+@router.get("/recursos-docentes/organizacion-digital-inicio-curso", response_class=HTMLResponse)
+def teacher_resource_digital_course_start(request: Request):
+    lang = get_language_from_path(request.url.path)
+
+    if lang == "va":
+        page_title = "Organització digital per a començar el curs en un centre nou | Funkcionario.com"
+        page_description = (
+            "Guia per a organitzar comptes, carpetes, calendaris, plantilles i arxius docents en començar el curs en un centre nou."
+        )
+        breadcrumbs = [
+            ("Inici", "/"),
+            ("Recursos per a docents", "/recursos-docentes"),
+            ("Organització digital per a començar el curs en un centre nou", "/recursos-docentes/organizacion-digital-inicio-curso"),
+        ]
+        headline = "Organització digital per a començar el curs en un centre nou"
+    else:
+        page_title = "Organización digital para empezar el curso en un centro nuevo | Funkcionario.com"
+        page_description = (
+            "Guía para organizar cuentas, carpetas, calendarios, plantillas y archivos docentes al comenzar el curso en un centro nuevo."
+        )
+        breadcrumbs = [
+            ("Inicio", "/"),
+            ("Recursos para docentes", "/recursos-docentes"),
+            ("Organización digital para empezar el curso en un centro nuevo", "/recursos-docentes/organizacion-digital-inicio-curso"),
+        ]
+        headline = "Organización digital para empezar el curso en un centro nuevo"
+
+    article_path = "/recursos-docentes/organizacion-digital-inicio-curso"
+    context = seo_context(
+        request,
+        active_page="recursos-docentes",
+        page_title=page_title,
+        page_description=page_description,
+        path=article_path,
+        breadcrumbs=breadcrumbs,
+        page_type="article",
+        extra_json_ld=[
+            {
+                "@context": "https://schema.org",
+                "@type": "Article",
+                "headline": headline,
+                "description": page_description,
+                "mainEntityOfPage": absolute_url(request, localized_path(article_path, lang)),
+                "author": {
+                    "@type": "Person",
+                    "name": PROJECT_OWNER,
+                },
+                "publisher": {
+                    "@type": "Organization",
+                    "name": "Funkcionario.com",
+                    "url": get_public_base_url(request),
+                },
+                "datePublished": "2026-08-30",
+                "dateModified": "2026-08-30",
+            }
+        ],
+    )
+    return TEMPLATES.TemplateResponse(
+        request=request,
+        name="teacher_resource_digital_course_start.html",
         context=context,
     )
 
