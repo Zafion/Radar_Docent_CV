@@ -275,6 +275,34 @@
           </a>
         </div>
       </article>
+
+      <article class="panel-card">
+        <div class="panel-card__title">
+          <span class="panel-card__emoji">🪑</span>
+          <h2>
+            {% if current_lang == 'va' %}
+            Ergonomia i espai de treball per a preparar classes a casa
+            {% else %}
+            Ergonomía y espacio de trabajo para preparar clases en casa
+            {% endif %}
+          </h2>
+        </div>
+        <p class="panel-card__hint">
+          {% if current_lang == 'va' %}
+          Com ordenar pantalla, cadira, il·luminació i materials per a treballar amb més comoditat sense muntar un despatx complet.
+          {% else %}
+          Cómo ordenar pantalla, silla, iluminación y materiales para trabajar con más comodidad sin montar un despacho completo.
+          {% endif %}
+        </p>
+        <div class="stack-actions">
+          <a
+            class="button button--secondary button--full"
+            href="{% if current_lang == 'va' %}/va/recursos-docentes/ergonomia-preparar-clases-casa{% else %}/recursos-docentes/ergonomia-preparar-clases-casa{% endif %}"
+          >
+            {% if current_lang == 'va' %}Llegir guia{% else %}Leer guía{% endif %}
+          </a>
+        </div>
+      </article>
     </div>
   </section>
 </section>

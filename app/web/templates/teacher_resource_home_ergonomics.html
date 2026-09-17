@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block body_class %}page-inner{% endblock %}
+
+{% block hero %}
+<section class="hero hero--module">
+  <div class="hero__backdrop"></div>
+  <div class="shell hero__content hero__content--module">
+    <p class="eyebrow">
+      {% if current_lang == 'va' %}
+      Guia pràctica per a treballar des de casa
+      {% else %}
+      Guía práctica para trabajar desde casa
+      {% endif %}
+    </p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="shell section-space">
+  <div class="breadcrumbs">
+    <a href="{% if current_lang == 'va' %}/va{% else %}/{% endif %}">
+      {% if current_lang == 'va' %}Inici{% else %}Inicio{% endif %}
+    </a>
+    <span>›</span>
+    <a href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}">
+      {% if current_lang == 'va' %}Recursos per a docents{% else %}Recursos para docentes{% endif %}
+    </a>
+    <span>›</span>
+    {% if current_lang == 'va' %}Ergonomia i espai de treball per a preparar classes a casa{% else %}Ergonomía y espacio de trabajo para preparar clases en casa{% endif %}
+  </div>
+
+  <article class="module-card">
+    <div class="module-card__header">
+      <div>
+        <h1>
+          {% if current_lang == 'va' %}
+          Ergonomia i espai de treball per a preparar classes a casa
+          {% else %}
+          Ergonomía y espacio de trabajo para preparar clases en casa
+          {% endif %}
+        </h1>
+        <p>
+          {% if current_lang == 'va' %}
+          Com ordenar pantalla, cadira, il·luminació i materials per a treballar amb més comoditat sense muntar un despatx complet.
+          {% else %}
+          Cómo ordenar pantalla, silla, iluminación y materiales para trabajar con más comodidad sin montar un despacho completo.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <p class="panel-card__meta">
+      {% if current_lang == 'va' %}Publicat el 13 de setembre de 2026{% else %}Publicado el 13 de septiembre de 2026{% endif %}
+    </p>
+
+    <p class="panel-card__hint">
+      {% if current_lang == 'va' %}
+      Preparar classes i corregir pot ocupar moltes hores fora del centre. No necessites un despatx perfecte, però sí una postura sostenible, llum suficient i un sistema que reduïsca moviments repetits i acumulació de materials.
+      {% else %}
+      Preparar clases y corregir puede ocupar muchas horas fuera del centro. No necesitas un despacho perfecto, pero sí una postura sostenible, luz suficiente y un sistema que reduzca movimientos repetidos y acumulación de materiales.
+      {% endif %}
+    </p>
+  </article>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Comença per observar com treballes{% else %}Empieza por observar cómo trabajas{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Abans de comprar res, registra durant diversos dies quines molèsties o interrupcions apareixen i quines tasques ocupen més temps.</p>
+    <ul>
+      <li>Coll inclinat cap a la pantalla.</li>
+      <li>Muscles elevats en escriure.</li>
+      <li>Canells doblegats o recolzats en una vora dura.</li>
+      <li>Reflexos en la pantalla.</li>
+      <li>Documents que obliguen a girar-se constantment.</li>
+      <li>Cables i materials que envaïxen la superfície.</li>
+      <li>Sessions massa llargues sense canviar de postura.</li>
+    </ul>
+{% else %}
+    <p>Antes de comprar nada, registra durante varios días qué molestias o interrupciones aparecen y qué tareas ocupan más tiempo.</p>
+    <ul>
+      <li>Cuello inclinado hacia la pantalla.</li>
+      <li>Hombros elevados al escribir.</li>
+      <li>Muñecas dobladas o apoyadas en un borde duro.</li>
+      <li>Reflejos en la pantalla.</li>
+      <li>Documentos que obligan a girarse constantemente.</li>
+      <li>Cables y materiales que invaden la superficie.</li>
+      <li>Sesiones demasiado largas sin cambiar de postura.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Ajusta primer cadira, taula i pantalla{% else %}Ajusta primero silla, mesa y pantalla{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Busca una posició estable que pugues mantindre sense tensió. Les mesures exactes depenen del teu cos i del mobiliari, per la qual cosa importa més la relació entre els elements que una xifra universal.</p>
+    <ul>
+      <li>Peus recolzats a terra o en una superfície estable.</li>
+      <li>Esquena recolzada sense avançar el cap.</li>
+      <li>Colzes prop del cos.</li>
+      <li>Teclat i ratolí a una altura que no eleve els muscles.</li>
+      <li>Pantalla centrada i a una distància còmoda.</li>
+      <li>Part superior de la pantalla aproximadament a l’altura dels ulls, adaptant-la a les teues ulleres i postura.</li>
+    </ul>
+{% else %}
+    <p>Busca una posición estable que puedas mantener sin tensión. Las medidas exactas dependen de tu cuerpo y del mobiliario, por lo que importa más la relación entre los elementos que una cifra universal.</p>
+    <ul>
+      <li>Pies apoyados en el suelo o en una superficie estable.</li>
+      <li>Espalda apoyada sin adelantar la cabeza.</li>
+      <li>Codos cerca del cuerpo.</li>
+      <li>Teclado y ratón a una altura que no eleve los hombros.</li>
+      <li>Pantalla centrada y a una distancia cómoda.</li>
+      <li>Parte superior de la pantalla aproximadamente a la altura de los ojos, adaptándola a tus gafas y postura.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Si treballes amb portàtil{% else %}Si trabajas con portátil{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>El portàtil obliga a triar entre una pantalla baixa o un teclat alt. Per a sessions llargues, elevar-lo i usar teclat i ratolí externs sol permetre una postura més neutral.</p>
+    <ul>
+      <li>Suport estable o elevació segura.</li>
+      <li>Teclat extern de grandària suficient.</li>
+      <li>Ratolí que no obligue a apretar la mà.</li>
+      <li>Espai per a recolzar avantbraços sense bloquejar el moviment.</li>
+      <li>Carregador col·locat perquè el cable no creue la zona de treball.</li>
+    </ul>
+{% else %}
+    <p>El portátil obliga a elegir entre una pantalla baja o un teclado alto. Para sesiones largas, elevarlo y usar teclado y ratón externos suele permitir una postura más neutral.</p>
+    <ul>
+      <li>Soporte estable o elevación segura.</li>
+      <li>Teclado externo de tamaño suficiente.</li>
+      <li>Ratón que no obligue a apretar la mano.</li>
+      <li>Espacio para apoyar antebrazos sin bloquear el movimiento.</li>
+      <li>Cargador colocado para que el cable no cruce la zona de trabajo.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Il·luminació sense reflexos{% else %}Iluminación sin reflejos{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Combina llum general amb una llum de tasca per a paper o escriptura. Evita col·locar una finestra o llum intensa directament davant o darrere de la pantalla.</p>
+    <ul>
+      <li>Col·locar la pantalla perpendicular a la finestra quan siga possible.</li>
+      <li>Ajustar la brillantor a la llum de l’habitació.</li>
+      <li>Il·luminar els documents sense crear ombres de la mà.</li>
+      <li>Netejar la pantalla i les ulleres per a reduir esforç visual.</li>
+      <li>Augmentar la grandària del text abans que acostar massa el cap.</li>
+    </ul>
+{% else %}
+    <p>Combina luz general con una luz de tarea para papel o escritura. Evita colocar una ventana o lámpara intensa directamente delante o detrás de la pantalla.</p>
+    <ul>
+      <li>Colocar la pantalla perpendicular a la ventana cuando sea posible.</li>
+      <li>Ajustar el brillo a la luz de la habitación.</li>
+      <li>Iluminar los documentos sin crear sombras de la mano.</li>
+      <li>Limpiar la pantalla y las gafas para reducir esfuerzo visual.</li>
+      <li>Aumentar tamaño de texto antes que acercar demasiado la cabeza.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Dividix la superfície en zones{% else %}Divide la superficie en zonas{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Fins i tot una taula xicoteta funciona millor quan cada zona té una finalitat.</p>
+    <ul>
+      <li>Zona central per a teclat, ratolí i tasca actual.</li>
+      <li>Zona lateral per a documents de consulta.</li>
+      <li>Safata o carpeta per a material pendent.</li>
+      <li>Lloc fix per a bolígrafs, carregadors i adaptadors.</li>
+      <li>Àrea fora de la taula per a arxiu i materials poc freqüents.</li>
+    </ul>
+{% else %}
+    <p>Incluso una mesa pequeña funciona mejor cuando cada zona tiene una finalidad.</p>
+    <ul>
+      <li>Zona central para teclado, ratón y tarea actual.</li>
+      <li>Zona lateral para documentos de consulta.</li>
+      <li>Bandeja o carpeta para material pendiente.</li>
+      <li>Lugar fijo para bolígrafos, cargadores y adaptadores.</li>
+      <li>Área fuera de la mesa para archivo y materiales poco frecuentes.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Alterna tasques i postures{% else %}Alterna tareas y posturas{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>La millor postura deixa de ser bona si es manté massa temps. Canvia d’activitat i alça’t amb regularitat.</p>
+    <ul>
+      <li>Agrupar impressions o escanejos per a alçar-te.</li>
+      <li>Fer telefonades o lectures breus dret si és còmode.</li>
+      <li>Alternar correcció en pantalla amb planificació en paper.</li>
+      <li>Programar pauses curtes abans de notar fatiga intensa.</li>
+      <li>Moure coll, muscles, mans i cames suaument.</li>
+    </ul>
+    <p class="panel-card__hint">Si apareix dolor persistent, formigueig o pèrdua de força, consulta un professional sanitari; no intentes resoldre-ho només amb accessoris.</p>
+{% else %}
+    <p>La mejor postura deja de ser buena si se mantiene demasiado tiempo. Cambia de actividad y levántate con regularidad.</p>
+    <ul>
+      <li>Agrupar impresiones o escaneos para levantarte.</li>
+      <li>Realizar llamadas o lecturas breves de pie si es cómodo.</li>
+      <li>Alternar corrección en pantalla con planificación en papel.</li>
+      <li>Programar pausas cortas antes de notar fatiga intensa.</li>
+      <li>Mover cuello, hombros, manos y piernas suavemente.</li>
+    </ul>
+    <p class="panel-card__hint">Si aparece dolor persistente, hormigueo o pérdida de fuerza, consulta a un profesional sanitario; no intentes resolverlo solo con accesorios.</p>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Reduïx soroll i distraccions{% else %}Reduce ruido y distracciones{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>Un espai còmode també necessita límits. Prepara sessions amb una tasca concreta i tanca el que no intervinga en ella.</p>
+    <ul>
+      <li>Silenciar notificacions no urgents.</li>
+      <li>Usar un perfil de navegador professional.</li>
+      <li>Deixar el telèfon fora de l’abast si no és necessari.</li>
+      <li>Utilitzar auriculars només quan siguen còmodes i segurs.</li>
+      <li>Definir una hora de finalització per a evitar allargar la jornada indefinidament.</li>
+    </ul>
+{% else %}
+    <p>Un espacio cómodo también necesita límites. Prepara sesiones con una tarea concreta y cierra lo que no intervenga en ella.</p>
+    <ul>
+      <li>Silenciar notificaciones no urgentes.</li>
+      <li>Usar un perfil de navegador profesional.</li>
+      <li>Dejar el teléfono fuera del alcance si no es necesario.</li>
+      <li>Utilizar auriculares solo cuando sean cómodos y seguros.</li>
+      <li>Definir una hora de finalización para evitar alargar la jornada indefinidamente.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Orde de millora amb pressupost limitat{% else %}Orden de mejora con presupuesto limitado{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <p>No és necessari comprar-ho tot alhora. Corregix primer el problema que més hores o molèsties genera.</p>
+    <ul>
+      <li>Ajustar amb el que ja tens.</li>
+      <li>Millorar l’altura de pantalla.</li>
+      <li>Afegir teclat i ratolí si uses portàtil durant hores.</li>
+      <li>Millorar la il·luminació.</li>
+      <li>Revisar cadira o suport de peus.</li>
+      <li>Afegir emmagatzematge per a aclarir la taula.</li>
+      <li>Valorar una segona pantalla només si millora una tasca habitual.</li>
+    </ul>
+{% else %}
+    <p>No es necesario comprar todo a la vez. Corrige primero el problema que más horas o molestias genera.</p>
+    <ul>
+      <li>Ajustar con lo que ya tienes.</li>
+      <li>Mejorar la altura de pantalla.</li>
+      <li>Añadir teclado y ratón si usas portátil durante horas.</li>
+      <li>Mejorar la iluminación.</li>
+      <li>Revisar silla o apoyo de pies.</li>
+      <li>Añadir almacenamiento para despejar la mesa.</li>
+      <li>Valorar una segunda pantalla solo si mejora una tarea habitual.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Comprovació mensual de l’espai{% else %}Comprobación mensual del espacio{% endif %}</h2>
+      </div>
+    </div>
+{% if current_lang == 'va' %}
+    <ul>
+      <li>La pantalla continua centrada i a una altura còmoda.</li>
+      <li>La cadira permet recolzar esquena i peus.</li>
+      <li>Teclat i ratolí no obliguen a elevar muscles.</li>
+      <li>La llum no produïx reflexos importants.</li>
+      <li>Els cables estan recollits i sense tensió.</li>
+      <li>La taula conté només material d’ús freqüent.</li>
+      <li>Pots canviar de postura i alçar-te amb facilitat.</li>
+      <li>Les sessions tenen pauses i una hora de tancament.</li>
+    </ul>
+{% else %}
+    <ul>
+      <li>La pantalla sigue centrada y a una altura cómoda.</li>
+      <li>La silla permite apoyar espalda y pies.</li>
+      <li>Teclado y ratón no obligan a elevar hombros.</li>
+      <li>La luz no produce reflejos importantes.</li>
+      <li>Los cables están recogidos y sin tensión.</li>
+      <li>La mesa contiene solo material de uso frecuente.</li>
+      <li>Puedes cambiar de postura y levantarte con facilidad.</li>
+      <li>Las sesiones tienen pausas y una hora de cierre.</li>
+    </ul>
+{% endif %}
+  </section>
+
+  <section class="content-card content-stack--standalone">
+    <div class="content-card__header">
+      <div>
+        <h2>{% if current_lang == 'va' %}Criteri final{% else %}Criterio final{% endif %}</h2>
+      </div>
+    </div>
+    {% if current_lang == 'va' %}
+    <p>Comença amb un sistema senzill, comprova si realment et facilita el treball i ajusta’l quan canvien el centre, l’horari o les necessitats. Una organització útil ha de reduir errors i decisions repetides, no crear més manteniment.</p>
+    {% else %}
+    <p>Empieza con un sistema sencillo, comprueba si realmente te facilita el trabajo y ajústalo cuando cambien el centro, el horario o las necesidades. Una organización útil debe reducir errores y decisiones repetidas, no crear más mantenimiento.</p>
+    {% endif %}
+
+    <div class="stack-actions">
+      <a class="button button--ghost" href="{% if current_lang == 'va' %}/va/recursos-docentes{% else %}/recursos-docentes{% endif %}">
+        {% if current_lang == 'va' %}Tornar a recursos per a docents{% else %}Volver a recursos para docentes{% endif %}
+      </a>
+    </div>
+  </section>
+</section>
+{% endblock %}
