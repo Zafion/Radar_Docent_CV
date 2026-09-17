@@ -39,7 +39,7 @@ fi
 
   echo
   echo "3) Parse documents"
-  python run_parse_documents.py
+  python run_parse_documents.py || echo 'WARNING: run_parse_documents.py finished with errors; continuing pipeline'
 
   echo
   echo "4) Update position lifecycle"

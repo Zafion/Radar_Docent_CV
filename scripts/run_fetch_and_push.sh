@@ -28,7 +28,6 @@ fi
   echo
   echo "1) Fetch CEICE from local network"
   python scripts/fetch_ceice_remote.py \
-    --source-key family_adjudicacion \
     --download-delay 0.75
 
   echo

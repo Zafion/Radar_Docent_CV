@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.services.discovery.adjudicacion3 import Adjudicacion3Adapter
 from app.services.discovery.base import BaseDiscoveryAdapter
 from app.services.discovery.generic_family import GenericFamilyDiscoveryAdapter
 from app.services.discovery.novedades import NovedadesDiscoveryAdapter
@@ -9,6 +10,7 @@ from app.services.discovery.rrhh_main import RrhhMainDiscoveryAdapter
 
 def get_discovery_adapters() -> list[BaseDiscoveryAdapter]:
     return [
+        Adjudicacion3Adapter(),
         NovedadesDiscoveryAdapter(),
         RrhhMainDiscoveryAdapter(),
         GenericFamilyDiscoveryAdapter(
