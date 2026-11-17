@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from app.storage.db import get_connection
+from app.services.parse_selection import filter_candidates
+from app.storage.notification_eligibility_store import processing_started, processing_unsuccessful
 
 
 DOCENT_BAG_DOC_FAMILIES = (
@@ -58,19 +60,11 @@ class DocentBagStore:
                 LIMIT 1
             ) a ON TRUE
             WHERE d.doc_family IN ({placeholders})
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM document_parse_runs pr
-                  WHERE pr.document_version_id = d.document_version_id
-                    AND pr.parser_key = %s
-                    AND pr.parser_version = %s
-                    AND pr.status = 'success'
-              )
             ORDER BY d.id
             """,
-            (*DOCENT_BAG_DOC_FAMILIES, parser_key, parser_version),
+            DOCENT_BAG_DOC_FAMILIES,
         ).fetchall()
-        return [dict(row) for row in rows]
+        return filter_candidates(self.connection, rows, parser_key, parser_version)
 
     def create_parse_run(
         self,
@@ -79,6 +73,7 @@ class DocentBagStore:
         parser_version: str,
         started_at: str,
     ) -> int:
+        processing_started(self.connection, document_version_id)
         cursor = self.connection.execute(
             """
             INSERT INTO document_parse_runs (
@@ -127,6 +122,9 @@ class DocentBagStore:
                 parse_run_id,
             ),
         )
+
+        if status != 'success':
+            processing_unsuccessful(self.connection, parse_run_id, status)
 
     def clear_for_document(self, document_id: int) -> None:
         self.connection.execute(

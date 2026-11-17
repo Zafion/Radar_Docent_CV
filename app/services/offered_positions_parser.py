@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.services.parse_selection import locked_documents
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,7 +14,7 @@ from app.storage.offered_positions_store import OfferedPositionsStore
 
 
 PARSER_KEY = "offered_positions_parser"
-PARSER_VERSION = "0.4.0"
+PARSER_VERSION = "0.5.0"
 
 ROW_START_RE = re.compile(r"^(?:\d+\s+)?(.+?)\s+-\s+\d{8}\s+-\s+.+$")
 LOCALITY_CENTER_RE = re.compile(
@@ -20,12 +22,20 @@ LOCALITY_CENTER_RE = re.compile(
 )
 SPECIALTY_RE_1 = re.compile(r"^(?P<code>[0-9A-Z]+)\s*-\s*(?P<name>.+)$")
 SPECIALTY_RE_2 = re.compile(r"^(?P<code>[0-9A-Z]+)\s+(?P<name>.+)$")
-POSITION_CODE_RE = re.compile(r"(?P<code>\d{6})(?!\d)")
+POSITION_CODE_RE = re.compile(r"(?<!\d)(?P<code>\d{6}|\d\s+\d{5}|\d{2}\s+\d{4}|\d{3}\s+\d{3}|\d{4}\s+\d{2}|\d{5}\s+\d)(?!\d)")
 HOURS_RE = re.compile(r"\b(?P<hours>\d{1,2}(?:,\d+)?)\b")
 TYPE_ONLY_ROW_RE = re.compile(
     r"^(?P<number>\d+)\s+(?P<type>SUSTITUCIÓN INDETERMINADA|SUSTITUCIÓN DETERMINADA|VACANTE)$",
     flags=re.IGNORECASE,
 )
+
+
+class SkippedOfferedDocument(ValueError):
+    """A document that must not replace stored positions with zero rows."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 
 @dataclass(slots=True)
@@ -61,7 +71,7 @@ class OfferedPositionsParserService:
                 parser_version=PARSER_VERSION,
             )
 
-            for document in documents:
+            for document in locked_documents(store, documents, PARSER_KEY, PARSER_VERSION):
                 started_at = self._utc_now_iso()
                 parse_run_id = store.create_parse_run(
                     document_version_id=int(document["document_version_id"]),
@@ -70,8 +80,13 @@ class OfferedPositionsParserService:
                     started_at=started_at,
                 )
 
+                # Preserve run metadata when a failed replacement rolls back.
+                store.connection.commit()
+
                 try:
                     rows = self._parse_document(document)
+                    if not rows:
+                        raise ValueError("No rows parsed from offered positions document")
                     store.clear_offered_positions_for_document(
                         int(document["document_id"])
                     )
@@ -107,6 +122,7 @@ class OfferedPositionsParserService:
                         rows_extracted=len(rows),
                         error_message=None,
                     )
+                    store.attest_validation(document_id=int(document["document_id"]), parse_run_id=parse_run_id)
                     store.mark_document_parsed(
                         document_id=int(document["document_id"]),
                         parsed_at=finished_at,
@@ -121,6 +137,23 @@ class OfferedPositionsParserService:
                             "status": "success",
                         }
                     )
+
+                except SkippedOfferedDocument as exc:
+                    store.finish_parse_run(
+                        parse_run_id=parse_run_id,
+                        finished_at=self._utc_now_iso(),
+                        status="skipped",
+                        rows_extracted=0,
+                        error_message=exc.reason,
+                    )
+                    store.connection.commit()
+                    summaries.append({
+                        "document_id": int(document["document_id"]),
+                        "original_filename": document["original_filename"],
+                        "rows_extracted": 0,
+                        "status": "skipped",
+                        "reason": exc.reason,
+                    })
 
                 except Exception as exc:
                     store.connection.rollback()
@@ -165,9 +198,11 @@ class OfferedPositionsParserService:
         row_buffer: Optional[str] = None
         pending_row_prefix: Optional[str] = None
         parsed_rows: list[ParsedOfferedPosition] = []
+        pending_composition_lines: list[str] = []
+        row_composition: Optional[str] = None
 
         def flush_row_buffer() -> None:
-            nonlocal row_buffer
+            nonlocal row_buffer, row_composition
 
             if not row_buffer:
                 return
@@ -181,20 +216,29 @@ class OfferedPositionsParserService:
                 province=current_province,
             )
             if parsed:
+                if row_composition:
+                    parsed.composition = " | ".join(filter(None, [row_composition, parsed.composition]))
                 parsed_rows.append(parsed)
 
             row_buffer = None
+            row_composition = None
 
-        for line in self._extract_clean_lines(file_path):
+        lines = self._extract_clean_lines(file_path)
+        if not lines:
+            raise ValueError("No readable text in offered positions document")
+
+        for line in lines:
             if self._is_body_line(line):
                 flush_row_buffer()
                 pending_row_prefix = None
+                pending_composition_lines.clear()
                 current_body_name = self._parse_body_name(line)
                 continue
 
             if self._is_specialty_line(line):
                 flush_row_buffer()
                 pending_row_prefix = None
+                pending_composition_lines.clear()
                 (
                     current_specialty_code,
                     current_specialty_name,
@@ -204,6 +248,7 @@ class OfferedPositionsParserService:
             if self._is_province_line(line):
                 flush_row_buffer()
                 pending_row_prefix = None
+                pending_composition_lines.clear()
                 current_province = self._parse_province(line)
                 continue
 
@@ -217,6 +262,7 @@ class OfferedPositionsParserService:
             if TYPE_ONLY_ROW_RE.match(line):
                 flush_row_buffer()
                 pending_row_prefix = line
+                pending_composition_lines.clear()
                 continue
 
             if self._looks_like_row_start(line):
@@ -227,13 +273,35 @@ class OfferedPositionsParserService:
                 else:
                     row_buffer = line
 
+                row_composition = " | ".join(pending_composition_lines) or None
+                pending_composition_lines.clear()
                 pending_row_prefix = None
                 continue
 
+            if pending_row_prefix and not row_buffer:
+                pending_composition_lines.append(line)
             if row_buffer:
                 row_buffer = f"{row_buffer} {line}"
 
         flush_row_buffer()
+        if not parsed_rows:
+            # A zero is never proof that existing positions should be removed.
+            # Recognized rows that cannot be parsed are real failures, whereas
+            # unrelated documents should not block the pipeline.
+            headings = {"plazas ofertadas", "puestos ofertados", "llocs oferits", "vacantes"}
+            empty_notices = {"no hay plazas ofertadas.", "no hi ha llocs oferits."}
+            has_heading = any(line.casefold() in headings for line in lines)
+            has_candidates = any(
+                self._looks_like_row_start(line) or TYPE_ONLY_ROW_RE.match(line)
+                for line in lines
+            )
+            if has_candidates:
+                raise ValueError("Offered position rows recognized but no rows parsed")
+            if has_heading and any(line.casefold() in empty_notices for line in lines):
+                raise SkippedOfferedDocument("explicitly_empty")
+            if has_heading:
+                raise ValueError("Offered positions heading recognized but no rows parsed")
+            raise SkippedOfferedDocument("unsupported_format")
         return parsed_rows
 
     def _parse_row(
@@ -289,32 +357,19 @@ class OfferedPositionsParserService:
         center_code = locality_match.group("center_code").strip()
         rest = locality_match.group("rest").strip()
 
-        position_match = POSITION_CODE_RE.search(rest)
+        position_match = self._find_position_code(rest)
         if not position_match:
             return None
 
-        center_name = rest[: position_match.start()].strip()
-        position_code = position_match.group("code")
-        tail = rest[position_match.end() :].strip()
+        center_name = rest[: position_match.start("code")].strip()
+        position_code = re.sub(r"\s+", "", position_match.group("code"))
+        tail = rest[position_match.end("code") :].strip()
 
         tail = self._remove_header_noise(tail)
 
-        valenciano_required_text = self._extract_last_yes_no(tail)
-        if valenciano_required_text:
-            tail = re.sub(
-                rf"\b{re.escape(valenciano_required_text)}\b\s*$",
-                "",
-                tail,
-                flags=re.IGNORECASE,
-            ).strip()
-
-        hours_text = self._extract_last_hours(tail)
+        is_itinerant, valenciano_required_text, hours_text, remainder = self._read_offer_fields(tail)
         hours_value = self._coerce_hours(hours_text)
-        if hours_text:
-            tail = re.sub(rf"\b{re.escape(hours_text)}\b\s*$", "", tail).strip()
-
-        observations = self._normalize_spaces(tail) or None
-        observations = self._clean_trailing_yes_no_noise(observations)
+        observations, composition = self._split_offer_remainder(remainder)
 
         return ParsedOfferedPosition(
             source_type=source_type,
@@ -329,12 +384,23 @@ class OfferedPositionsParserService:
             position_code=position_code,
             hours_text=hours_text,
             hours_value=hours_value,
-            is_itinerant=None,
+            is_itinerant=is_itinerant,
             valenciano_required_text=valenciano_required_text,
             position_type=position_type,
-            composition=None,
+            composition=composition,
             observations=observations,
             raw_row_text=cleaned,
+        )
+
+    def _find_position_code(self, text: str):
+        match = POSITION_CODE_RE.search(text)
+        if match:
+            return match
+        # Known PDF layout: the numbered centre and its six-digit position
+        # touch, e.g. "NÚMERO 2" + "899658". Keep the centre number intact.
+        return re.search(
+            r"\b(?:NÚMERO|NUMERO|N[º°])\s+\d{1,3}(?P<code>\d{6})(?!\d)(?=\s+(?:SI|NO)\b)",
+            text, re.IGNORECASE,
         )
 
     def _parse_dificil_cobertura_row(
@@ -348,7 +414,10 @@ class OfferedPositionsParserService:
         province: Optional[str],
     ) -> Optional[ParsedOfferedPosition]:
         cleaned = self._remove_header_noise(self._normalize_spaces(row_text))
-        cleaned = re.sub(r"^\d+\s+", "", cleaned).strip()
+        prefix_hours = None
+        prefix = re.match(r"^(?P<hours>\d{1,2}(?:[,.]\d+)?)\s*(?P<rest>[^\d\s].*)$", cleaned)
+        if prefix:
+            prefix_hours, cleaned = prefix["hours"], prefix["rest"]
 
         locality_match = LOCALITY_CENTER_RE.match(cleaned)
         if not locality_match:
@@ -358,67 +427,42 @@ class OfferedPositionsParserService:
         center_code = locality_match.group("center_code").strip()
         rest = locality_match.group("rest").strip()
 
-        position_match = POSITION_CODE_RE.search(rest)
+        position_match = self._find_position_code(rest)
         if not position_match:
             return None
 
-        before_code = rest[: position_match.start()].strip()
-        position_code = position_match.group("code")
-        after_code = rest[position_match.end() :].strip()
+        before_code = rest[: position_match.start("code")].strip()
+        position_code = re.sub(r"\s+", "", position_match.group("code"))
+        after_code = rest[position_match.end("code") :].strip()
 
-        pre_hours = self._extract_last_hours(before_code)
-        pre_yes_no = self._extract_last_yes_no(before_code)
-
+        flags = list(re.finditer(r"(?<!\w)(?:SI|NO)(?=\s|$)", before_code, re.IGNORECASE))
+        pre_flag = pre_requirement = None
         center_name = before_code
-        if pre_yes_no:
-            center_name = re.sub(
-                rf"\b{re.escape(pre_yes_no)}\b\s*$",
-                "",
-                center_name,
-                flags=re.IGNORECASE,
-            ).strip()
-        if pre_hours:
-            center_name = re.sub(
-                rf"\b{re.escape(pre_hours)}\b\s*$",
-                "",
-                center_name,
-            ).strip()
+        if flags:
+            flag = flags[-1]
+            center_name = before_code[:flag.start()].strip()
+            pre_flag, pre_requirement, _, pre_remainder = self._read_offer_fields(
+                before_code[flag.start():], allow_hours=False,
+            )
+        else:
+            pre_remainder = ""
 
         after_code = self._remove_header_noise(after_code)
-
         position_type = self._extract_dificil_position_type(after_code)
         if position_type:
-            after_code = re.sub(
-                re.escape(position_type),
-                "",
-                after_code,
-                count=1,
-                flags=re.IGNORECASE,
-            ).strip()
-
-        post_hours = self._extract_first_hours(after_code)
-        post_yes_no = self._extract_first_yes_no(after_code)
-
-        hours_text = post_hours or pre_hours
+            after_code = re.sub(re.escape(position_type), "", after_code, count=1, flags=re.IGNORECASE).strip()
+        post_flag, post_requirement, post_hours, remainder = self._read_offer_fields(
+            after_code, allow_hours=prefix_hours is None,
+        )
+        if pre_flag is not None and post_flag is not None and pre_flag != post_flag:
+            raise ValueError("conflicting_itinerancy_fields")
+        is_itinerant = pre_flag if pre_flag is not None else post_flag
+        valenciano_required_text = " ".join(filter(None, [pre_requirement, post_requirement])) or None
+        hours_text = prefix_hours or post_hours
         hours_value = self._coerce_hours(hours_text)
-        valenciano_required_text = post_yes_no or pre_yes_no
-
-        remainder = after_code
-        if post_hours:
-            remainder = re.sub(
-                rf"\b{re.escape(post_hours)}\b", "", remainder, count=1
-            ).strip()
-        if post_yes_no:
-            remainder = re.sub(
-                rf"\b{re.escape(post_yes_no)}\b",
-                "",
-                remainder,
-                count=1,
-                flags=re.IGNORECASE,
-            ).strip()
-
-        composition = self._normalize_spaces(remainder) or None
-        composition = self._clean_trailing_yes_no_noise(composition)
+        observations, composition = self._split_offer_remainder(
+            " ".join(filter(None, [pre_remainder, remainder]))
+        )
 
         return ParsedOfferedPosition(
             source_type=source_type,
@@ -433,13 +477,42 @@ class OfferedPositionsParserService:
             position_code=position_code,
             hours_text=hours_text,
             hours_value=hours_value,
-            is_itinerant=None,
+            is_itinerant=is_itinerant,
             valenciano_required_text=valenciano_required_text,
             position_type=position_type,
             composition=composition,
-            observations=None,
+            observations=observations,
             raw_row_text=cleaned,
         )
+
+    def _read_offer_fields(self, text: str, *, allow_hours: bool = True):
+        """Consume only explicit leading column values, never numbers in notes."""
+        remainder = text.strip()
+        itinerant = None
+        hours = None
+        requirements = []
+        while remainder:
+            flag = re.match(r"^(SI|NO)(?=\s|\d|$)\s*", remainder, re.IGNORECASE)
+            language = re.match(r"^(?:[A-Z]{2,3}-[ABC][12]\.?|[ABC][12]\s*Val\.)(?=\s|$)", remainder, re.IGNORECASE)
+            numeric = re.match(r"^(\d{1,2}(?:[,.]\d+)?)(?=\s|SI\b|NO\b|$)\s*", remainder, re.IGNORECASE)
+            if flag and itinerant is None:
+                itinerant = flag[1].upper() == "SI"
+                remainder = remainder[flag.end():].strip()
+            elif language:
+                requirements.append(language.group())
+                remainder = remainder[language.end():].strip()
+            elif numeric and allow_hours and hours is None:
+                hours = numeric[1]
+                remainder = remainder[numeric.end():].strip()
+            else:
+                break
+        return itinerant, " ".join(requirements) or None, hours, remainder
+
+    def _split_offer_remainder(self, text: str):
+        center = re.search(r"\b\d{8}\s*:", text)
+        if center:
+            return text[:center.start()].strip() or None, text[center.start():].strip()
+        return text.strip() or None, None
 
     def _extract_clean_lines(self, pdf_path: Path) -> list[str]:
         reader = PdfReader(str(pdf_path))
@@ -475,6 +548,12 @@ class OfferedPositionsParserService:
         return "ESPECIALIDAD/ESPECIALITAT:" in line.upper()
 
     def _parse_specialty(self, line: str) -> tuple[Optional[str], Optional[str]]:
+        prefix = re.match(
+            r"^(?P<code>[0-9A-Z]{2,5})\s*ESPECIALIDAD/ESPECIALITAT:\s*(?P<name>.+)$",
+            line, re.IGNORECASE,
+        )
+        if prefix:
+            return prefix["code"].upper(), prefix["name"].strip()
         value = line.split(":", 1)[1].strip()
 
         match = SPECIALTY_RE_1.match(value)
@@ -482,7 +561,7 @@ class OfferedPositionsParserService:
             return match.group("code").strip(), match.group("name").strip()
 
         match = SPECIALTY_RE_2.match(value)
-        if match:
+        if match and any(character.isdigit() for character in match.group("code")):
             return match.group("code").strip(), match.group("name").strip()
 
         return None, value
@@ -539,6 +618,8 @@ class OfferedPositionsParserService:
             "PUESTOS DE DIFÍCIL COBERTURA CONVOCADOS",
             "LLOCS DE DIFÍCIL COBERTURA CONVOCATS EN EL",
             "LLOCS DE DIFÍCIL COBERTURA CONVOCATS",
+            "ADJUDICACIÓN DE PERSONAL DOCENTE INICIO DE CURSO",
+            "ADJUDICACIÓ DE PERSONAL DOCENT INICI DE CURS",
             "ADJUDICACIÓN DE PERSONAL DOCENTE INTERINO DÍA",
             "ADJUDICACIÓ DE PERSONAL DOCENT INTERÍ DIA",
             "TIPUS/TIPO",

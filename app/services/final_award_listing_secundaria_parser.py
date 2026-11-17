@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.services.parse_selection import locked_documents
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,10 +12,13 @@ from typing import Optional
 from pypdf import PdfReader
 
 from app.storage.award_results_store import AwardResultsStore
+from app.services.career_practice_award_parser import (
+    CareerAwardValidationError, is_career_layout, parse_career_awards,
+)
 
 
 PARSER_KEY = "final_award_listing_secundaria_parser"
-PARSER_VERSION = "0.3.0"
+PARSER_VERSION = "0.4.0"
 
 ENTRY_START_WITH_NAME_RE = re.compile(
     r"^(?P<order>\d{1,5})(?:\s*/\s*\d{1,5})?\s*"
@@ -99,7 +104,7 @@ class FinalAwardListingSecundariaParserService:
                 parser_version=PARSER_VERSION,
             )
 
-            for document in documents:
+            for document in locked_documents(store, documents, PARSER_KEY, PARSER_VERSION):
                 started_at = self._utc_now_iso()
                 parse_run_id = store.create_parse_run(
                     document_version_id=int(document["document_version_id"]),
@@ -108,8 +113,12 @@ class FinalAwardListingSecundariaParserService:
                     started_at=started_at,
                 )
 
+                store.connection.commit()
+
                 try:
                     rows = self._parse_document(document)
+                    if not rows:
+                        raise ValueError("No results parsed from secundaria award document")
                     store.clear_award_results_for_document(int(document["document_id"]))
 
                     for row in rows:
@@ -154,6 +163,7 @@ class FinalAwardListingSecundariaParserService:
                         rows_extracted=len(rows),
                         error_message=None,
                     )
+                    store.attest_validation(document_id=int(document["document_id"]), parse_run_id=parse_run_id)
                     store.mark_document_parsed(
                         document_id=int(document["document_id"]),
                         parsed_at=finished_at,
@@ -203,6 +213,18 @@ class FinalAwardListingSecundariaParserService:
     def _parse_document(self, document) -> list[ParsedAwardResult]:
         file_path = self._resolve_file_path(document["file_path"])
         lines = self._extract_clean_lines(file_path)
+        if is_career_layout(lines):
+            return [ParsedAwardResult(
+                order_number=row.order_number,
+                person_display_name=row.person_display_name,
+                person_name_normalized=self._normalize_person_name(row.person_display_name),
+                status=row.status,
+                specialty_code=row.specialty_code,
+                specialty_name=row.specialty_name,
+                raw_block_text=row.raw_block_text,
+                assignment=ParsedAssignment(**row.assignment) if row.assignment else None,
+                body_name=row.body_name,
+            ) for row in parse_career_awards(lines)]
 
         current_body_name: Optional[str] = None
         current_specialty_code: Optional[str] = None
@@ -536,6 +558,12 @@ class FinalAwardListingSecundariaParserService:
 
     def _is_entry_start(self, lines: list[str], index: int) -> bool:
         line = lines[index]
+
+        specialty = ASSIGNMENT_SPECIALTY_RE.match(line)
+        if specialty and re.search(r"[A-Z]", specialty.group("code")):
+            # E.g. "2A5 / MÀQUINES, SERVEIS..." resembles a glued ordinal/name.
+            # Numeric n/m ordinals remain valid person starts.
+            return False
 
         if ENTRY_START_WITH_NAME_RE.match(line):
             return True

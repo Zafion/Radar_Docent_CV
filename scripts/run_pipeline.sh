@@ -41,8 +41,9 @@ echo "============================================================"
 echo "Inicio pipeline: $(date '+%F %T')"
 
 python run_sync_all.py
-python run_register_documents.py
+python run_register_documents.py --origin live_new
 python run_parse_documents.py
+python run_reconcile_notifications.py
 python run_update_position_lifecycle.py
 
 echo

@@ -1,3 +1,7 @@
+from app.services.parse_cli import automatic_entrypoint
+if __name__ == '__main__':
+    automatic_entrypoint()
+
 import sys
 
 from app.services.document_parse_dispatcher import DocumentParseDispatcherService
@@ -41,6 +45,10 @@ if result.matcher_executed:
     print(f"Matched refinados: {result.matcher_matched_refined}")
     print(f"Ambiguos: {result.matcher_ambiguous}")
     print(f"Sin match: {result.matcher_no_match}")
+
+
+from app.services.notification_eligibility import reconcile_if_configured
+reconcile_if_configured()
 
 if has_failures:
     sys.exit(1)

@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from app.storage.db import get_connection
+from app.services.parse_selection import filter_candidates
+from app.storage.notification_eligibility_store import processing_started, processing_unsuccessful, attest_validation
 
 
 class OfferedPositionsStore:
@@ -39,19 +41,11 @@ class OfferedPositionsStore:
             JOIN sources s
                 ON s.id = d.source_id
             WHERE d.doc_family = 'offered_positions'
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM document_parse_runs pr
-                  WHERE pr.document_version_id = d.document_version_id
-                    AND pr.parser_key = %s
-                    AND pr.parser_version = %s
-                    AND pr.status = 'success'
-              )
             ORDER BY d.id
             """,
-            (parser_key, parser_version),
+            (),
         ).fetchall()
-        return [dict(row) for row in rows]
+        return filter_candidates(self.connection, rows, parser_key, parser_version)
 
     def create_parse_run(
         self,
@@ -80,6 +74,7 @@ class OfferedPositionsStore:
                 started_at,
             ),
         )
+        processing_started(self.connection, document_version_id)
         return int(cursor.fetchone()[0])
 
     def finish_parse_run(
@@ -108,6 +103,9 @@ class OfferedPositionsStore:
                 parse_run_id,
             ),
         )
+
+        if status != "success":
+            processing_unsuccessful(self.connection, parse_run_id, status)
 
     def clear_offered_positions_for_document(self, document_id: int) -> None:
         self.connection.execute(
@@ -213,3 +211,5 @@ class OfferedPositionsStore:
             """,
             (parsed_at, document_id),
         )
+    def attest_validation(self, *, document_id: int, parse_run_id: int) -> None:
+        attest_validation(self.connection, document_id, parse_run_id)

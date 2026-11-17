@@ -25,7 +25,7 @@ class ClassifiedDocument:
 
 
 class DocumentClassifierService:
-    classifier_version = "0.7.0"
+    classifier_version = "0.8.0"
 
     def classify(
         self,
@@ -264,6 +264,16 @@ class DocumentClassifierService:
         title: str,
         combined_text: str,
     ) -> tuple[str, Optional[str], str] | None:
+        if re.fullmatch(r"lis_vac_act_adj_ini_\d{2}_\d{2}(?:__[0-9a-f]+)?\.pdf", filename):
+            return "offered_positions", "inicio_curso", "filename=vacancy_update_inicio_curso"
+
+        career = re.fullmatch(
+            r"ini_20\d{2}_adj_(?:res|rpp)_(?:lis_)?(mae|sec)(?:__[0-9a-f]+)?\.pdf", filename
+        )
+        if career:
+            scope = "maestros" if career[1] == "mae" else "secundaria_otros"
+            return "final_award_listing", scope, "filename=career_practice_award"
+
         if "_adj_" in filename and "_lis_mae" in filename:
             return "final_award_listing", "maestros", "filename=adj_lis_mae"
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.services.parse_selection import locked_documents
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,7 +15,7 @@ from app.storage.difficult_coverage_store import DifficultCoverageStore
 
 
 PARSER_KEY = "difficult_coverage_provisional_parser"
-PARSER_VERSION = "0.3.0"
+PARSER_VERSION = "0.4.0"
 
 DATE_TIME_RE = re.compile(
     r"(?P<dt>\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}:\d{2})"
@@ -27,7 +29,7 @@ SPECIALTY_RE = re.compile(
 )
 
 POSITION_LINE_RE = re.compile(
-    r"^(?P<prefix>.+?)\s+(?P<position_code>\d{6})\s+(?P<center_code>\d{8})\s+PUESTO\s*:\s*$",
+    r"^(?P<prefix>.+?(?<!\d)|.+?(?:NÚMERO|NUMERO|N[º°])\s+\d+)\s*(?P<position_code>\d{6})\s+(?P<center_code>\d{8})\s*PUESTO\s*:\s*$",
     re.IGNORECASE,
 )
 
@@ -81,7 +83,7 @@ class DifficultCoverageProvisionalParserService:
                 parser_version=PARSER_VERSION,
             )
 
-            for document in documents:
+            for document in locked_documents(store, documents, PARSER_KEY, PARSER_VERSION):
                 started_at = self._utc_now_iso()
                 parse_run_id = store.create_parse_run(
                     document_version_id=int(document["document_version_id"]),
@@ -89,6 +91,8 @@ class DifficultCoverageProvisionalParserService:
                     parser_version=PARSER_VERSION,
                     started_at=started_at,
                 )
+
+                store.connection.commit()
 
                 try:
                     parsed_positions = self._parse_document(document)
@@ -147,6 +151,7 @@ class DifficultCoverageProvisionalParserService:
                         rows_extracted=inserted_candidates,
                         error_message=None,
                     )
+                    store.attest_validation(document_id=int(document["document_id"]), parse_run_id=parse_run_id)
                     store.mark_document_parsed(
                         document_id=int(document["document_id"]),
                         parsed_at=finished_at,
@@ -260,6 +265,20 @@ class DifficultCoverageProvisionalParserService:
             candidates = self._parse_candidates(current_candidate_lines)
             parsed_blocks.append((current_position, candidates))
 
+        if parsed_blocks and not any(candidates for _, candidates in parsed_blocks):
+            raise ValueError("no_candidates_parsed")
+        unknown_headers = sum(
+            bool(re.search(r"PUESTO\s*:\s*$", line)) and not POSITION_LINE_RE.match(line)
+            for line in lines
+        )
+        if unknown_headers:
+            raise ValueError(f"unrecognized_position_headers: {unknown_headers}")
+        for position, candidates in parsed_blocks:
+            orders = [candidate.row_number for candidate in candidates]
+            if len(set(orders)) != len(orders):
+                raise ValueError(f"duplicate_candidate_order: position={position.position_code}")
+            if orders and (min(orders) != 1 or max(orders) != len(orders)):
+                raise ValueError(f"candidate_order_gaps: position={position.position_code}")
         return parsed_blocks
 
     def _build_position(
@@ -302,6 +321,11 @@ class DifficultCoverageProvisionalParserService:
         registro_inferior = long_numbers[2] if len(long_numbers) >= 3 else None
 
         raw_header_text = self._normalize_spaces(" ".join(meta_lines + [position_line]))
+        attached_superior = re.search(r"(\d{7,})\s*Nº de registro superior", raw_header_text, re.IGNORECASE)
+        if attached_superior:
+            registro_superior = attached_superior[1]
+            sorteo_number = None
+            registro_inferior = None
 
         return ParsedPosition(
             body_name=body_name,
@@ -322,9 +346,14 @@ class DifficultCoverageProvisionalParserService:
         parsed: list[ParsedCandidate] = []
 
         for raw_row in lines:
+            # Convocatoria number + generation timestamp is repeated in page
+            # headers; a date line is not itself evidence of a candidate.
+            if re.fullmatch(r"\d+\s+\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}:\d{2}", raw_row):
+                continue
             candidate = self._parse_candidate_row(raw_row)
-            if candidate is not None:
-                parsed.append(candidate)
+            if candidate is None or not candidate.row_number or not candidate.full_name:
+                raise ValueError("unrecognized_candidate_row")
+            parsed.append(candidate)
 
         return parsed
 
@@ -344,25 +373,25 @@ class DifficultCoverageProvisionalParserService:
         registration_datetime_text = dt_match.group("dt").strip()
         post = cleaned[dt_match.end() :].strip()
 
-        pre_tokens = pre.split()
-        row_number_idx = None
-
-        for idx in range(len(pre_tokens) - 1, -1, -1):
-            if pre_tokens[idx].isdigit():
-                row_number_idx = idx
-                break
-
-        if row_number_idx is None:
-            return None
-
-        try:
+        glued = re.fullmatch(r"(?P<surnames>[^\d]+?)(?P<row>\d{1,5})\s+(?P<first>[^\d]+)", pre)
+        if glued:
+            row_number = int(glued['row'])
+            surnames = glued['surnames'].strip()
+            first_name = glued['first'].strip()
+            full_name = f"{surnames} {first_name}"
+            parts = surnames.split()
+            last_name_1, last_name_2 = parts if len(parts) == 2 else (None, None)
+        else:
+            pre_tokens = pre.split()
+            row_number_idx = next((i for i in range(len(pre_tokens)-1, -1, -1)
+                                   if pre_tokens[i].isdigit()), None)
+            if row_number_idx is None:
+                return None
             row_number = int(pre_tokens[row_number_idx])
-        except ValueError:
-            row_number = None
-
-        full_name = " ".join(pre_tokens[:row_number_idx] + pre_tokens[row_number_idx + 1 :]).strip()
-        if not full_name:
-            return None
+            full_name = " ".join(pre_tokens[:row_number_idx] + pre_tokens[row_number_idx+1:]).strip()
+            if not full_name:
+                return None
+            last_name_1, last_name_2, first_name = self._split_person_name(full_name)
 
         post_tokens = post.split()
 
@@ -399,8 +428,6 @@ class DifficultCoverageProvisionalParserService:
 
         if petition_text and petition_text.isdigit():
             petition_number = int(petition_text)
-
-        last_name_1, last_name_2, first_name = self._split_person_name(full_name)
 
         return ParsedCandidate(
             row_number=row_number,
@@ -454,6 +481,7 @@ class DifficultCoverageProvisionalParserService:
     ) -> tuple[Optional[str], Optional[str]]:
         markers = (
             "CEIP",
+            "CEP",
             "IES",
             "CIPFP",
             "CEE",

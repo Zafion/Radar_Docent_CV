@@ -1,3 +1,7 @@
+from app.services.parse_cli import automatic_entrypoint
+if __name__ == '__main__':
+    automatic_entrypoint()
+
 import sys
 
 from app.services.offered_positions_parser import OfferedPositionsParserService
@@ -20,6 +24,10 @@ for item in results:
     if item["status"] == "failed":
         has_failures = True
     print("-" * 80)
+
+
+from app.services.notification_eligibility import reconcile_if_configured
+reconcile_if_configured()
 
 if has_failures:
     sys.exit(1)

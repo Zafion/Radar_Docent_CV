@@ -31,17 +31,19 @@ fi
 
   echo
   echo "1) Import remote fetch"
-  python scripts/import_remote_fetch.py
+  python scripts/import_remote_fetch.py --notification-origin "${NOTIFICATION_IMPORT_INTENT:-historical_import}"
 
   echo
   echo "2) Register documents"
-  python run_register_documents.py
+  python run_register_documents.py --origin "${NOTIFICATION_IMPORT_INTENT:-historical_import}"
 
   echo
   echo "3) Parse documents"
   python run_parse_documents.py || echo 'WARNING: run_parse_documents.py finished with errors; continuing pipeline'
 
   echo
+  python run_reconcile_notifications.py
+
   echo "4) Update position lifecycle"
   python run_update_position_lifecycle.py
 

@@ -1,3 +1,7 @@
+from app.services.parse_cli import automatic_entrypoint
+if __name__ == '__main__':
+    automatic_entrypoint()
+
 from app.services.difficult_coverage_provisional_parser import (
     DifficultCoverageProvisionalParserService,
 )
@@ -17,3 +21,5 @@ for item in results:
     if 'error' in item:
         print(f"error={item['error']}")
     print("-" * 80)
+from app.services.notification_eligibility import reconcile_if_configured
+reconcile_if_configured()

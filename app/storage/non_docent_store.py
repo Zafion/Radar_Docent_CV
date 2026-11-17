@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from app.storage.db import get_connection
+from app.services.parse_selection import filter_candidates
+from app.storage.notification_eligibility_store import processing_started, processing_unsuccessful, attest_validation
 
 
 class NonDocentStore:
@@ -51,14 +53,6 @@ class NonDocentStore:
             LEFT JOIN assets a
                 ON a.document_version_id = d.document_version_id
             WHERE d.doc_family IN ({placeholders})
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM document_parse_runs pr
-                  WHERE pr.document_version_id = d.document_version_id
-                    AND pr.parser_key = %s
-                    AND pr.parser_version = %s
-                    AND pr.status = 'success'
-              )
             GROUP BY
                 d.id,
                 d.document_version_id,
@@ -77,9 +71,9 @@ class NonDocentStore:
                 s.label
             ORDER BY d.id
             """,
-            (*doc_families, parser_key, parser_version),
+            doc_families,
         ).fetchall()
-        return [dict(row) for row in rows]
+        return filter_candidates(self.connection, rows, parser_key, parser_version)
 
     def create_parse_run(
         self,
@@ -103,6 +97,7 @@ class NonDocentStore:
             """,
             (document_version_id, parser_key, parser_version, "running", started_at),
         )
+        processing_started(self.connection, document_version_id)
         return int(cursor.fetchone()[0])
 
     def finish_parse_run(
@@ -126,6 +121,9 @@ class NonDocentStore:
             """,
             (finished_at, status, rows_extracted, error_message, parse_run_id),
         )
+
+        if status != "success":
+            processing_unsuccessful(self.connection, parse_run_id, status)
 
     def mark_document_parsed(self, *, document_id: int, parsed_at: str) -> None:
         self.connection.execute(
@@ -445,3 +443,6 @@ class NonDocentStore:
             ),
         )
         return int(cursor.fetchone()[0])
+
+    def attest_validation(self, *, document_id: int, parse_run_id: int) -> None:
+        attest_validation(self.connection, document_id, parse_run_id)

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from app.services.parse_selection import locked_documents
+
 from dataclasses import dataclass
+from collections import Counter
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 import re
@@ -10,12 +14,15 @@ from typing import Optional
 from pypdf import PdfReader
 
 from app.storage.award_results_store import AwardResultsStore
+from app.services.career_practice_award_parser import (
+    CareerAwardValidationError, is_career_layout, parse_career_awards,
+)
 
 
 PARSER_KEY = "final_award_listing_maestros_parser"
-PARSER_VERSION = "0.2.0"
+PARSER_VERSION = "0.4.0"
 
-ENTRY_START_WITH_NAME_RE = re.compile(r"^(?P<order>\d{1,5})\s+(?P<name>.+,\s*.+)$")
+ENTRY_START_WITH_NAME_RE = re.compile(r"^(?P<order>\d{1,5})\s*(?P<name>[^\d\s].*,\s*.+)$")
 ENTRY_START_ONLY_ORDER_RE = re.compile(r"^(?P<order>\d{1,5})$")
 CENTER_LINE_RE = re.compile(
     r"^(?P<locality>.+?)\((?P<center_code>\d{8})\)(?P<center_name>.+)$"
@@ -52,6 +59,25 @@ REQUEST_KEYWORDS = (
 )
 
 
+class SkippedMaestrosDocument(ValueError):
+    """A document this parser cannot safely use to replace existing awards."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+class MaestrosExtractionValidationError(ValueError):
+    """Aggregate diagnostics only: no names or raw document text in logs."""
+
+    def __init__(self, metrics: dict) -> None:
+        self.metrics = metrics
+        super().__init__(
+            "maestros_extraction_validation_failed: "
+            + json.dumps(metrics, sort_keys=True, ensure_ascii=False)
+        )
+
+
 @dataclass(slots=True)
 class ParsedAssignment:
     assignment_kind: Optional[str]
@@ -77,6 +103,8 @@ class ParsedAwardResult:
     status: str
     raw_block_text: str
     assignment: ParsedAssignment | None
+    specialty_code: Optional[str] = None
+    specialty_name: Optional[str] = None
 
 
 class FinalAwardListingMaestrosParserService:
@@ -91,7 +119,7 @@ class FinalAwardListingMaestrosParserService:
                 parser_version=PARSER_VERSION,
             )
 
-            for document in documents:
+            for document in locked_documents(store, documents, PARSER_KEY, PARSER_VERSION):
                 started_at = self._utc_now_iso()
                 parse_run_id = store.create_parse_run(
                     document_version_id=int(document["document_version_id"]),
@@ -100,8 +128,14 @@ class FinalAwardListingMaestrosParserService:
                     started_at=started_at,
                 )
 
+                # Persist only run metadata. A replacement remains atomic below;
+                # rollback must not erase the run whose failure we need to record.
+                store.connection.commit()
+
                 try:
                     rows = self._parse_document(document)
+                    if not rows:
+                        raise ValueError("No results parsed from maestros award document")
                     store.clear_award_results_for_document(int(document["document_id"]))
 
                     for row in rows:
@@ -110,8 +144,8 @@ class FinalAwardListingMaestrosParserService:
                             list_scope="maestros",
                             body_code=None,
                             body_name="MESTRES / MAESTROS",
-                            specialty_code=None,
-                            specialty_name=None,
+                            specialty_code=row.specialty_code,
+                            specialty_name=row.specialty_name,
                             order_number=row.order_number,
                             person_display_name=row.person_display_name,
                             person_name_normalized=row.person_name_normalized,
@@ -146,6 +180,7 @@ class FinalAwardListingMaestrosParserService:
                         rows_extracted=len(rows),
                         error_message=None,
                     )
+                    store.attest_validation(document_id=int(document["document_id"]), parse_run_id=parse_run_id)
                     store.mark_document_parsed(
                         document_id=int(document["document_id"]),
                         parsed_at=finished_at,
@@ -160,6 +195,24 @@ class FinalAwardListingMaestrosParserService:
                             "status": "success",
                         }
                     )
+
+                except SkippedMaestrosDocument as exc:
+                    # No results have been deleted or inserted on this path.
+                    store.finish_parse_run(
+                        parse_run_id=parse_run_id,
+                        finished_at=self._utc_now_iso(),
+                        status="skipped",
+                        rows_extracted=0,
+                        error_message=exc.reason,
+                    )
+                    store.connection.commit()
+                    summaries.append({
+                        "document_id": int(document["document_id"]),
+                        "original_filename": document["original_filename"],
+                        "rows_extracted": 0,
+                        "status": "skipped",
+                        "reason": exc.reason,
+                    })
 
                 except Exception as exc:
                     store.connection.rollback()
@@ -184,6 +237,8 @@ class FinalAwardListingMaestrosParserService:
                             "rows_extracted": 0,
                             "status": "failed",
                             "error": str(exc),
+                            **({"validation": exc.metrics}
+                               if isinstance(exc, (MaestrosExtractionValidationError, CareerAwardValidationError)) else {}),
                         }
                     )
 
@@ -195,16 +250,103 @@ class FinalAwardListingMaestrosParserService:
     def _parse_document(self, document) -> list[ParsedAwardResult]:
         file_path = self._resolve_file_path(document["file_path"])
         lines = self._extract_clean_lines(file_path)
+        if is_career_layout(lines):
+            return [ParsedAwardResult(
+                order_number=row.order_number,
+                person_display_name=row.person_display_name,
+                person_name_normalized=self._normalize_person_name(row.person_display_name),
+                status=row.status,
+                specialty_code=row.specialty_code,
+                specialty_name=row.specialty_name,
+                raw_block_text=row.raw_block_text,
+                assignment=ParsedAssignment(**row.assignment) if row.assignment else None,
+            ) for row in parse_career_awards(lines)]
+        if not lines:
+            raise ValueError("No readable text in maestros award document")
         blocks = self._split_into_blocks(lines)
+        has_status = any(line in STATUS_VALUES for line in lines)
+        if not has_status:
+            # Deliberately narrow: an unsupported layout, including career /
+            # practice, is not evidence that a document has no adjudications.
+            # Empty notices never erase a previous successful extraction.
+            empty_notices = {"no hay adjudicaciones.", "no hi ha adjudicacions."}
+            has_award_heading = any("adjudic" in line.casefold() for line in lines
+                                    if line.casefold() not in empty_notices)
+            reason = (
+                "explicitly_empty"
+                if has_award_heading and any(line.casefold() in empty_notices for line in lines)
+                else "unsupported_format"
+            )
+            raise SkippedMaestrosDocument(reason)
 
         parsed: list[ParsedAwardResult] = []
+        rejected_block_numbers: list[int] = []
 
-        for block in blocks:
+        for block_number, block in enumerate(blocks, start=1):
             row = self._parse_block(block)
             if row is not None:
                 parsed.append(row)
+            else:
+                rejected_block_numbers.append(block_number)
 
+        self._validate_extraction(lines, blocks, parsed, rejected_block_numbers)
         return parsed
+
+    def _validate_extraction(
+        self,
+        lines: list[str],
+        blocks: list[list[str]],
+        rows: list[ParsedAwardResult],
+        rejected_block_numbers: list[int],
+    ) -> None:
+        # Exact standalone status markers are independent of block discovery in
+        # the supported interino layout. Never use this rule for career/practice.
+        source_status_counts = Counter(line for line in lines if line in STATUS_VALUES)
+        parsed_status_counts = Counter(row.status for row in rows)
+        rejected_blocks = len(rejected_block_numbers)
+        ambiguous_blocks = sum(
+            sum(line in STATUS_VALUES for line in block) != 1 for block in blocks
+        )
+        missing_fields = {
+            "person_name": 0, "order_number": 0,
+            "assignment": 0, "center_code": 0, "position_code": 0,
+        }
+        for row in rows:
+            if not row.person_display_name.strip() or not row.person_name_normalized.strip():
+                missing_fields["person_name"] += 1
+            if row.order_number is None or row.order_number <= 0:
+                missing_fields["order_number"] += 1
+            if row.status != "Adjudicat":
+                continue
+            assignment = row.assignment
+            if assignment is None:
+                missing_fields["assignment"] += 1
+            if assignment is None or not re.fullmatch(r"\d{8}", assignment.center_code or ""):
+                missing_fields["center_code"] += 1
+            if assignment is None or not re.fullmatch(r"\d{6}", assignment.position_code or ""):
+                missing_fields["position_code"] += 1
+
+        issues = []
+        if source_status_counts != parsed_status_counts:
+            issues.append("status_counts_mismatch")
+        if rejected_blocks:
+            issues.append("rejected_blocks")
+        if ambiguous_blocks:
+            issues.append("ambiguous_blocks")
+        if any(missing_fields.values()):
+            issues.append("missing_required_fields")
+        if issues:
+            raise MaestrosExtractionValidationError({
+                "issues": issues,
+                "source_status_counts": dict(source_status_counts),
+                "parsed_status_counts": dict(parsed_status_counts),
+                "blocks": len(blocks),
+                "parsed_rows": len(rows),
+                "rejected_blocks": rejected_blocks,
+                "rejected_block_numbers": rejected_block_numbers[:20],
+                "ambiguous_blocks": ambiguous_blocks,
+                "missing_fields": missing_fields,
+            })
 
     def _split_into_blocks(self, lines: list[str]) -> list[list[str]]:
         blocks: list[list[str]] = []
@@ -308,7 +450,9 @@ class FinalAwardListingMaestrosParserService:
             assignment_lines.append(line)
 
             if assignment_kind is None and self._is_assignment_kind_line(line):
-                assignment_kind = "VACANT" if line.upper().startswith("VACANT") else line
+                assignment_kind = next(
+                    kind for kind in ASSIGNMENT_KIND_VALUES if line.upper().startswith(kind)
+                )
                 continue
 
             if center_code is None:
@@ -406,7 +550,7 @@ class FinalAwardListingMaestrosParserService:
 
     def _is_assignment_kind_line(self, line: str) -> bool:
         upper = line.upper()
-        return upper in ASSIGNMENT_KIND_VALUES or upper.startswith("VACANT")
+        return any(upper.startswith(kind) for kind in ASSIGNMENT_KIND_VALUES)
 
     def _looks_like_petition_line(self, line: str) -> bool:
         if "," not in line:

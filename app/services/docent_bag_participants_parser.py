@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.services.parse_selection import locked_documents
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -97,7 +99,7 @@ class DocentBagParticipantsParserService:
                 parser_version=PARSER_VERSION,
             )
 
-            for document in documents:
+            for document in locked_documents(store, documents, PARSER_KEY, PARSER_VERSION):
                 started_at = self._utc_now_iso()
                 parse_run_id = store.create_parse_run(
                     document_version_id=int(document["document_version_id"]),
@@ -105,6 +107,9 @@ class DocentBagParticipantsParserService:
                     parser_version=PARSER_VERSION,
                     started_at=started_at,
                 )
+                # Retain the attempt and explicit replay hold even if business
+                # replacement rolls back, consistently with the other parsers.
+                store.connection.commit()
 
                 try:
                     rows = self._parse_document(document)

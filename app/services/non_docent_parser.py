@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.services.parse_selection import locked_documents
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,6 +13,9 @@ from typing import Any, Optional
 from pypdf import PdfReader
 
 from app.storage.non_docent_store import NonDocentStore
+from app.services.non_docent_validation import (
+    BufferedNonDocentRows, EmptyNonDocentDocument, validate_non_docent_rows,
+)
 
 
 PARSER_KEY = "non_docent_parser"
@@ -47,7 +52,7 @@ class NonDocentParserService:
                 parser_version=PARSER_VERSION,
             )
 
-            for document in documents:
+            for document in locked_documents(store, documents, PARSER_KEY, PARSER_VERSION):
                 started_at = self._utc_now_iso()
                 parse_run_id = store.create_parse_run(
                     document_version_id=int(document["document_version_id"]),
@@ -55,6 +60,9 @@ class NonDocentParserService:
                     parser_version=PARSER_VERSION,
                     started_at=started_at,
                 )
+                # Keep the attempt outside the transaction replacing publication
+                # rows, so rollback can still finish this run as failed.
+                store.connection.commit()
 
                 try:
                     result = self._parse_document(store, document)
@@ -67,6 +75,7 @@ class NonDocentParserService:
                         rows_extracted=result.rows_extracted,
                         error_message=None,
                     )
+                    store.attest_validation(document_id=int(document["document_id"]), parse_run_id=parse_run_id)
                     store.mark_document_parsed(
                         document_id=int(document["document_id"]),
                         parsed_at=finished_at,
@@ -83,6 +92,21 @@ class NonDocentParserService:
                             "status": "success",
                         }
                     )
+
+                except EmptyNonDocentDocument as exc:
+                    store.connection.rollback()
+                    store.finish_parse_run(
+                        parse_run_id=parse_run_id, finished_at=self._utc_now_iso(),
+                        status="skipped", rows_extracted=0, error_message=str(exc),
+                    )
+                    store.connection.commit()
+                    summaries.append({
+                        "document_id": int(document["document_id"]),
+                        "doc_family": document["doc_family"],
+                        "original_filename": document["original_filename"],
+                        "rows_extracted": 0, "status": "skipped", "reason": exc.reason,
+                        "validation": exc.metrics,
+                    })
 
                 except Exception as exc:
                     store.connection.rollback()
@@ -143,6 +167,34 @@ class NonDocentParserService:
             doc_family=doc_family,
         )
 
+        buffer = BufferedNonDocentRows(store)
+        if doc_family == "non_docent_adc_call":
+            rows = self._parse_adc_call_positions(
+                store=buffer,
+                publication_id=0,
+                staff_group_id=staff_group_id,
+                staff_group_code=staff_group_code,
+                lines=lines,
+            )
+        elif doc_family == "non_docent_adc_award":
+            rows = self._parse_adc_awards(
+                store=buffer,
+                publication_id=0,
+                staff_group_id=staff_group_id,
+                full_text=full_text,
+            )
+        else:
+            rows = self._parse_bag_document(
+                store=buffer,
+                publication_id=0,
+                staff_group_id=staff_group_id,
+                document=document,
+                lines=lines,
+                source_kind="ceice_specific" if doc_family == "non_docent_bag_update" else "funcion_publica",
+            )
+
+        validate_non_docent_rows(doc_family, full_text, lines, buffer, rows)
+
         title = document["title"] or document["original_filename"]
         publication_id = store.upsert_publication(
             staff_group_id=staff_group_id,
@@ -159,30 +211,7 @@ class NonDocentParserService:
         )
         store.clear_publication_rows(publication_id=publication_id)
 
-        if doc_family == "non_docent_adc_call":
-            rows = self._parse_adc_call_positions(
-                store=store,
-                publication_id=publication_id,
-                staff_group_id=staff_group_id,
-                staff_group_code=staff_group_code,
-                lines=lines,
-            )
-        elif doc_family == "non_docent_adc_award":
-            rows = self._parse_adc_awards(
-                store=store,
-                publication_id=publication_id,
-                staff_group_id=staff_group_id,
-                full_text=full_text,
-            )
-        else:
-            rows = self._parse_bag_document(
-                store=store,
-                publication_id=publication_id,
-                staff_group_id=staff_group_id,
-                document=document,
-                lines=lines,
-                source_kind="ceice_specific" if doc_family == "non_docent_bag_update" else "funcion_publica",
-            )
+        buffer.replay(store, publication_id)
 
         return ParseResult(rows_extracted=rows, publication_id=publication_id)
 
@@ -369,7 +398,7 @@ class NonDocentParserService:
             r"(?P<scope>(?:[A-Z]{2,3}\d*(?:,\s*)?)+)\s+"
             r"(?P<name>[A-ZÁÉÍÓÚÜÑÇÀÈÒÏ' -]{4,}?)\s+"
             r"(?P<fc>S[ií]|No)\s+"
-            r"(?P<position_code>\d{4,6})\s*-\s*"
+            r"(?P<position_code>\d{3,6})\s*-\s*"
             r"(?P<position_text>.+?)(?=(?:\d{1,3}-E\.|\*F\.C\.|Queden deserts|Quedan desiertos|S'han retirat|Se han retirado|No han quedat|No han quedado|$))",
             flags=re.IGNORECASE,
         )
