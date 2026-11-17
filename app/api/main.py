@@ -6,6 +6,8 @@ from app.web.routes import TEMPLATES, router as web_router
 from app.web.i18n import get_language_from_path, translate_html
 
 import os
+import re
+from datetime import date
 from contextlib import contextmanager
 from typing import Any, Iterable, Sequence
 
@@ -457,32 +459,6 @@ def build_user_view(
     bag_memberships: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     bag_memberships = bag_memberships or []
-    latest_award = awards[0] if awards else None
-    latest_bag = bag_memberships[0] if bag_memberships else None
-
-    latest_awarded = next(
-        (
-            award
-            for award in awards
-            if award.get("status") == "Adjudicat" and award.get("assignments_count", 0) > 0
-        ),
-        None,
-    )
-
-    selected_difficult = next(
-        (row for row in difficult_coverage if row.get("is_selected") is True),
-        None,
-    )
-
-    def date_key(value: Any) -> str:
-        return str(value or "")
-
-    latest_non_bag_date = max(
-        [
-            date_key(latest_award.get("document_date_iso") if latest_award else None),
-            date_key(difficult_coverage[0].get("document_date_iso") if difficult_coverage else None),
-        ]
-    )
 
     base = {
         "display_name": person["display_name"],
@@ -513,13 +489,71 @@ def build_user_view(
         "bag_position_scope": None,
     }
 
+    # A summary describes the latest dated publication, never an administrative
+    # status inferred from an arbitrary historical award. Unknown dates and ties
+    # across documents/scopes require the user to consult the history.
+    records = (
+        [("award", row) for row in awards]
+        + [("difficult", row) for row in difficult_coverage]
+        + [("bag", row) for row in bag_memberships]
+    )
+
+    def date_key(row: dict[str, Any]) -> str | None:
+        try:
+            return date.fromisoformat(str(row.get("document_date_iso") or "")[:10]).isoformat()
+        except ValueError:
+            return None
+
+    def course(row: dict[str, Any]) -> str | None:
+        value = row.get("course_year")
+        if value:
+            return str(value)
+        filename = str(row.get("original_filename") or "")
+        match = re.match(r"ini_(20\d{2})_", filename)
+        if match:
+            year = int(match.group(1))
+            return f"{year}/{year + 1}"
+        match = re.match(r"\d{6}_lis_(?:mae|sec)", filename)
+        day = date_key(row)
+        if match and day:
+            parsed = date.fromisoformat(day)
+            year = parsed.year if parsed.month >= 9 else parsed.year - 1
+            return f"{year}/{year + 1}"
+        return None
+
+    if not records or any(date_key(row) is None for _, row in records):
+        return {**base, "current_result_message": "Faltan fechas fiables para resumir las publicaciones. Consulta el historial; no se puede deducir la situación administrativa actual."}
+    latest_date = max(date_key(row) for _, row in records)
+    latest = [(kind, row) for kind, row in records if date_key(row) == latest_date]
+    known_courses = [course(row) for _, row in records if course(row)]
+    if known_courses and any(course(row) and course(row) < max(known_courses) for _, row in latest):
+        return {**base, "latest_date": latest_date, "current_result_message": "La publicación con fecha posterior pertenece a un curso anterior. Consulta cada curso y procedimiento en el historial."}
+    if len(latest) != 1:
+        return {**base, "current_result": "ambiguous", "latest_date": latest_date,
+                "current_result_label": "Varios resultados en la misma fecha",
+                "current_result_message": "Hay varios resultados, ámbitos o procedimientos en la fecha más reciente. Consulta cada publicación; no se deduce una situación administrativa única."}
+    kind, latest_row = latest[0]
+    latest_award = latest_row if kind == "award" else None
+    latest_bag = latest_row if kind == "bag" else None
+    latest_awarded = (
+        latest_award
+        if latest_award
+        and latest_award.get("status") == "Adjudicat"
+        and latest_award.get("assignments_count", len(latest_award.get("assignments", []))) > 0
+        else None
+    )
+    selected_difficult = latest_row if kind == "difficult" and latest_row.get("is_selected") is True else None
+    base["result_context"] = {"course_year": course(latest_row), "procedure": latest_row.get("procedure"),
+                              "list_scope": latest_row.get("list_scope"), "specialty_code": latest_row.get("specialty_code")}
+
     if latest_awarded:
-        first_assignment = latest_awarded["assignments"][0] if latest_awarded["assignments"] else None
+        assignments = latest_awarded.get("assignments") or []
+        first_assignment = assignments[0] if assignments else None
         return {
             **base,
             "current_result": "awarded",
             "current_result_label": "Adjudicado",
-            "current_result_message": "Sí tienes una plaza adjudicada en los datos cargados.",
+            "current_result_message": "En la publicación más reciente consultada consta una adjudicación en su curso y procedimiento. No acredita la situación administrativa actual.",
             "latest_scope_label": map_list_scope_label(latest_awarded.get("list_scope")),
             "latest_specialty_label": make_label(
                 latest_awarded.get("specialty_code"),
@@ -540,7 +574,7 @@ def build_user_view(
             "assigned_distance_km": first_assignment.get("distance_km") if first_assignment else None,
         }
 
-    if latest_bag and not selected_difficult and (not latest_non_bag_date or date_key(latest_bag.get("document_date_iso")) >= latest_non_bag_date):
+    if latest_bag:
         position_scope = latest_bag.get("position_scope")
         scope_label = "Bolsa general" if position_scope == "general" else "Bolsa por especialidad"
         service_or_collective = latest_bag.get("service_status") or latest_bag.get("collective")
@@ -578,7 +612,7 @@ def build_user_view(
                 **base,
                 "current_result": "not_awarded",
                 "current_result_label": "No adjudicado",
-                "current_result_message": "No te han adjudicado plaza en los datos cargados.",
+                "current_result_message": "La publicación más reciente consultada indica que no hubo adjudicación en ese procedimiento; no describe otros ámbitos ni la situación administrativa actual.",
                 "latest_scope_label": scope_label,
                 "latest_specialty_label": specialty_label,
                 "latest_date": latest_award.get("document_date_iso"),
@@ -614,7 +648,7 @@ def build_user_view(
                 **base,
                 "current_result": "deactivated",
                 "current_result_label": "Desactivado",
-                "current_result_message": "Figuras como desactivado en este procedimiento.",
+                "current_result_message": "La publicación más reciente consultada indica desactivación en ese procedimiento; no determina la situación en otros cursos o ámbitos.",
                 "latest_scope_label": scope_label,
                 "latest_specialty_label": specialty_label,
                 "latest_date": latest_award.get("document_date_iso"),
@@ -626,7 +660,7 @@ def build_user_view(
             **base,
             "current_result": "selected_difficult_coverage",
             "current_result_label": "Seleccionado en difícil cobertura",
-            "current_result_message": "Consta como seleccionado en un procedimiento de difícil cobertura.",
+            "current_result_message": "En la publicación más reciente consultada consta selección en difícil cobertura; verifica su fecha y ámbito en la fuente oficial.",
             "latest_scope_label": "Difícil cobertura",
             "latest_specialty_label": make_label(
                 selected_difficult.get("specialty_code"),
@@ -647,8 +681,8 @@ def build_user_view(
             "assigned_distance_km": selected_difficult.get("distance_km"),
         }
 
-    if difficult_coverage:
-        latest_difficult = difficult_coverage[0]
+    if kind == "difficult":
+        latest_difficult = latest_row
         return {
             **base,
             "current_result": "difficult_coverage_candidate",
@@ -1229,6 +1263,7 @@ def get_person_profile(
                     ar.document_id,
                     d.document_date_iso,
                     d.title AS document_title,
+                    dv.original_filename,
                     s.source_key,
                     ar.list_scope,
                     ar.body_code,
@@ -1256,6 +1291,7 @@ def get_person_profile(
                     ) AS matched_assignments_count
                 FROM award_results ar
                 JOIN documents d ON d.id = ar.document_id
+                JOIN document_versions dv ON dv.id = d.document_version_id
                 JOIN sources s ON s.id = d.source_id
                 WHERE normalize_text(ar.person_display_name) = normalize_text(?)
                    OR normalize_text(ar.person_name_normalized) = normalize_text(?)
