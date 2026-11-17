@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from app.services.notification_policy import notifications_enabled
 from app.storage.push_subscription_store import (
     delete_push_subscription,
     list_active_push_subscriptions,
@@ -48,61 +49,19 @@ def send_push_notification_to_all(
     body: str,
     url: str,
 ) -> dict[str, Any]:
+    if not notifications_enabled():
+        return {"sent": 0, "failed": 0, "deleted": 0, "disabled": True, "reason": "notifications_disabled"}
     if not is_push_configured():
         return {"sent": 0, "failed": 0, "deleted": 0, "reason": "push_not_configured"}
 
-    from pywebpush import WebPushException, webpush
-
-    payload = json.dumps(
-        {
-            "title": title,
-            "body": body,
-            "url": url,
-        }
-    )
-
-    sent = 0
-    failed = 0
-    deleted = 0
-    last_error: str | None = None
-
-    subscriptions = list_active_push_subscriptions(conn)
-
-    for sub in subscriptions:
-        subscription_info = {
-            "endpoint": sub["endpoint"],
-            "keys": {
-                "p256dh": sub["p256dh_key"],
-                "auth": sub["auth_key"],
-            },
-        }
-
-        try:
-            webpush(
-                subscription_info=subscription_info,
-                data=payload,
-                vapid_private_key=VAPID_PRIVATE_KEY,
-                vapid_claims={"sub": VAPID_SUBJECT},
-            )
-            sent += 1
-        except WebPushException as exc:
-            failed += 1
-            last_error = str(exc)
-            response = getattr(exc, "response", None)
-            status_code = getattr(response, "status_code", None)
-            if status_code in (404, 410):
-                delete_push_subscription(conn, sub["endpoint"])
-                deleted += 1
-        except Exception as exc:
-            failed += 1
-            last_error = str(exc)
-
-    result = {
-        "active_subscriptions": len(subscriptions),
-        "sent": sent,
-        "failed": failed,
-        "deleted": deleted,
-    }
-    if last_error:
-        result["last_error"] = last_error
+    # Compatibility entrypoint for local/manual callers: detach recipients and
+    # commit their read transaction BEFORE invoking the bounded transport.
+    import time
+    from app.services.notification_transport import prepare_push_recipients,send_push_snapshot,BATCH_SECONDS,dispatch_transport,deactivate_expired_recipients
+    subscriptions,total=prepare_push_recipients(conn)
+    result=send_push_snapshot(subscriptions,total,dict(title=title,body=body,url=url),
+                              time.monotonic()+BATCH_SECONDS,dispatch=dispatch_transport)
+    result['deactivated']=deactivate_expired_recipients(conn,subscriptions,result)
+    conn.commit()
+    result['deleted']=0
     return result

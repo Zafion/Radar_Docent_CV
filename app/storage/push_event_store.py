@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from app.storage.notification_eligibility_store import eligible_event_sql, deliverable_event_sql
 
 
 def enqueue_push_notification_event(
@@ -34,6 +35,7 @@ def enqueue_push_notification_event(
 
 
 def list_pending_push_notification_events(conn: Any, *, limit: int = 20) -> list[dict[str, Any]]:
+    gate,gate_params=deliverable_event_sql("push_notification_events.event_key")
     rows = conn.execute(
         """
         SELECT
@@ -47,10 +49,13 @@ def list_pending_push_notification_events(conn: Any, *, limit: int = 20) -> list
             created_at
         FROM push_notification_events
         WHERE status = 'pending'
+          AND __ELIGIBLE_PUSH__
+          AND NOT EXISTS(SELECT 1 FROM notification_legacy_holds h WHERE h.channel='push' AND h.queue_id=push_notification_events.id)
+          AND NOT EXISTS(SELECT 1 FROM notification_delivery_attempts da WHERE da.channel='push' AND da.queue_id=push_notification_events.id AND da.state NOT IN ('disabled','blocked'))
         ORDER BY created_at ASC, id ASC
         LIMIT %s
-        """,
-        (limit,),
+        """.replace("__ELIGIBLE_PUSH__",gate),
+        (*gate_params, limit),
     ).fetchall()
     return [dict(row) for row in rows]
 
@@ -93,7 +98,7 @@ def mark_push_notification_event_failed(
         UPDATE push_notification_events
         SET
             status = 'failed',
-            sent_at = NOW(),
+            sent_at = NULL,
             sent_count = %s,
             failed_count = %s,
             deleted_count = %s,

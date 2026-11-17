@@ -1,9 +1,15 @@
 from __future__ import annotations
+import os
+
+from app.services.notification_policy import notifications_enabled
+from app.services.notification_transport import dispatch_transport
+from app.storage.notification_eligibility_store import (
+    claim_notification_delivery, finish_delivery_attempt,
+)
 
 from app.services.telegram_notifications import (
     is_telegram_configured,
-    send_telegram_message,
-    send_telegram_photo,
+    get_telegram_channel_id,
 )
 from app.storage.db import get_connection
 from app.storage.public_alert_store import (
@@ -44,58 +50,63 @@ def build_telegram_photo_caption(text: str) -> str:
     return text[:1000].rstrip() + "\n\n…"
 
 
-def main() -> None:
-    conn = get_connection()
+def safe_delivery_log(message: str) -> None:
+    # A broken stdout AFTER commit must not turn a confirmed delivery into failed.
     try:
-        configured = is_telegram_configured()
-        posts = list_pending_notification_posts(conn, channel="telegram", limit=50)
+        print(message)
+    except (OSError, ValueError):
+        pass
 
-        print("=" * 100)
-        print("public_notification_publishers")
-        print(f"Telegram configurado: {'sí' if configured else 'no'}")
-        print(f"Posts Telegram pendientes: {len(posts)}")
 
-        if not posts:
-            conn.commit()
-            return
-        if not configured:
-            print("Telegram no configurado: se conservan los posts pendientes.")
-            conn.commit()
-            return
-
-        for post in posts:
-            try:
-                rendered_text = str(post["rendered_text"])
-                event_type = str(post.get("event_type") or "")
-                image_url = get_telegram_image_url(event_type)
-
-                if image_url:
-                    result = send_telegram_photo(
-                        photo_url=image_url,
-                        caption=build_telegram_photo_caption(rendered_text),
-                    )
-                    print(f"- {post['event_key']}: published telegram photo={image_url}")
-                else:
-                    result = send_telegram_message(rendered_text)
-                    print(f"- {post['event_key']}: published telegram text fallback")
-
-                message_id = result.get("result", {}).get("message_id")
-                mark_notification_post_published(
-                    conn,
-                    post_id=int(post["id"]),
-                    external_message_id=str(message_id) if message_id is not None else None,
-                )
-                print(f"  telegram message_id={message_id}")
-            except Exception as exc:
-                mark_notification_post_failed(conn, post_id=int(post["id"]), error_message=str(exc))
-                print(f"- {post['event_key']}: failed {exc}")
+def main() -> None:
+    if not notifications_enabled():
+        print("Notificaciones desactivadas: se conservan los pendientes.")
+        return
+    import time
+    from app.services.notification_transport import BATCH_SECONDS,MAX_EVENTS,REQUEST_SECONDS
+    deadline=time.monotonic()+BATCH_SECONDS
+    conn=get_connection()
+    try:
+        if not is_telegram_configured():return
+        posts=list_pending_notification_posts(conn,channel='telegram',limit=MAX_EVENTS)
         conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn._conn.close()
+        for post in posts:
+            if time.monotonic()>=deadline:break
+            image_url=get_telegram_image_url(str(post.get('event_type') or ''))
+            authorization=claim_notification_delivery(conn,'telegram',int(post['id']),str(post['event_key']),return_authorization=True,
+                delivery_context=dict(image_url=image_url,chat_id=get_telegram_channel_id(),
+                    disable_preview=os.getenv('TELEGRAM_DISABLE_WEB_PAGE_PREVIEW','true').strip().lower() in {'1','true','yes','on'},
+                    request_seconds=REQUEST_SECONDS,batch_seconds=BATCH_SECONDS))
+            if authorization is None:continue
+            attempt=authorization['attempt_id']
+            token=authorization['token'];snapshot=authorization['snapshot'];content=snapshot['content']
+            image=snapshot['delivery_context'].get('image_url')
+            request=(dict(kind='telegram_photo',photo_url=image,caption=build_telegram_photo_caption(str(content['rendered_text'])))
+                     if image else dict(kind='telegram_message',text=str(content['rendered_text'])))
+            request.update(chat_id=snapshot['delivery_context'].get('chat_id'),
+                           disable_preview=snapshot['delivery_context'].get('disable_preview',True))
+            try:
+                result=dispatch_transport(request,timeout=min(REQUEST_SECONDS,deadline-time.monotonic()),deadline=deadline)
+                if result.get('not_started'):
+                    state='disabled' if result.get('disabled') else 'blocked'
+                    finish_delivery_attempt(conn,attempt,state,'transport_not_started',token=token)
+                    conn.commit();continue
+                message_id=result.get('result',{}).get('message_id')
+                if result.get('ok') is not True or type(message_id) is not int or message_id<=0:raise RuntimeError('telegram_delivery_not_confirmed')
+                confirmed=finish_delivery_attempt(conn,attempt,'sent',token=token)
+                if confirmed:
+                    mark_notification_post_published(conn,post_id=int(post['id']),external_message_id=str(message_id))
+                conn.commit()
+                safe_delivery_log(f"- {post['event_key']}: "+('published telegram' if confirmed else 'obsolete authorization ignored'))
+            except Exception:
+                conn.rollback()
+                if finish_delivery_attempt(conn,attempt,'uncertain','delivery_outcome_uncertain',token=token):
+                    mark_notification_post_failed(conn,post_id=int(post['id']),error_message='delivery_outcome_uncertain')
+                conn.commit()
+        safe_delivery_log('Lote Telegram finalizado; los posts no reclamados permanecen pendientes.')
+    except BaseException:
+        conn.rollback();raise
+    finally:conn.close()
 
 
-if __name__ == "__main__":
-    main()
+if __name__=='__main__':main()

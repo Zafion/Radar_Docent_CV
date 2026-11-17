@@ -22,7 +22,7 @@
   <section class="module-card public-alerts-module">
     <div class="module-card__header">
       <div>
-        <h1>Últimas novedades detectadas</h1>
+        <h1>Documentos procesados y validados</h1>
         <p>Publicaciones oficiales procesadas por Funkcionario.com. No necesitas registrarte ni ceder email o teléfono para consultar los avisos.</p>
       </div>
     </div>
@@ -80,10 +80,23 @@
       {% else %}
         <div class="empty-state">
           <h3>Aún no hay avisos públicos registrados.</h3>
-          <p>Cuando el pipeline detecte nuevas publicaciones oficiales, aparecerán aquí automáticamente.</p>
+          <p>Los avisos aparecerán cuando los documentos nuevos se hayan procesado, validado y autorizado para publicación.</p>
         </div>
       {% endif %}
     </div>
+    {% if detections %}
+    <section class="panel-card public-alerts-history" aria-label="Detecciones sin acreditación de datos">
+      <h2>Detecciones registradas</h2>
+      <p>Información de detección; no confirma que los datos estén disponibles.</p>
+      {% for detection in detections %}
+        <article class="public-alert-card">
+          <span>{{ detection.detected_at }}</span>
+          <h3>{{ detection.title }}</h3><p>{{ detection.summary }}</p>
+          {% if detection.source_url %}<a href="{{ detection.source_url }}" rel="noopener" target="_blank">Fuente oficial</a>{% endif %}
+        </article>
+      {% endfor %}
+    </section>
+    {% endif %}
   </section>
 </section>
 {% endblock %}

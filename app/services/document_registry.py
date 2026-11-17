@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from app.services.document_classifier import DocumentClassifierService
 from app.storage.document_store import DocumentStore
+from app.storage.notification_eligibility_store import register_detection
 
 
 @dataclass(slots=True)
@@ -23,7 +24,7 @@ class DocumentRegistryService:
     def __init__(self) -> None:
         self.classifier = DocumentClassifierService()
 
-    def register_unclassified_documents(self) -> list[RegisteredDocument]:
+    def register_unclassified_documents(self, *, notification_intent: str = "unknown") -> list[RegisteredDocument]:
         store = DocumentStore()
         registered: list[RegisteredDocument] = []
 
@@ -67,6 +68,9 @@ class DocumentRegistryService:
                     list_scope=classified.list_scope,
                     notes=notes,
                 )
+
+                register_detection(store.connection, document_id, document_version_id,
+                                   row.get("canonical_url"), row.get("publication_date_text"), notification_intent)
 
                 registered.append(
                     RegisteredDocument(

@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.services.telegram_notifications import get_telegram_channel_url
 from app.storage.db import get_connection
-from app.storage.public_alert_store import count_public_alerts, list_public_alerts
+from app.storage.public_alert_store import count_public_alerts, list_public_alerts, list_public_detections
 from app.web.i18n import (
     LANGUAGES,
     add_language_context,
@@ -925,12 +925,17 @@ def public_alerts_page(request: Request):
         breadcrumbs=[("Inicio", "/"), ("Avisos", "/avisos")],
     )
     conn = get_connection()
-    alerts = list_public_alerts(conn, limit=50, offset=0)
-    total = count_public_alerts(conn)
+    try:
+        alerts = list_public_alerts(conn, limit=50, offset=0)
+        total = count_public_alerts(conn)
+        detections = list_public_detections(conn)
+    finally:
+        conn.close()
     context.update(
         {
             "alerts": alerts,
             "alerts_total": total,
+            "detections": detections,
             "telegram_channel_url": get_telegram_channel_url(),
         }
     )
@@ -939,7 +944,10 @@ def public_alerts_page(request: Request):
 
 def _feed_alerts(limit: int = 50) -> list[dict]:
     conn = get_connection()
-    return list_public_alerts(conn, limit=limit, offset=0)
+    try:
+        return list_public_alerts(conn, limit=limit, offset=0)
+    finally:
+        conn.close()
 
 
 @router.get("/feed.xml", include_in_schema=False)

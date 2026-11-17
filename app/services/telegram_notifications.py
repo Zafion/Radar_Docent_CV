@@ -6,6 +6,8 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from app.services.notification_policy import notifications_enabled
+
 TELEGRAM_API_BASE = "https://api.telegram.org"
 
 
@@ -32,6 +34,8 @@ def get_telegram_channel_url() -> str | None:
 
 
 def _telegram_json_request(method: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if not notifications_enabled():
+        return {"ok": False, "disabled": True, "reason": "notifications_disabled"}
     token = get_telegram_bot_token()
     if not token:
         raise RuntimeError("telegram_not_configured")
@@ -45,7 +49,7 @@ def _telegram_json_request(method: str, payload: dict[str, Any]) -> dict[str, An
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urllib.request.urlopen(request, timeout=10) as response:
             body = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         error_body = exc.read().decode("utf-8", errors="replace")
@@ -60,6 +64,8 @@ def _telegram_json_request(method: str, payload: dict[str, Any]) -> dict[str, An
 
 
 def send_telegram_message(text: str) -> dict[str, Any]:
+    if not notifications_enabled():
+        return {"ok": False, "disabled": True, "reason": "notifications_disabled"}
     chat_id = get_telegram_channel_id()
     if not get_telegram_bot_token() or not chat_id:
         raise RuntimeError("telegram_not_configured")
@@ -83,6 +89,8 @@ def send_telegram_photo(photo_url: str, caption: str | None = None) -> dict[str,
     must be reachable from the production domain, for example:
     https://funkcionario.com/static/img/telegram/telegram_docent_awards.png
     """
+    if not notifications_enabled():
+        return {"ok": False, "disabled": True, "reason": "notifications_disabled"}
     chat_id = get_telegram_channel_id()
     if not get_telegram_bot_token() or not chat_id:
         raise RuntimeError("telegram_not_configured")

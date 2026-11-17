@@ -66,6 +66,18 @@ EXCLUDED_LOCALIZED_PATH_PREFIXES: tuple[str, ...] = (
 # Traducción de interfaz. Se usa tanto para las plantillas renderizadas como para
 # contenido insertado por JavaScript en cliente. No traduce datos oficiales de la API.
 ES_TO_VA: dict[str, str] = {
+    'Documento de la publicación oficial de ': 'Document de la publicació oficial de ',
+    ' procesado y validado. Consulta su resultado y la fuente oficial.': ' processat i validat. Consulta el seu resultat i la font oficial.',
+    'documento validado': 'document validat',
+
+    'Documentos procesados y validados': 'Documents processats i validats',
+    'Los avisos aparecerán cuando los documentos nuevos se hayan procesado, validado y autorizado para publicación.': 'Els avisos apareixeran quan els documents nous s’hagen processat, validat i autoritzat per a publicar-los.',
+    'Detecciones sin acreditación de datos': 'Deteccions sense acreditació de dades',
+    'Detecciones registradas': 'Deteccions registrades',
+    'Información de detección; no confirma que los datos estén disponibles.': 'Informació de detecció; no confirma que les dades estiguen disponibles.',
+    'Publicación oficial detectada': 'Publicació oficial detectada',
+    'Detección registrada; el procesamiento de los datos no está acreditado para este aviso.': 'Detecció registrada; el processament de les dades no està acreditat per a este avís.',
+
     # SEO y cabecera
     "Funkcionario.com | Plazas y adjudicaciones docentes Comunidad Valenciana": "Funkcionario.com | Places i adjudicacions docents Comunitat Valenciana",
     "Consulta en Funkcionario.com plazas ofertadas, adjudicaciones docentes, difícil cobertura y resultados de personal interino docente en la Comunitat Valenciana.": "Consulta en Funkcionario.com places oferides, adjudicacions docents, difícil cobertura i resultats de personal interí docent en la Comunitat Valenciana.",

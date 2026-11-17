@@ -184,7 +184,10 @@ class SyncStore:
         content_type: str | None,
         size_bytes: int,
         downloaded_at: str,
+        notification_intent: str = "unknown",
     ) -> int:
+        if notification_intent not in {"live_new","historical_import","reprocess","unknown"}:
+            raise ValueError("invalid_notification_ingestion_intent")
         cursor = self.connection.execute(
             """
             INSERT INTO document_versions (
@@ -194,9 +197,10 @@ class SyncStore:
                 file_path,
                 content_type,
                 size_bytes,
-                downloaded_at
+                downloaded_at,
+                notification_ingest_intent
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
             (
@@ -207,6 +211,7 @@ class SyncStore:
                 content_type,
                 size_bytes,
                 downloaded_at,
+                notification_intent,
             ),
         )
         return int(cursor.fetchone()[0])
