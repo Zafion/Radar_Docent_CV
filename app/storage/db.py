@@ -85,7 +85,7 @@ class PgCompatConnection:
         return PgCompatCursor(cur)
 
     def close(self) -> None:
-        return None
+        self._conn.close()
 
     def commit(self) -> None:
         self._conn.commit()
