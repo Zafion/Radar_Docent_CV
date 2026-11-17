@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 import argparse
 import json
 from pathlib import Path
-import shutil
 import sys
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -12,6 +11,9 @@ sys.path.insert(0, str(ROOT_DIR))
 
 from app.services.discovery.base import DiscoveredAsset
 from app.storage.sync_store import SyncStore
+from app.services.remote_import_integrity import (
+    ImportIntegrityError, validated_manifest, publish_snapshot, verify_existing_version,
+)
 
 
 DEFAULT_INCOMING_DIR = Path("/srv/funkcionario/remote_fetch/incoming/current")
@@ -20,33 +22,6 @@ DEFAULT_DATA_DIR = Path("data")
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def read_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def is_safe_relative_path(path_value: str) -> bool:
-    path = Path(path_value)
-    return not path.is_absolute() and ".." not in path.parts
-
-
-def require_safe_incoming_file(incoming_dir: Path, relative_file_path: str) -> Path:
-    if not relative_file_path:
-        raise ValueError("relative_file_path vacío")
-
-    if not is_safe_relative_path(relative_file_path):
-        raise ValueError(f"Ruta relativa no segura: {relative_file_path}")
-
-    file_path = incoming_dir / relative_file_path
-
-    if not file_path.exists():
-        raise FileNotFoundError(f"No existe el fichero recibido: {file_path}")
-
-    if not file_path.is_file():
-        raise ValueError(f"No es un fichero regular: {file_path}")
-
-    return file_path
 
 
 def build_asset(asset_payload: dict) -> DiscoveredAsset:
@@ -64,12 +39,14 @@ def build_asset(asset_payload: dict) -> DiscoveredAsset:
     )
 
 
-def import_manifest(*, manifest_path: Path, incoming_dir: Path, data_dir: Path) -> dict:
-    manifest = read_json(manifest_path)
+def import_manifest(*, manifest_path: Path, incoming_dir: Path, data_dir: Path, notification_intent: str = "historical_import") -> dict:
+    if notification_intent not in {"live_new","historical_import","reprocess","unknown"}:
+        raise ValueError("invalid_notification_ingestion_intent")
+    with validated_manifest(manifest_path, incoming_dir, data_dir) as (manifest, snapshots):
+        return _import_validated_manifest(manifest, snapshots, data_dir, notification_intent)
 
-    if manifest.get("schema_version") != 1:
-        raise ValueError(f"schema_version no soportado: {manifest.get('schema_version')}")
 
+def _import_validated_manifest(manifest, snapshots, data_dir, notification_intent):
     store = SyncStore()
 
     global_summary = {
@@ -90,8 +67,7 @@ def import_manifest(*, manifest_path: Path, incoming_dir: Path, data_dir: Path) 
             source_label = source_payload.get("source_label") or source_key
 
             print("=" * 100)
-            print(f"Importando source: {source_key}")
-            print(f"URL:               {source_url}")
+            print("Importando fuente validada")
 
             source_id = store.ensure_source(
                 source_key=source_key,
@@ -166,6 +142,7 @@ def import_manifest(*, manifest_path: Path, incoming_dir: Path, data_dir: Path) 
                 existing = store.get_document_version_by_sha256(sha256)
 
                 if existing is not None:
+                    verify_existing_version(existing, data_dir=data_dir, sha256=sha256, size_bytes=result['size_bytes'])
                     document_version_id = int(existing["id"])
                     source_summary["known_versions_count"] += 1
                     store.set_asset_document_version(
@@ -175,21 +152,15 @@ def import_manifest(*, manifest_path: Path, incoming_dir: Path, data_dir: Path) 
                     processed_canonical_urls[canonical_url] = document_version_id
                     continue
 
-                relative_file_path = result.get("relative_file_path")
-                incoming_file = require_safe_incoming_file(incoming_dir, relative_file_path)
-
                 stored_filename = result["stored_filename"]
                 original_filename = result["original_filename"]
                 content_type = result.get("content_type")
-                size_bytes = int(result.get("size_bytes") or incoming_file.stat().st_size)
+                size_bytes = result["size_bytes"]
                 downloaded_at = result.get("downloaded_at") or utc_now_iso()
-
-                files_dir = data_dir / source_key / "files"
-                files_dir.mkdir(parents=True, exist_ok=True)
-
-                destination_file = files_dir / stored_filename
-                if not destination_file.exists():
-                    shutil.copy2(incoming_file, destination_file)
+                destination_file = publish_snapshot(
+                    snapshots[id(result)], data_dir=data_dir, source_key=source_key,
+                    filename=stored_filename, sha256=sha256, size_bytes=size_bytes,
+                )
 
                 document_version_id = store.create_document_version(
                     sha256=sha256,
@@ -199,6 +170,7 @@ def import_manifest(*, manifest_path: Path, incoming_dir: Path, data_dir: Path) 
                     content_type=content_type,
                     size_bytes=size_bytes,
                     downloaded_at=downloaded_at,
+                    notification_intent=notification_intent,
                 )
 
                 source_summary["new_versions_count"] += 1
@@ -212,7 +184,7 @@ def import_manifest(*, manifest_path: Path, incoming_dir: Path, data_dir: Path) 
             store.finish_sync_run(
                 run_id=run_id,
                 finished_at=source_payload.get("finished_at") or utc_now_iso(),
-                status="success",
+                status=source_payload["status"] if source_payload.get("status") in {"failed", "partial"} else "success",
                 discovered_assets_count=len(source_payload.get("assets", [])),
                 downloadable_assets_count=sum(
                     1
@@ -223,7 +195,7 @@ def import_manifest(*, manifest_path: Path, incoming_dir: Path, data_dir: Path) 
                 known_versions_count=source_summary["known_versions_count"],
                 duplicate_assets_count=source_summary["duplicate_assets_count"],
                 non_downloadable_count=source_summary["non_downloadable_count"],
-                error_message=None,
+                error_message=source_payload.get("error_message") if source_payload.get("status") in {"failed", "partial"} else None,
             )
 
             global_summary["sources_count"] += 1
@@ -267,6 +239,7 @@ def main() -> int:
         help="Directorio data del proyecto. Default: data",
     )
 
+    parser.add_argument("--notification-origin",choices=("live_new","historical_import","reprocess","unknown"),default="historical_import")
     args = parser.parse_args()
 
     incoming_dir = Path(args.incoming_dir)
@@ -276,11 +249,16 @@ def main() -> int:
     if not manifest_path.exists():
         raise SystemExit(f"No existe manifest: {manifest_path}")
 
-    summary = import_manifest(
-        manifest_path=manifest_path,
-        incoming_dir=incoming_dir,
-        data_dir=data_dir,
-    )
+    try:
+        summary = import_manifest(
+            manifest_path=manifest_path,
+            incoming_dir=incoming_dir,
+            data_dir=data_dir,
+            notification_intent=args.notification_origin,
+        )
+    except ImportIntegrityError as exc:
+        print(json.dumps({"status": "rejected", "rejected_batches": 1, "reason": exc.reason}))
+        return 2
 
     print("=" * 100)
     print("IMPORT REMOTE FETCH OK")

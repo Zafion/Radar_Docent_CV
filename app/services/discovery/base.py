@@ -36,6 +36,7 @@ class BaseDiscoveryAdapter(ABC):
 
     def __init__(self, timeout: float = 20.0) -> None:
         self.timeout = timeout
+        self.discovery_errors: list[dict] = []
         self.headers = {
             "User-Agent": "RadarDocentCV/0.7 (+https://ceice.gva.es/)"
         }
@@ -45,13 +46,9 @@ class BaseDiscoveryAdapter(ABC):
         raise NotImplementedError
 
     def _fetch_html(self) -> str:
-        response = httpx.get(
-            self.source_url,
-            headers=self.headers,
-            timeout=self.timeout,
-            follow_redirects=True,
-        )
-        response.raise_for_status()
+        response = self._fetch_response(self.source_url)
+        if response is None:
+            raise ValueError(f"discovery_fetch_failed: {self.discovery_errors}")
         return response.text
 
     def _get_soup(self) -> BeautifulSoup:
@@ -66,9 +63,17 @@ class BaseDiscoveryAdapter(ABC):
                 follow_redirects=True,
             )
             if response.status_code >= 400:
+                self.discovery_errors.append({
+                    "url": url, "kind": "http_error", "status_code": response.status_code,
+                    "retry_after": response.headers.get("retry-after"),
+                })
                 return None
             return response
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
+            self.discovery_errors.append({
+                "url": url, "kind": "timeout" if isinstance(exc, httpx.TimeoutException) else "connection_error",
+                "status_code": None, "error_type": type(exc).__name__,
+            })
             return None
 
     def _absolute_url(self, href: str, base_url: str | None = None) -> str:
@@ -82,7 +87,9 @@ class BaseDiscoveryAdapter(ABC):
                 parsed.netloc,
                 parsed.path,
                 "",
-                "",
+                # HTML queries select pages/filters; dropping them hides links.
+                # Retain established document keys and download deduplication.
+                "" if self._looks_like_downloadable_document(url) else parsed.query,
                 "",
             )
         )
@@ -139,7 +146,7 @@ class BaseDiscoveryAdapter(ABC):
             return False
 
         path = parsed.path.lower()
-        return path.startswith("/es/web/rrhh-educacion")
+        return re.match(r"^/(?:es|va)/web/rrhh-educacion(?:/|$)", path) is not None
 
     def _should_follow_html_url(self, url: str) -> bool:
         if not self._is_rrhh_educacion_html_url(url):
@@ -395,7 +402,10 @@ class BaseDiscoveryAdapter(ABC):
         seed_urls: list[str],
         max_depth: int = 2,
         asset_role: str = "pdf_candidate",
+        optional_seed_urls: set[str] | None = None,
     ) -> list[DiscoveredAsset]:
+        self.discovery_errors.clear()
+        optional_seed_urls = optional_seed_urls or set()
         queue: deque[tuple[str, int]] = deque()
         visited_pages: set[str] = set()
         assets_by_url: dict[str, DiscoveredAsset] = {}
@@ -413,6 +423,12 @@ class BaseDiscoveryAdapter(ABC):
 
             response = self._fetch_response(current_url)
             if response is None:
+                if not any(error.get("url") == current_url for error in self.discovery_errors):
+                    self.discovery_errors.append({"url": current_url, "kind": "empty_response", "status_code": None})
+                if depth == 0 and current_url in optional_seed_urls:
+                    for error in self.discovery_errors:
+                        if error.get("url") == current_url and error.get("status_code") == 404:
+                            error["optional_probe"] = True
                 continue
 
             if not self._looks_like_html_response(response):

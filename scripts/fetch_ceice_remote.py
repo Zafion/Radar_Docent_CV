@@ -12,6 +12,7 @@ import re
 import shutil
 import sys
 import time
+import tempfile
 
 import httpx
 
@@ -19,6 +20,10 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
 
 from app.services.discovery.registry import get_discovery_adapters
+from app.services.document_payload import (
+    MAX_DOWNLOAD_BYTES, atomic_write_document, filename_from_url as document_filename,
+    read_document_bytes, validate_document,
+)
 
 
 DEFAULT_OUTPUT_DIR = Path(
@@ -36,10 +41,19 @@ def utc_now_iso() -> str:
 
 def write_json(path: Path, payload: dict | list) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    content = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".fetch-json-", delete=False) as handle:
+            temporary = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
 
 
 def read_json(path: Path, default: dict) -> dict:
@@ -78,8 +92,8 @@ def slugify(value: str) -> str:
 
 
 def filename_from_url(url: str) -> str:
-    path = Path(re.sub(r"/+$", "", url.split("?", 1)[0].split("#", 1)[0]))
-    return path.name or "documento.pdf"
+    return document_filename(url)
+
 
 
 def build_versioned_filename(original_filename: str, sha256: str) -> str:
@@ -106,28 +120,91 @@ def download_asset(
     url: str,
     canonical_url: str,
     cache_files_dir: Path,
+    previous: dict | None = None,
+    use_conditional_headers: bool = True,
+    max_download_bytes: int = MAX_DOWNLOAD_BYTES,
 ) -> dict:
-    response = client.get(url)
-    response.raise_for_status()
-
-    content = response.content
+    cache_valid = False
+    if previous and previous.get("stored_filename"):
+        try:
+            cached_bytes = (cache_files_dir / previous["stored_filename"]).read_bytes()
+            if len(cached_bytes) <= max_download_bytes and hashlib.sha256(cached_bytes).hexdigest() == previous.get("sha256"):
+                validate_document(cached_bytes, canonical_url)
+                cache_valid = True
+        except (ValueError, OSError):
+            pass
+    conditional = {}
+    if previous and use_conditional_headers and cache_valid:
+        if previous.get("etag"):
+            conditional["If-None-Match"] = previous["etag"]
+        if previous.get("last_modified"):
+            conditional["If-Modified-Since"] = previous["last_modified"]
+    with client.stream("GET", url, headers=conditional) as response:
+        checked_at = utc_now_iso()
+        if response.status_code == 304:
+            if not previous or not cache_valid:
+                raise ValueError("http_304_without_valid_cached_file")
+            return {
+                **previous,
+                "cache_file_path": str(cache_files_dir / previous["stored_filename"]),
+                "last_checked_at": checked_at,
+                "etag": response.headers.get("etag") or previous.get("etag"),
+                "last_modified": response.headers.get("last-modified") or previous.get("last_modified"),
+                "not_modified": True,
+            }
+        response.raise_for_status()
+        payload = validate_document(read_document_bytes(response, max_download_bytes), canonical_url, response.headers)
+        response_headers = dict(response.headers)
+    content = payload.content
     sha256 = hashlib.sha256(content).hexdigest()
-    original_filename = filename_from_url(canonical_url)
+    original_filename = payload.original_filename
     stored_filename = build_versioned_filename(original_filename, sha256)
     cache_file_path = cache_files_dir / stored_filename
 
-    if not cache_file_path.exists():
-        cache_file_path.write_bytes(content)
+    atomic_write_document(cache_file_path, content)
 
+    history = list((previous or {}).get("previous_versions") or [])
+    hash_changes = list((previous or {}).get("hash_changes") or [])
+    if previous and previous.get("sha256") != sha256:
+        hash_changes.append({"checked_at": checked_at, "from_sha256": previous.get("sha256"), "to_sha256": sha256})
+        prior = {key: previous.get(key) for key in CACHE_METADATA_KEYS if key not in {"previous_versions", "hash_changes"}}
+        prior["replaced_at"] = checked_at
+        if not any(item.get("sha256") == prior["sha256"] for item in history):
+            history.append(prior)
     return {
         "sha256": sha256,
         "original_filename": original_filename,
         "stored_filename": stored_filename,
         "cache_file_path": str(cache_file_path),
-        "content_type": response.headers.get("content-type"),
+        "content_type": payload.content_type,
         "size_bytes": len(content),
-        "downloaded_at": utc_now_iso(),
+        "downloaded_at": checked_at,
+        "last_checked_at": checked_at,
+        "etag": response_headers.get("etag"),
+        "last_modified": response_headers.get("last-modified"),
+        "previous_versions": history,
+        "hash_changes": hash_changes,
+        "not_modified": False,
     }
+
+
+CACHE_METADATA_KEYS = (
+    "sha256", "original_filename", "stored_filename", "content_type", "size_bytes",
+    "downloaded_at", "last_checked_at", "etag", "last_modified", "previous_versions", "hash_changes",
+)
+
+
+def cache_metadata(downloaded: dict) -> dict:
+    return {key: downloaded.get(key) for key in CACHE_METADATA_KEYS}
+
+
+def revalidation_due(cached: dict, ttl: timedelta) -> bool:
+    stamp = parse_iso_datetime(cached.get("last_checked_at") or cached.get("downloaded_at"))
+    if stamp is None:
+        return True
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - stamp >= ttl
 
 
 def select_adapters(source_keys: list[str] | None):
@@ -192,7 +269,19 @@ def main() -> int:
         help="Horas antes de reintentar un PDF que falló al descargarse. Default: 24.",
     )
 
+    parser.add_argument("--revalidate-after-hours", type=float, default=24.0,
+                        help="TTL de comprobación de URLs conocidas; default: 24 horas.")
+    parser.add_argument("--max-revalidations", type=int, default=10,
+                        help="Máximo de revalidaciones por ejecución; default: 10. No limita --redownload-known.")
+    parser.add_argument("--max-download-mb", type=float, default=50.0, help="Límite por documento, default: 50 MiB.")
     args = parser.parse_args()
+    if args.max_download_mb <= 0:
+        parser.error("El límite de descarga debe ser positivo")
+    max_download_bytes = int(args.max_download_mb * 1024 * 1024)
+    if args.revalidate_after_hours < 0 or args.max_revalidations < 0:
+        parser.error("TTL y límite de revalidación deben ser no negativos")
+    revalidation_ttl = timedelta(hours=args.revalidate_after_hours)
+    revalidations_left = args.max_revalidations
 
     output_dir = Path(args.output_dir)
     cache_dir = output_dir / "cache"
@@ -268,6 +357,10 @@ def main() -> int:
 
             try:
                 assets = adapter.discover_assets()
+                diagnostics = getattr(adapter, "discovery_errors", [])
+                diagnostics = diagnostics if isinstance(diagnostics, list) else []
+                source_summary["discovery_errors"] = [error for error in diagnostics if not error.get("optional_probe")]
+                source_summary["optional_probe_misses"] = [error for error in diagnostics if error.get("optional_probe")]
                 source_summary["assets"] = [asdict(asset) for asset in assets]
 
                 for asset in assets:
@@ -301,9 +394,13 @@ def main() -> int:
                         source_summary["results"].append(result)
                         continue
 
+                    cached = assets_by_canonical_url.get(canonical_url)
+                    cached_file_ok = bool(cached and cached.get("stored_filename")
+                                          and (cache_files_dir / cached["stored_filename"]).is_file())
                     cached_error = errors_by_canonical_url.get(canonical_url)
                     if (
                         cached_error
+                        and not cached_file_ok
                         and not args.redownload_known
                         and not should_retry_error(cached_error, retry_error_after)
                     ):
@@ -327,16 +424,38 @@ def main() -> int:
                         source_summary["results"].append(result)
                         continue
 
-                    cached = assets_by_canonical_url.get(canonical_url)
-                    cached_file_ok = False
-
-                    if cached and not args.redownload_known:
-                        stored_filename = cached.get("stored_filename")
-                        if stored_filename:
-                            cached_file_path = cache_files_dir / stored_filename
-                            cached_file_ok = cached_file_path.exists()
-
                     if cached and cached_file_ok and not args.redownload_known:
+                        result_status = "cached_url"
+                        revalidation_error = None
+                        revalidation_status = "fresh"
+                        previous_sha256 = cached.get("sha256")
+                        if cached_error and not should_retry_error(cached_error, retry_error_after):
+                            revalidation_error = cached_error.get("error_message")
+                            revalidation_status = "error_backoff"
+                        elif revalidation_due(cached, revalidation_ttl):
+                            if revalidations_left > 0:
+                                revalidations_left -= 1
+                                try:
+                                    checked = download_asset(client=client, url=asset.url,
+                                        canonical_url=canonical_url, cache_files_dir=cache_files_dir, previous=cached, max_download_bytes=max_download_bytes)
+                                    cached = {**cached, **cache_metadata(checked)}
+                                    assets_by_canonical_url[canonical_url] = cached
+                                    errors_by_canonical_url.pop(canonical_url, None)
+                                    revalidation_status = "not_modified" if checked.get("not_modified") else "downloaded"
+                                    if not checked.get("not_modified"):
+                                        result_status = "downloaded"
+                                except Exception as exc:
+                                    revalidation_error = str(exc)
+                                    revalidation_status = "failed"
+                                    errors_by_canonical_url[canonical_url] = {
+                                        "last_error_at": utc_now_iso(), "error_message": str(exc),
+                                        "original_filename": cached.get("original_filename"),
+                                        "url": asset.url, "title": asset.title,
+                                    }
+                                if args.download_delay > 0:
+                                    time.sleep(args.download_delay)
+                            else:
+                                revalidation_status = "budget_deferred"
                         stored_filename = cached["stored_filename"]
                         cache_file_path = cache_files_dir / stored_filename
                         current_file_path = current_files_dir / stored_filename
@@ -344,7 +463,11 @@ def main() -> int:
 
                         result = {
                             "asset": asset_dict,
-                            "status": "cached_url",
+                            "status": result_status,
+                            "revalidation_status": revalidation_status,
+                            "revalidation_error": revalidation_error,
+                            "last_checked_at": cached.get("last_checked_at"),
+                            "previous_sha256": previous_sha256 if previous_sha256 != cached["sha256"] else None,
                             "sha256": cached["sha256"],
                             "original_filename": cached["original_filename"],
                             "stored_filename": stored_filename,
@@ -361,6 +484,9 @@ def main() -> int:
                                 url=asset.url,
                                 canonical_url=canonical_url,
                                 cache_files_dir=cache_files_dir,
+                                previous=cached,
+                                use_conditional_headers=False,
+                                max_download_bytes=max_download_bytes,
                             )
 
                             stored_filename = downloaded["stored_filename"]
@@ -368,14 +494,7 @@ def main() -> int:
                             current_file_path = current_files_dir / stored_filename
                             hardlink_or_copy(cache_file_path, current_file_path)
 
-                            assets_by_canonical_url[canonical_url] = {
-                                "sha256": downloaded["sha256"],
-                                "original_filename": downloaded["original_filename"],
-                                "stored_filename": stored_filename,
-                                "content_type": downloaded["content_type"],
-                                "size_bytes": downloaded["size_bytes"],
-                                "downloaded_at": downloaded["downloaded_at"],
-                            }
+                            assets_by_canonical_url[canonical_url] = cache_metadata(downloaded)
                             errors_by_canonical_url.pop(canonical_url, None)
 
                             result = {
@@ -388,6 +507,7 @@ def main() -> int:
                                 "content_type": downloaded["content_type"],
                                 "size_bytes": downloaded["size_bytes"],
                                 "downloaded_at": downloaded["downloaded_at"],
+                                "last_checked_at": downloaded.get("last_checked_at"),
                                 "error_message": None,
                             }
 
@@ -437,7 +557,21 @@ def main() -> int:
                         for item in results
                         if item["status"] in {"download_error", "download_error_cached"}
                     ),
+                    "revalidation_error_count": sum(bool(item.get("revalidation_error")) for item in results),
+                    "revalidated_count": sum(item.get("revalidation_status") in {"not_modified", "downloaded"} for item in results),
+                    "revalidation_deferred_count": sum(item.get("revalidation_status") == "budget_deferred" for item in results),
                 }
+
+                if source_summary["counts"]["download_error_count"] or any(item.get("revalidation_error") for item in results):
+                    source_summary["status"] = "partial"
+                    source_summary["error_message"] = "document_download_or_revalidation_errors"
+                    has_source_failures = True
+
+                if source_summary.get("discovery_errors"):
+                    source_summary["status"] = "partial" if assets else "failed"
+                    source_summary["error_message"] = "discovery_errors"
+                    source_summary["counts"]["discovery_error_count"] = len(source_summary["discovery_errors"])
+                    has_source_failures = True
 
                 print(f"Assets descubiertos: {source_summary['counts']['discovered_assets_count']}")
                 print(f"Descargables:         {source_summary['counts']['downloadable_assets_count']}")

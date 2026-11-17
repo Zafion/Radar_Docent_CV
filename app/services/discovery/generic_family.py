@@ -33,4 +33,5 @@ class GenericFamilyDiscoveryAdapter(BaseDiscoveryAdapter):
             seed_urls=seed_urls,
             max_depth=self.max_depth,
             asset_role="pdf_candidate",
+            optional_seed_urls=set(seed_urls[1:]),
         )

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 import hashlib
@@ -12,6 +14,10 @@ import httpx
 
 from app.services.discovery.base import BaseDiscoveryAdapter, DiscoveredAsset
 from app.storage.sync_store import SyncStore
+from app.services.document_payload import (
+    MAX_DOWNLOAD_BYTES, atomic_write_document, filename_from_url as document_filename,
+    read_document_bytes, validate_document,
+)
 
 
 @dataclass(slots=True)
@@ -42,10 +48,11 @@ class SyncedAsset:
 
 
 class DocumentSyncService:
-    def __init__(self, base_dir: str | Path = "data", timeout: float = 30.0) -> None:
+    def __init__(self, base_dir: str | Path = "data", timeout: float = 30.0, max_download_bytes: int = MAX_DOWNLOAD_BYTES) -> None:
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout
+        self.max_download_bytes = max_download_bytes
         self.headers = {
             "User-Agent": "RadarDocentCV/0.6 (+https://ceice.gva.es/)"
         }
@@ -79,9 +86,12 @@ class DocumentSyncService:
             )
 
             assets = adapter.discover_assets()
+            diagnostics = getattr(adapter, "discovery_errors", [])
+            diagnostics = diagnostics if isinstance(diagnostics, list) else []
+            discovery_errors = [error for error in diagnostics if not error.get("optional_probe")]
 
             self._write_json(
-                discovered_path,
+                source_dir / "discovered_assets.partial.json" if discovery_errors else discovered_path,
                 [asdict(item) for item in assets],
             )
 
@@ -180,10 +190,15 @@ class DocumentSyncService:
             )
 
             finished_at = self._utc_now_iso()
+            download_errors = [item for item in results if item.status == "download_error"]
+            run_status = ("failed" if discovery_errors and not assets else
+                          "partial" if discovery_errors or download_errors else "success")
+            run_error = json.dumps({"discovery_errors": discovery_errors,
+                                    "download_error_count": len(download_errors)}, ensure_ascii=False) if run_status != "success" else None
             store.finish_sync_run(
                 run_id=run_id,
                 finished_at=finished_at,
-                status="success",
+                status=run_status,
                 discovered_assets_count=len(assets),
                 downloadable_assets_count=sum(1 for item in assets if item.downloadable),
                 new_versions_count=sum(1 for item in results if item.status == "new_version_saved"),
@@ -194,11 +209,14 @@ class DocumentSyncService:
                     for item in results
                     if item.status in {"non_downloadable", "download_error"}
                 ),
-                error_message=None,
+                error_message=run_error,
             )
             store.connection.commit()
 
             return {
+                "status": run_status,
+                "discovery_errors": discovery_errors,
+                "error_message": run_error,
                 "source_key": adapter.source_key,
                 "source_url": adapter.source_url,
                 "started_at": started_at,
@@ -264,19 +282,19 @@ class DocumentSyncService:
         files_dir: Path,
         store: SyncStore,
     ) -> SyncedAsset:
-        response = httpx.get(
-            asset.url,
-            headers=self.headers,
-            timeout=self.timeout,
-            follow_redirects=True,
-        )
-        response.raise_for_status()
-
-        content = response.content
+        processing_mode=os.getenv("NOTIFICATION_PROCESSING_INTENT","normal")
+        if processing_mode not in {"normal","reprocess"}:
+            raise ValueError("invalid_notification_processing_intent")
+        with httpx.stream("GET", asset.url, headers=self.headers, timeout=self.timeout, follow_redirects=True) as response:
+            response.raise_for_status()
+            payload = validate_document(
+                read_document_bytes(response, self.max_download_bytes), asset.canonical_url, response.headers,
+            )
+        content = payload.content
         sha256 = hashlib.sha256(content).hexdigest()
-        content_type = response.headers.get("content-type")
+        content_type = payload.content_type
         size_bytes = len(content)
-        original_filename = self._filename_from_url(asset.canonical_url)
+        original_filename = payload.original_filename
         downloaded_at = self._utc_now_iso()
 
         existing_version = store.get_document_version_by_sha256(sha256)
@@ -302,7 +320,7 @@ class DocumentSyncService:
 
         stored_filename = self._build_versioned_filename(original_filename, sha256)
         file_path = files_dir / stored_filename
-        file_path.write_bytes(content)
+        atomic_write_document(file_path, content)
 
         document_version_id = store.create_document_version(
             sha256=sha256,
@@ -312,6 +330,7 @@ class DocumentSyncService:
             content_type=content_type,
             size_bytes=size_bytes,
             downloaded_at=downloaded_at,
+            notification_intent="reprocess" if processing_mode=="reprocess" else "live_new",
         )
 
         return SyncedAsset(
@@ -340,9 +359,7 @@ class DocumentSyncService:
         )
 
     def _filename_from_url(self, url: str) -> str:
-        path = Path(re.sub(r"/+$", "", url.split("?", 1)[0].split("#", 1)[0]))
-        name = path.name or "documento.pdf"
-        return name
+        return document_filename(url)
 
     def _build_versioned_filename(self, original_filename: str, sha256: str) -> str:
         path = Path(original_filename)

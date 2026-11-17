@@ -9,10 +9,13 @@ has_failures = False
 for adapter in get_discovery_adapters():
     try:
         summary = sync_service.sync_adapter(adapter)
+        if summary.get("status", "success") != "success":
+            has_failures = True
 
         print("=" * 100)
         print(summary["source_key"])
         print(summary["source_url"])
+        print(f"Estado: {summary.get('status', 'success')}")
         print(f"Inicio: {summary['started_at']}")
         print(f"Fin: {summary['finished_at']}")
         print(f"Assets descubiertos: {summary['discovered_assets_count']}")

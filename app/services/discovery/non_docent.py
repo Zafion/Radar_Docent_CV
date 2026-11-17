@@ -76,51 +76,80 @@ class NonDocentSubstitutionDiscoveryAdapter(BaseDiscoveryAdapter):
         self.source_label = f"No docente ADC - {page.staff_group_name}"
 
     def discover_assets(self) -> list[DiscoveredAsset]:
-        soup = self._get_soup()
-        page_title = self._extract_page_title(soup) or self.source_label
+        self.discovery_errors.clear()
+        pages = [(self._get_soup(), self.source_url, 0)]
+        visited = {self._canonicalize_url(self.source_url)}
         assets_by_url: dict[str, DiscoveredAsset] = {}
+        # One detail hop, at most ten pages; other collective landing pages stay out.
+        for soup, page_url, depth in pages:
+            page_title = self._extract_page_title(soup) or self.source_label
 
-        for anchor in soup.find_all("a", href=True):
-            href = (anchor.get("href") or "").strip()
-            if self._is_ignorable_href(href):
-                continue
+            for anchor in soup.find_all("a", href=True):
+                href = (anchor.get("href") or "").strip()
+                if self._is_ignorable_href(href):
+                    continue
 
-            absolute_url = self._absolute_url(href)
-            if not self._looks_like_downloadable_document(absolute_url):
-                continue
+                absolute_url = self._absolute_url(href, base_url=page_url)
+                if not self._looks_like_downloadable_document(absolute_url):
+                    if depth == 0 and self._is_adc_detail_url(absolute_url, anchor.get_text(" ", strip=True)):
+                        canonical = self._canonicalize_url(absolute_url)
+                        if canonical in visited:
+                            continue
+                        if len(visited) >= 11:
+                            if not any(error.get("kind") == "page_limit" for error in self.discovery_errors):
+                                self.discovery_errors.append({"url": absolute_url, "kind": "page_limit", "status_code": None})
+                            continue
+                        visited.add(canonical)
+                        response = self._fetch_response(absolute_url)
+                        if response is None:
+                            continue
+                        if not self._is_adc_detail_url(str(response.url), anchor.get_text(" ", strip=True)):
+                            self.discovery_errors.append({"url": absolute_url, "kind": "out_of_scope_redirect", "status_code": response.status_code})
+                            continue
+                        if self._looks_like_html_response(response):
+                            pages.append((BeautifulSoup(response.text, "html.parser"), str(response.url), 1))
+                    continue
 
-            title = self._guess_anchor_title(anchor, absolute_url)
-            role = self._classify_adc_asset(title=title, url=absolute_url)
-            if role is None:
-                continue
+                title = self._guess_anchor_title(anchor, absolute_url)
+                role = self._classify_adc_asset(title=title, url=absolute_url)
+                if role is None:
+                    continue
 
-            canonical_url = self._canonicalize_url(absolute_url)
-            section = self._guess_anchor_section(anchor, page_title)
-            staff_section = f"{self.page.staff_group_code} - {self.page.staff_group_name}"
-            if section and section != page_title:
-                section = f"{staff_section} | {section}"
-            else:
-                section = staff_section
+                canonical_url = self._canonicalize_url(absolute_url)
+                section = self._guess_anchor_section(anchor, page_title)
+                staff_section = f"{self.page.staff_group_code} - {self.page.staff_group_name}"
+                if section and section != page_title:
+                    section = f"{staff_section} | {section}"
+                else:
+                    section = staff_section
 
-            discovered = DiscoveredAsset(
-                source_key=self.source_key,
-                source_url=self.source_url,
-                publication_label=page_title,
-                publication_date_text=self._guess_anchor_publication_date(anchor),
-                asset_role=role,
-                title=title,
-                url=absolute_url,
-                canonical_url=canonical_url,
-                section=section,
-                downloadable=True,
-            )
-            existing = assets_by_url.get(canonical_url)
-            if existing is None:
-                assets_by_url[canonical_url] = discovered
-            else:
-                assets_by_url[canonical_url] = self._merge_asset(existing, discovered)
+                discovered = DiscoveredAsset(
+                    source_key=self.source_key,
+                    source_url=self.source_url,
+                    publication_label=page_title,
+                    publication_date_text=self._guess_anchor_publication_date(anchor),
+                    asset_role=role,
+                    title=title,
+                    url=absolute_url,
+                    canonical_url=canonical_url,
+                    section=section,
+                    downloadable=True,
+                )
+                existing = assets_by_url.get(canonical_url)
+                if existing is None:
+                    assets_by_url[canonical_url] = discovered
+                else:
+                    assets_by_url[canonical_url] = self._merge_asset(existing, discovered)
 
         return list(assets_by_url.values())
+
+    def _is_adc_detail_url(self, url: str, title: str) -> bool:
+        parsed = urlparse(url)
+        if parsed.scheme != "https" or parsed.netloc.lower() != "ceice.gva.es":
+            return False
+        if not re.match(r"^/(?:es|va)/web/inclusioeducativa/-/", parsed.path.lower()):
+            return False
+        return self._classify_adc_asset(title=title, url=url) is not None
 
     def _classify_adc_asset(self, *, title: str, url: str) -> Optional[str]:
         text = self._normalize_match_text(f"{title} {url}")
