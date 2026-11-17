@@ -12,6 +12,7 @@ import re
 class Selection:
     entries: tuple = ()
     reprocess: bool = False
+    selective_live: bool = False
 
 
 CURRENT_SELECTION = ContextVar('parse_selection', default=Selection())
@@ -44,6 +45,13 @@ def reason(item, parser_key, parser_version, selection=None):
     selection = selection or CURRENT_SELECTION.get()
     if item['doc_family'] == 'unknown':
         return 'unknown_requires_separate_classification'
+    if selection.selective_live:
+        match = next((e for e in selection.entries
+                      if e['document_id'] == item['document_id']
+                      and e['document_version_id'] == item['document_version_id']
+                      and e['sha256'] == item['sha256']), None)
+        if match is None:
+            return 'outside_explicit_live_selection'
     if selection.reprocess:
         match = next((e for e in selection.entries
                       if e['document_id'] == item['document_id']
@@ -65,6 +73,26 @@ def reason(item, parser_key, parser_version, selection=None):
     if item['corrected_url'] or item['delivery_hold_reason']:
         return 'correction_or_hold_requires_plan'
     return None
+
+
+def selective_live_selection(entries):
+    if not isinstance(entries, list) or not 1 <= len(entries) <= 1000:
+        raise ValueError('explicit_nonempty_bounded_selection_required')
+    seen = set()
+    verified = []
+    for entry in entries:
+        if (not isinstance(entry, dict)
+                or set(entry) != {'document_id', 'document_version_id', 'sha256'}
+                or any(type(entry[k]) is not int or entry[k] < 1
+                       for k in ('document_id', 'document_version_id'))
+                or not isinstance(entry['sha256'], str)
+                or not re.fullmatch(r'[0-9a-f]{64}', entry['sha256'])):
+            raise ValueError('invalid_live_selection_entry')
+        if entry['document_version_id'] in seen:
+            raise ValueError('duplicate_document_in_selection')
+        seen.add(entry['document_version_id'])
+        verified.append(dict(entry))
+    return Selection(tuple(verified), False, True)
 
 
 def filter_candidates(conn, rows, parser_key, parser_version):
