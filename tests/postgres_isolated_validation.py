@@ -72,7 +72,9 @@ class FreshCluster:
         for executable in ('initdb', 'pg_ctl', 'postgres'):
             if not (BIN / executable).is_file():
                 raise RuntimeError('PostgreSQL temporary binaries unavailable')
-        self.temp = tempfile.TemporaryDirectory(prefix='pgv_', dir=ROOT / 'auditoria_local')
+        local_dir = ROOT / 'auditoria_local'
+        local_dir.mkdir(mode=0o700, exist_ok=True)
+        self.temp = tempfile.TemporaryDirectory(prefix='pgv_', dir=local_dir)
         self.root = Path(self.temp.name)
         self.data = self.root / 'd'; self.sock = self.root / 's'; self.sock.mkdir(mode=0o700)
         self.token = uuid.uuid4().hex
