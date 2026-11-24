@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 import psycopg
@@ -16,6 +18,22 @@ def _require_db_url() -> str:
 
 
 _pool: ConnectionPool | None = None
+_write_fence = ContextVar('selective_write_fence', default=None)
+_transaction_authorization = ContextVar('selective_transaction_authorization', default=None)
+
+
+@contextmanager
+def selective_transaction_fence(fence, authorization=None):
+    """Guard selected synchronous DB operations without changing legacy calls."""
+    if fence is None:
+        raise ValueError('fence_required')
+    token = _write_fence.set(fence)
+    authority_token = _transaction_authorization.set(authorization)
+    try:
+        yield
+    finally:
+        _transaction_authorization.reset(authority_token)
+        _write_fence.reset(token)
 
 
 def get_pool() -> ConnectionPool:
@@ -41,12 +59,18 @@ def close_pool() -> None:
         _pool = None
 
 
-def get_raw_connection() -> psycopg.Connection:
+def _open_connection() -> psycopg.Connection:
     return psycopg.connect(
         _require_db_url(),
         autocommit=False,
         row_factory=dict_row,
     )
+
+
+def get_raw_connection() -> psycopg.Connection:
+    if _transaction_authorization.get() is not None:
+        raise RuntimeError('raw_connection_forbidden_in_selective_scope')
+    return _open_connection()
 
 
 class PgCompatRow(dict):
@@ -77,8 +101,26 @@ class PgCompatCursor:
 class PgCompatConnection:
     def __init__(self, conn) -> None:
         self._conn = conn
+        self._held_authorization = None
+
+    def _guard(self):
+        try:
+            fence = _write_fence.get()
+            if fence is not None:
+                fence.check()
+            authorization = _transaction_authorization.get()
+            if self._held_authorization is not None and authorization != self._held_authorization:
+                raise RuntimeError('transaction_authorization_scope_changed')
+            if authorization is not None and self._held_authorization is None:
+                authorization.acquire(self._conn)
+                self._held_authorization = authorization
+        except BaseException:
+            self._conn.rollback()
+            self._held_authorization = None
+            raise
 
     def execute(self, sql: str, params=None) -> PgCompatCursor:
+        self._guard()
         sql_pg = sql.replace("?", "%s")
         cur = self._conn.cursor()
         cur.execute(sql_pg, params or [])
@@ -88,14 +130,21 @@ class PgCompatConnection:
         self._conn.close()
 
     def commit(self) -> None:
-        self._conn.commit()
+        self._guard()
+        try:
+            self._conn.commit()
+        finally:
+            self._held_authorization = None
 
     def rollback(self) -> None:
-        self._conn.rollback()
+        try:
+            self._conn.rollback()
+        finally:
+            self._held_authorization = None
 
 
 def get_connection() -> PgCompatConnection:
-    return PgCompatConnection(get_raw_connection())
+    return PgCompatConnection(_open_connection())
 
 
 def init_db(schema_path: str | None = None) -> str:

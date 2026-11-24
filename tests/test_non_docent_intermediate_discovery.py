@@ -1,5 +1,6 @@
 """Bounded ADC detail navigation, offline only."""
 import unittest
+from contextlib import contextmanager
 from unittest.mock import patch
 from bs4 import BeautifulSoup
 import httpx
@@ -51,8 +52,11 @@ class NonDocentIntermediateDiscoveryTests(unittest.TestCase):
 
     def test_failed_detail_keeps_direct_document_and_error_context(self):
         p=self.adapter();root=f'<a href="{DETAIL}">Convocatoria ADC</a><a href="{CALL}">Convocatoria ADC</a>'
+        @contextmanager
+        def simulated_stream(*args, **kwargs):
+            yield response(DETAIL,'unavailable',500)
         with patch.object(p,'_get_soup',return_value=BeautifulSoup(root,'html.parser')),patch(
-                'app.services.discovery.base.httpx.get',return_value=response(DETAIL,'unavailable',500)):
+                'app.services.discovery.http_policy.PolicyClient.stream', side_effect=simulated_stream):
             assets=p.discover_assets()
         self.assertEqual([a.canonical_url for a in assets],[CALL])
         self.assertEqual(p.discovery_errors[0]['status_code'],500)

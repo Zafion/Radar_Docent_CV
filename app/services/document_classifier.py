@@ -25,7 +25,7 @@ class ClassifiedDocument:
 
 
 class DocumentClassifierService:
-    classifier_version = "0.8.0"
+    classifier_version = "0.8.3"
 
     def classify(
         self,
@@ -68,6 +68,106 @@ class DocumentClassifierService:
             publication_date_text=publication_date_text,
             original_filename=original_filename,
         )
+
+        # Merit assessment tables are not rankings of interim-teacher bags.
+        # Classify on the PDF's own content before any legacy asset-role hint.
+        if (('bors' in normalized_preview or 'bols' in normalized_preview)
+                and 'extraordinari' in normalized_preview
+                and 'musica' in normalized_preview and 'escenic' in normalized_preview
+                and 'barem' in normalized_preview and 'merit' in normalized_preview):
+            return ClassifiedDocument(
+                doc_family='docent_music_merit_assessment',
+                list_scope='musica_artes_escenicas',
+                title=title,
+                document_date_text=document_date_text,
+                document_date_iso=document_date_iso,
+                classifier_version=self.classifier_version,
+                signals='content=music_extraordinary_bag_merit_assessment_unsupported',
+            )
+
+        # The Religion Primary awards table is a distinct format: its masked
+        # identity and destination columns must not be treated as an ordinary
+        # interim award layout or as an unrelated document.
+        if all(token in normalized_preview for token in (
+                'dnimasc', 'peticio', 'cognom', 'ordeng', 'modalitat',
+                'valencia', 'centre', 'localitat')):
+            return ClassifiedDocument(
+                doc_family='religion_award_listing', list_scope='religion_primary_review',
+                title=title, document_date_text=document_date_text,
+                document_date_iso=document_date_iso, classifier_version=self.classifier_version,
+                signals='content=masked_religion_award_table_unsupported',
+            )
+        if (('resolucion' in normalized_preview or 'resolucio' in normalized_preview)
+                and 'personal docente' in normalized_preview
+                and 'religion catolica' in normalized_preview
+                and 'listados definitivos' in normalized_preview):
+            return ClassifiedDocument(
+                doc_family='resolution_text', list_scope='religion_primary_review',
+                title=title, document_date_text=document_date_text,
+                document_date_iso=document_date_iso, classifier_version=self.classifier_version,
+                signals='content=religion_staff_resolution',
+            )
+
+        # A formal call to create a bag is not a list of ranked members.
+        # Keep it separate when the inspected text contains no masked IDs;
+        # annexes and other ambiguous layouts remain subject to review.
+        if (('resolucion de' in normalized_preview or 'resolucio de' in normalized_preview)
+                and ('por la que se convoca' in normalized_preview or 'per la qual es convoca' in normalized_preview)
+                and ('bolsa' in normalized_preview or 'borsa' in normalized_preview)
+                and ('resuelvo' in normalized_preview or 'resolc' in normalized_preview)
+                and not re.search(r'\*{2,}\d{3,}|\d{3,}\*{2,}', normalized_preview)):
+            return ClassifiedDocument(
+                doc_family='docent_bag_resolution', list_scope=None, title=title,
+                document_date_text=document_date_text, document_date_iso=document_date_iso,
+                classifier_version=self.classifier_version,
+                signals='content=formal_docent_bag_call_not_member_list',
+            )
+
+        # Keep distinct official procedures out of ordinary vacancy/award
+        # parsers. These classifications do not assert publication dates.
+        header = normalized_preview[:3500]
+        dedicated = None
+        if ('listado provisional de personas solicitantes con' in header
+                and 'especialidades reconocidas y no reconocidas' in header):
+            return ClassifiedDocument(
+                doc_family='docent_specialty_recognition', list_scope=None, title=title,
+                document_date_text=None, document_date_iso=None,
+                classifier_version=self.classifier_version,
+                signals='content=specialty_recognition_not_difficult_coverage_candidates',
+            )
+        if ('puestos vacantes no adjudicados por ausencia de solicitudes' in header
+                and 'personal experto del sector productivo' in header):
+            return ClassifiedDocument(
+                doc_family='unawarded_expert_vacancies', list_scope='expertos', title=title,
+                document_date_text=None, document_date_iso=None,
+                classifier_version=self.classifier_version,
+                signals='content=unawarded_expert_vacancies_not_available_offers',
+            )
+        if ('relacion de puestos adjudicados a desplazados/suprimidos' in header
+                and 'cuerpo de secundaria' in header):
+            dedicated = ('displaced_award_listing', 'secundaria_otros', 'content=displaced_secondary_awards')
+        elif ('annex i' in header and 'centres de dificil provisio' in header
+              and 'localitat' in header):
+            dedicated = ('difficult_provision_centers_catalog', None, 'content=school_centers_not_offered_positions')
+        elif (('adjudicacion especialistas dificil cobertura' in header
+               or 'adjudicacion expertos dificil cobertura' in header
+               or 'expertos. adjudicados provisional dificil cobertura' in header)
+              and 'dni' in header):
+            dedicated = ('specialist_difficult_award_listing', 'dificil_cobertura', 'content=specialist_coverage_awards')
+        elif ('compromiso' in normalized_title and 'formacion pedagogica' in normalized_title
+              and 'formacion pedagogica y didactica' in header and 'solicitud' in header):
+            dedicated = ('docent_pedagogical_commitment_form', None, 'content=pedagogical_commitment_form')
+        elif ('convocatoria de la direccion general de personal docente' in header
+              and 'adjudicacion de puestos de personal experto' in header
+              and 'formacion profesional' in header):
+            dedicated = ('specialist_expert_call_with_annex', None, 'content=expert_call_annex_review')
+        if dedicated is not None:
+            family, scope, signals = dedicated
+            return ClassifiedDocument(
+                doc_family=family, list_scope=scope, title=title,
+                document_date_text=document_date_text, document_date_iso=document_date_iso,
+                classifier_version=self.classifier_version, signals=signals,
+            )
 
         legacy = self._legacy_classification(
             asset_role=asset_role,

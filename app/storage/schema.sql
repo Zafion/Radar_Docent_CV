@@ -116,6 +116,10 @@ CREATE TABLE IF NOT EXISTS documents (
     list_scope TEXT,
     notes TEXT,
     parsed_at TIMESTAMPTZ,
+    validation_status TEXT CHECK (validation_status IN ('validated', 'validated_with_limitations', 'needs_validation')),
+    validation_parse_run_id BIGINT REFERENCES document_parse_runs(id),
+    historical_status TEXT CHECK (historical_status IN ('accredited', 'quarantine', 'unknown')),
+    publication_date_quality TEXT CHECK (publication_date_quality IN ('official', 'inferred', 'unknown')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

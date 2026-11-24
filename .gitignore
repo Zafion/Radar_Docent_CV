@@ -5,3 +5,5 @@ data/
 .pytest_cache/
 .vscode/
 env.local.sh
+auditoria_local/recuperacion_17nov_luks.img
+auditoria_local/recuperacion_17nov_luks/

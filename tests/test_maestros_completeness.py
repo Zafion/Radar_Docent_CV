@@ -15,6 +15,27 @@ VALID_AWARD = [
 
 
 class MaestrosCompletenessTests(unittest.TestCase):
+    def test_historical_shape_rejects_102_of_6416_results(self):
+        parser=module.FinalAwardListingMaestrosParserService()
+        source=['No adjudicat']*6416
+        blocks=[['No adjudicat'] for _ in range(102)]
+        rows=[module.ParsedAwardResult(i+1,PERSON,'synthetic','No adjudicat','synthetic',None) for i in range(102)]
+        with self.assertRaises(module.MaestrosExtractionValidationError) as error:
+            parser._validate_extraction(source,blocks,rows,[])
+        self.assertIn('status_counts_mismatch',error.exception.metrics['issues'])
+        self.assertEqual(error.exception.metrics['source_status_counts']['No adjudicat'],6416)
+        self.assertEqual(error.exception.metrics['parsed_rows'],102)
+
+    def test_equal_status_counts_cannot_hide_wrong_ordinal(self):
+        parser=module.FinalAwardListingMaestrosParserService()
+        lines=[f'1 {PERSON}','No adjudicat',f'2 {OTHER}','No adjudicat']
+        rows=[module.ParsedAwardResult(1,PERSON,'synthetic','No adjudicat','synthetic',None),
+              module.ParsedAwardResult(1,OTHER,'synthetic','No adjudicat','synthetic',None)]
+        with patch.object(parser,'_extract_clean_lines',return_value=lines),patch.object(parser,'_parse_block',side_effect=rows):
+            with self.assertRaises(module.MaestrosExtractionValidationError) as error:
+                parser._parse_document({'file_path':'synthetic.pdf'})
+        self.assertIn('ordinal_counts_mismatch',error.exception.metrics['issues'])
+
     def setUp(self):
         # Parser transactions are isolated; claims have real PostgreSQL coverage.
         claim = patch("app.services.final_award_listing_maestros_parser.locked_documents",

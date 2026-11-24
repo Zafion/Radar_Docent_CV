@@ -47,8 +47,7 @@ if result.matcher_executed:
     print(f"Sin match: {result.matcher_no_match}")
 
 
-from app.services.notification_eligibility import reconcile_if_configured
-reconcile_if_configured()
+# Reconciliation is a separate, explicitly authorized operation.
 
 if has_failures:
     sys.exit(1)

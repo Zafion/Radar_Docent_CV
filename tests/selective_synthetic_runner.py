@@ -14,6 +14,17 @@ from app.services.selective_live_parser import parse_selected
 from scripts.import_remote_fetch import import_manifest
 
 
+def run_guarded_fixture(cluster, staging, manifest_bytes, expected_sha, lock_paths):
+    """Synthetic-only flow with inherited locks checked at DB boundaries."""
+    from app.services.selective_lock_supervisor import InheritedLockFence
+    from app.storage.db import selective_transaction_fence
+    fence=InheritedLockFence(lock_paths)
+    with selective_transaction_fence(fence):
+        result=run_fixture(cluster,staging,manifest_bytes,expected_sha)
+        fence.check()
+        return result
+
+
 def run_fixture(cluster, staging, manifest_bytes, expected_sha):
     """Use only a verified, owned FreshCluster and explicitly synthetic URLs."""
     staging = Path(staging).resolve()

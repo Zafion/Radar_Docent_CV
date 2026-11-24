@@ -107,7 +107,7 @@ def validate_document(content: bytes, url: str, headers=None) -> DocumentPayload
     return DocumentPayload(content, name, mime, extension)
 
 
-def atomic_write_document(path: Path, content: bytes) -> None:
+def atomic_write_document(path: Path, content: bytes, *, preserve_partial: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.is_file() and hashlib.sha256(path.read_bytes()).digest() == hashlib.sha256(content).digest():
         return
@@ -118,5 +118,5 @@ def atomic_write_document(path: Path, content: bytes) -> None:
             handle.write(content); handle.flush(); os.fsync(handle.fileno())
         os.replace(temporary, path)
     finally:
-        if temporary is not None:
+        if temporary is not None and not preserve_partial:
             temporary.unlink(missing_ok=True)

@@ -5,6 +5,17 @@ from app.services.offered_positions_parser import OfferedPositionsParserService
 
 
 class OfferedPositionFieldTests(unittest.TestCase):
+    def test_alphanumeric_center_is_a_separate_source_row(self):
+        parser=OfferedPositionsParserService()
+        lines=['2696 VACANTEALACANT - 03001477 - CEP CENTRO DE RECEPCIÓN 920357 SI',
+               '2697 VACANTEALACANT - 03B39521 - CIDA-CENTRO DE INNOVACIÓN DIGITAL APLICADA865008 NO',
+               '2698 VACANTEALACANT - 03009968 - EI EL TOSSALET 919934 NO']
+        with patch.object(parser,'_extract_clean_lines',return_value=lines):
+            rows=parser._parse_document({'file_path':'fixture.pdf','list_scope':'inicio_curso'})
+        self.assertEqual([(r.center_code,r.position_code) for r in rows],
+                         [('03001477','920357'),('03B39521','865008'),('03009968','919934')])
+        self.assertNotIn('03B39521',rows[0].raw_row_text)
+
     def row(self, text, difficult=False):
         p=OfferedPositionsParserService()
         method=p._parse_dificil_cobertura_row if difficult else p._parse_continua_row
@@ -79,3 +90,10 @@ class OfferedPositionFieldTests(unittest.TestCase):
                 self.assertEqual(row.valenciano_required_text,value)
                 self.assertFalse(row.is_itinerant)
                 self.assertIsNone(row.hours_value)
+
+    def test_itinerancy_glued_to_valencian_requirement(self):
+        for flag, expected in [('SI', True), ('NO', False)]:
+            with self.subTest(flag=flag):
+                row=self.row(f'1 VACANTE LOCALIDAD - 00000001 - CENTRO 123456 {flag}C2 Val.')
+                self.assertIs(row.is_itinerant, expected)
+                self.assertEqual(row.valenciano_required_text, 'C2 Val.')

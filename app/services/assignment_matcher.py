@@ -39,6 +39,16 @@ class AssignmentMatcherService:
                 matched_id = None
                 status = "no_match"
 
+                # A matching position code cannot override a conflicting known
+                # centre. Preserve identifiers as strings, including letters.
+                center = row.get("center_code")
+                if center and candidates:
+                    compatible = [candidate for candidate in candidates
+                                  if not candidate.get("center_code") or candidate["center_code"] == center]
+                    if not compatible:
+                        status = "center_conflict"
+                    candidates = compatible
+
                 if len(candidates) == 1:
                     matched_id = int(candidates[0]["id"])
                     status = "matched_exact_position_code"

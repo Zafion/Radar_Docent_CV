@@ -1,0 +1,23 @@
+# Example only: do not install until the entire recovery window is authorized.
+[Unit]
+Description=Funkcionario read-only recovery web
+After=postgresql.service
+
+[Service]
+Type=simple
+User=funkcionario
+Group=funkcionario
+WorkingDirectory=/srv/funkcionario/app
+EnvironmentFile=/etc/funkcionario/recovery-readonly.env
+ExecStart=/bin/bash /srv/funkcionario/app/scripts/start_recovery_readonly.sh
+RuntimeDirectory=funkcionario-recovery
+RuntimeDirectoryMode=0750
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+Restart=no
+
+# No Install section: activation requires an independently authorized window.

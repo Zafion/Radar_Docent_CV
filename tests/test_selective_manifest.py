@@ -44,6 +44,22 @@ class TechnicalManifestTests(unittest.TestCase):
         (self.root / 'doc.pdf').symlink_to('/dev/null')
         with self.assertRaises(ManifestRejected): self.validate()
 
+    def test_v3_requires_capture_hash_and_exact_document_link(self):
+        page=b'<a href="/doc.pdf">document</a>'
+        (self.root/'page.html').write_bytes(page)
+        self.data['format']='funkcionario.selective-technical.v3'
+        self.data['entries'][0]['asset']={'source_key':'synthetic','source_url':'https://example.invalid/page',
+            'canonical_url':'https://example.invalid/doc.pdf','url':'https://example.invalid/doc.pdf',
+            'asset_role':'pdf_candidate','title':'synthetic','publication_date_text':'not verified'}
+        self.data['entries'][0]['evidence']={'html_file':'page.html','html_sha256':hashlib.sha256(page).hexdigest(),
+            'final_page_url':'https://example.invalid/page','linked_url':'https://example.invalid/doc.pdf'}
+        self.assertEqual(len(self.validate()),1)
+        altered=b'<a href="/other.pdf">changed</a>'
+        (self.root/'page.html').write_bytes(altered)
+        with self.assertRaises(ManifestRejected): self.validate()
+        self.data['entries'][0]['evidence']['html_sha256']=hashlib.sha256(altered).hexdigest()
+        with self.assertRaises(ManifestRejected): self.validate()
+
 
 if __name__ == '__main__':
     unittest.main()

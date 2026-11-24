@@ -14,7 +14,19 @@ from app.services.discovery.base import DiscoveredAsset
 from tests.document_fixtures import pdf_bytes
 
 ROOT=Path(__file__).resolve().parents[1]
-URL='https://example.invalid/documents/sample.pdf'
+URL='https://ceice.gva.es/documents/sample.pdf'
+
+
+def policy(client):
+    from app.services.discovery.http_policy import PolicyClient
+    def send(url,headers,limit):
+        if url.endswith('/robots.txt'):
+            return httpx.Response(200,text='User-agent: *\nAllow: /',request=httpx.Request('GET',url))
+        return client.get(url,headers=headers)
+    result=PolicyClient(user_agent=fetcher.HEADERS['User-Agent'])
+    result._resolve=lambda host:'1.1.1.1'
+    result._exchange=lambda url,headers,limit,ip:send(url,headers,limit)
+    return result
 
 
 class FetcherRevalidationTests(unittest.TestCase):
@@ -32,7 +44,7 @@ class FetcherRevalidationTests(unittest.TestCase):
                 seen.append(request)
                 return httpx.Response(304)
             with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-                result=fetcher.download_asset(client=client,url=URL,canonical_url=URL,cache_files_dir=cache,previous=old)
+                result=fetcher.download_asset(client=policy(client),url=URL,canonical_url=URL,cache_files_dir=cache,previous=old)
             self.assertEqual(result['downloaded_at'],old['downloaded_at'])
             self.assertNotEqual(result['last_checked_at'],old['downloaded_at'])
             self.assertEqual(seen[0].headers['if-none-match'],'"old"')
@@ -45,7 +57,7 @@ class FetcherRevalidationTests(unittest.TestCase):
             old={'sha256':hashlib.sha256(pdf_bytes('old')).hexdigest(),'original_filename':'sample.pdf',
                  'stored_filename':'old.pdf','downloaded_at':'2026-01-01T00:00:00+00:00'}
             with httpx.Client(transport=httpx.MockTransport(lambda r:httpx.Response(200,content=pdf_bytes('new'),headers={'etag':'"new"'}))) as client:
-                result=fetcher.download_asset(client=client,url=URL,canonical_url=URL,cache_files_dir=cache,previous=old)
+                result=fetcher.download_asset(client=policy(client),url=URL,canonical_url=URL,cache_files_dir=cache,previous=old)
             self.assertNotEqual(result['sha256'],old['sha256'])
             self.assertEqual(result['previous_versions'][0]['sha256'],old['sha256'])
             self.assertTrue((cache/'old.pdf').exists())
@@ -66,8 +78,8 @@ class FetcherRevalidationTests(unittest.TestCase):
                 requests.append(request)
                 return httpx.Response(500 if error else 304)
             client=httpx.Client(transport=httpx.MockTransport(handler))
-            with patch.object(fetcher,'select_adapters',return_value=[adapter]),patch.object(fetcher.httpx,'Client',return_value=client),patch('sys.argv',['fetcher','--output-dir',tmp,'--download-delay','0','--max-revalidations',str(limit)]),contextlib.redirect_stdout(io.StringIO()):
-                status=fetcher.main()
+            with patch.object(fetcher,'select_adapters',return_value=[adapter]),patch('sys.argv',['fetcher','--output-dir',tmp,'--download-delay','0','--max-revalidations',str(limit)]),contextlib.redirect_stdout(io.StringIO()):
+                status=fetcher.main(policy_factory=lambda **kwargs:policy(client))
             state=json.loads((output/'state.json').read_text())
             manifest=json.loads((output/'current/manifest.json').read_text())
             linked=[(output/'current'/r['relative_file_path']).exists() for r in manifest['sources'][0]['results'] if r.get('relative_file_path')]
@@ -75,7 +87,9 @@ class FetcherRevalidationTests(unittest.TestCase):
 
     def test_revalidation_budget_limits_legacy_cache_requests(self):
         status,state,manifest,requests,linked=self.run_fetch([URL+'?id=1',URL+'?id=2'])
-        self.assertEqual(status,0)
+        # Legacy cache has no captured HTML and cannot produce verified v3 evidence.
+        self.assertEqual(status,1)
+        self.assertEqual(manifest['sources'][0]['status'],'partial')
         self.assertEqual(len(requests),1)
         self.assertEqual(linked,[True,True])
         self.assertIn('last_checked_at',state['assets_by_canonical_url'][URL+'?id=1'])
@@ -96,7 +110,7 @@ class FetcherRevalidationTests(unittest.TestCase):
                  'original_filename':'sample.pdf','downloaded_at':'2026-01-01T00:00:00+00:00'}
             (cache/'old.pdf').write_bytes(data)
             with httpx.Client(transport=httpx.MockTransport(lambda r:httpx.Response(200,content=data))) as client:
-                result=fetcher.download_asset(client=client,url=URL,canonical_url=URL,cache_files_dir=cache,previous=old)
+                result=fetcher.download_asset(client=policy(client),url=URL,canonical_url=URL,cache_files_dir=cache,previous=old)
             self.assertEqual(result['sha256'],old['sha256'])
             self.assertEqual(result['previous_versions'],[])
             self.assertNotEqual(result['downloaded_at'],old['downloaded_at'])
@@ -110,7 +124,7 @@ class FetcherRevalidationTests(unittest.TestCase):
                 requests.append(request)
                 return httpx.Response(200,content=pdf_bytes('new'))
             with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-                result=fetcher.download_asset(client=client,url=URL,canonical_url=URL,cache_files_dir=cache,previous=old,use_conditional_headers=False)
+                result=fetcher.download_asset(client=policy(client),url=URL,canonical_url=URL,cache_files_dir=cache,previous=old,use_conditional_headers=False)
             self.assertNotIn('if-none-match',requests[0].headers)
             self.assertEqual(result['previous_versions'][0]['sha256'],hashlib.sha256(pdf_bytes('old')).hexdigest())
 
@@ -134,8 +148,8 @@ class FetcherRevalidationTests(unittest.TestCase):
             previous={'sha256':hashlib.sha256(original).hexdigest(),'stored_filename':'old.pdf','original_filename':'sample.pdf'}
             bodies=iter((changed,original))
             with httpx.Client(transport=httpx.MockTransport(lambda r:httpx.Response(200,content=next(bodies)))) as client:
-                first=fetcher.download_asset(client=client,url=URL,canonical_url=URL,cache_files_dir=cache,previous=previous)
-                restored=fetcher.download_asset(client=client,url=URL,canonical_url=URL,cache_files_dir=cache,previous=first)
+                first=fetcher.download_asset(client=policy(client),url=URL,canonical_url=URL,cache_files_dir=cache,previous=previous)
+                restored=fetcher.download_asset(client=policy(client),url=URL,canonical_url=URL,cache_files_dir=cache,previous=first)
             self.assertEqual(restored['sha256'],previous['sha256'])
             self.assertEqual(len(restored['hash_changes']),2)
             self.assertEqual(restored['hash_changes'][1]['from_sha256'],first['sha256'])

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 import re
+import unicodedata
 from typing import Optional
 
 from pypdf import PdfReader
@@ -14,11 +15,12 @@ from app.storage.offered_positions_store import OfferedPositionsStore
 
 
 PARSER_KEY = "offered_positions_parser"
-PARSER_VERSION = "0.5.0"
+PARSER_VERSION = "0.5.4"
 
-ROW_START_RE = re.compile(r"^(?:\d+\s+)?(.+?)\s+-\s+\d{8}\s+-\s+.+$")
+CENTER_ID_PATTERN = r"\d{2}[0-9A-Z]{6}"
+ROW_START_RE = re.compile(r"^(?:\d+\s+)?(.+?)\s+-\s+" + CENTER_ID_PATTERN + r"\s+-\s+.+$", re.IGNORECASE)
 LOCALITY_CENTER_RE = re.compile(
-    r"^(?P<locality>.+?)\s+-\s+(?P<center_code>\d{8})\s+-\s+(?P<rest>.+)$"
+    r"^(?P<locality>.+?)\s+-\s+(?P<center_code>" + CENTER_ID_PATTERN + r")\s+-\s+(?P<rest>.+)$", re.IGNORECASE
 )
 SPECIALTY_RE_1 = re.compile(r"^(?P<code>[0-9A-Z]+)\s*-\s*(?P<name>.+)$")
 SPECIALTY_RE_2 = re.compile(r"^(?P<code>[0-9A-Z]+)\s+(?P<name>.+)$")
@@ -61,6 +63,24 @@ class ParsedOfferedPosition:
 
 
 class OfferedPositionsParserService:
+    @staticmethod
+    def resolve_displaced_overlap(combined: str, candidates: list[tuple[str, str]]) -> tuple[str, str]:
+        """Resolve already row-scoped independent PDF cell operands conservatively.
+
+        Callers must scope candidates by source page, centre and row identifier.
+        Comparing character multisets allows overlapping visual text to be
+        interleaved; it must not be used to locate candidate rows.
+        """
+        def signature(value: str) -> list[str]:
+            text = unicodedata.normalize('NFKD', value.upper())
+            return sorted(re.sub(r'[^A-Z0-9]', '', text))
+        expected = signature(combined)
+        matches = {(locality, center) for locality, center in candidates
+                   if locality.strip() and center.strip() and signature(locality + center) == expected}
+        if len(matches) != 1:
+            raise ValueError('displaced_overlap_ambiguous')
+        return matches.pop()
+
     def parse_all_documents(self) -> list[dict]:
         store = OfferedPositionsStore()
         summaries: list[dict] = []
@@ -198,11 +218,12 @@ class OfferedPositionsParserService:
         row_buffer: Optional[str] = None
         pending_row_prefix: Optional[str] = None
         parsed_rows: list[ParsedOfferedPosition] = []
+        rejected_rows = 0
         pending_composition_lines: list[str] = []
         row_composition: Optional[str] = None
 
         def flush_row_buffer() -> None:
-            nonlocal row_buffer, row_composition
+            nonlocal row_buffer, row_composition, rejected_rows
 
             if not row_buffer:
                 return
@@ -219,6 +240,8 @@ class OfferedPositionsParserService:
                 if row_composition:
                     parsed.composition = " | ".join(filter(None, [row_composition, parsed.composition]))
                 parsed_rows.append(parsed)
+            else:
+                rejected_rows += 1
 
             row_buffer = None
             row_composition = None
@@ -227,7 +250,24 @@ class OfferedPositionsParserService:
         if not lines:
             raise ValueError("No readable text in offered positions document")
 
-        for line in lines:
+        if any('RELACIÓN DE VACANTES PARA LA ADJUDICACIÓN DE SUPRIMIDOS Y DESPLAZADOS' in line.upper() for line in lines[:40]):
+            from app.services.displaced_vacancy_geometry import parse_displaced_vacancies
+            return parse_displaced_vacancies(file_path, 'desplazados', self.resolve_displaced_overlap)
+
+        if any('PERSONAL EXPERTO EN SECTORES PRODUCTIVOS DE LA FORMACIÓN PROFESIONAL' in line.upper()
+               for line in lines):
+            return self._parse_expert_table(file_path, source_type)
+
+        if any('ADJUDICACIÓ PERSONAL ESPECIALISTA' in line.upper() for line in lines):
+            return self._parse_specialist_table(file_path)
+
+        if any('VACANTES PROVISIONALES DIFÍCIL COBERTURA ESPECIALISTES' in line.upper() for line in lines):
+            return self._parse_specialist_coverage_table(file_path)
+
+        if source_type == "dificil_cobertura":
+            lines = self._join_wrapped_center_lines(lines)
+
+        for index, line in enumerate(lines):
             if self._is_body_line(line):
                 flush_row_buffer()
                 pending_row_prefix = None
@@ -246,6 +286,15 @@ class OfferedPositionsParserService:
                 continue
 
             if self._is_province_line(line):
+                # A wrapped centre name can equal a province name. Only keep it
+                # with the current row when the next line proves a six-digit
+                # position follows its itinerancy flag.
+                following = lines[index + 1] if index + 1 < len(lines) else ""
+                if (source_type == "dificil_cobertura" and row_buffer
+                        and ":" not in line
+                        and re.match(r"^(?:SI|NO)\s*\d{6}(?!\d)", following, re.IGNORECASE)):
+                    row_buffer = f"{row_buffer} {line}"
+                    continue
                 flush_row_buffer()
                 pending_row_prefix = None
                 pending_composition_lines.clear()
@@ -254,6 +303,21 @@ class OfferedPositionsParserService:
 
             if self._should_ignore_non_row_line(line):
                 continue
+
+            # A numbered offer prefix is itself evidence of a row, even if the
+            # centre identifier is broken or absent from text extraction.
+            if (re.match(r'^\d+\s+(?:VACANTE|SUSTITUCIÓN INDETERMINADA|SUSTITUCIÓN DETERMINADA)', line, re.IGNORECASE)
+                    and not TYPE_ONLY_ROW_RE.match(line)
+                    and not self._looks_like_row_start(line)):
+                raise ValueError('offered_unrecognized_numbered_row')
+
+            # A centre identifier on a non-row line can otherwise be appended
+            # to the previous row and silently hide a whole unrecognized row.
+            # Composition entries use the explicit "12345678:" notation.
+            centers = list(re.finditer(r'(?<![0-9A-Z])' + CENTER_ID_PATTERN + r'(?![0-9A-Z])', line, re.IGNORECASE))
+            if (centers and not self._looks_like_row_start(line)
+                    and any(not re.match(r'\s*:', line[m.end():]) for m in centers)):
+                raise ValueError('offered_unrecognized_center_line')
 
             # In PDFs with itinerant/composite positions, text extraction may place
             # the row number and type on one line, the composition detail in the
@@ -284,6 +348,8 @@ class OfferedPositionsParserService:
                 row_buffer = f"{row_buffer} {line}"
 
         flush_row_buffer()
+        if rejected_rows:
+            raise ValueError(f'offered_extraction_incomplete: rejected_rows={rejected_rows}')
         if not parsed_rows:
             # A zero is never proof that existing positions should be removed.
             # Recognized rows that cannot be parsed are real failures, whereas
@@ -303,6 +369,222 @@ class OfferedPositionsParserService:
                 raise ValueError("Offered positions heading recognized but no rows parsed")
             raise SkippedOfferedDocument("unsupported_format")
         return parsed_rows
+
+    def _parse_specialist_coverage_table(self, file_path: Path) -> list[ParsedOfferedPosition]:
+        """Extract the bounded specialist-coverage table, without inferred codes."""
+        reader=PdfReader(str(file_path))
+        if len(reader.pages)!=1:
+            raise ValueError('specialist_coverage_page_count_unsupported')
+        fragments: list[tuple[float,float,str]]=[]
+        transformed=False
+        def collect(value, cm, tm, font, size):
+            nonlocal transformed
+            value=self._normalize_spaces(value)
+            if not value:
+                return
+            if tuple(round(float(x),3) for x in cm)!=(1,0,0,1,0,0):
+                transformed=True;return
+            fragments.append((float(tm[4]),float(tm[5]),value))
+        reader.pages[0].extract_text(visitor_text=collect)
+        headers=[y for x,y,v in fragments if v=='LLOC' and 40<x<70]
+        anchors=sorted(((y,v) for x,y,v in fragments if 90<x<150 and re.fullmatch(r'\d{8}',v)),reverse=True)
+        if transformed or len(headers)!=1 or not anchors:
+            raise ValueError('specialist_coverage_geometry_unsupported')
+        rows=[];seen=set()
+        for index,(y,center_code) in enumerate(anchors):
+            high=headers[0]-1 if index==0 else (anchors[index-1][0]+y)/2
+            low=40 if index==len(anchors)-1 else (anchors[index+1][0]+y)/2
+            cells: dict[str,list[tuple[float,float,str]]]={}
+            for x,row_y,value in fragments:
+                if not low<row_y<high:
+                    continue
+                field=('identifier' if 40<x<90 else 'code' if 90<=x<150 else
+                       'center' if 150<=x<420 else 'locality' if 420<=x<550 else
+                       'module' if 550<=x<740 else 'hours' if 740<=x<810 else None)
+                if field:cells.setdefault(field,[]).append((row_y,x,value))
+            values={key:self._normalize_spaces(' '.join(v for _,_,v in sorted(items,key=lambda t:(-t[0],t[1]))) ) for key,items in cells.items()}
+            identifier=values.get('identifier','');hours=values.get('hours','')
+            if (not re.fullmatch(r'\d{1,5}',identifier) or identifier in seen
+                    or values.get('code')!=center_code or not values.get('center')
+                    or not values.get('locality') or not values.get('module')
+                    or not re.fullmatch(r'\d{1,2}',hours)):
+                raise ValueError('specialist_coverage_row_incomplete_or_ambiguous')
+            seen.add(identifier)
+            rows.append(ParsedOfferedPosition(
+                source_type='personal_especialista_dificil_cobertura',body_code=None,
+                body_name='Personal especialista',specialty_code=None,specialty_name=None,
+                province=None,locality=values['locality'],center_code=center_code,
+                center_name=values['center'],position_code=None,hours_text=hours,hours_value=float(hours),
+                is_itinerant=None,valenciano_required_text=None,position_type=None,
+                composition=values['module'],observations=f'Lloc: {identifier}',
+                raw_row_text=' | '.join(values.values()),
+            ))
+        return rows
+
+    def _parse_specialist_table(self, file_path: Path) -> list[ParsedOfferedPosition]:
+        """Read the separate specialist table; its short Lloc is not a matching code."""
+        reader = PdfReader(str(file_path))
+        result: list[ParsedOfferedPosition] = []
+        seen: set[str] = set()
+        for page in reader.pages:
+            fragments: list[tuple[float, float, str]] = []
+            horizontal: list[float] = []
+            previous: list[tuple[float, float]] = []
+            transformed = False
+            def operand(op, args, cm, tm):
+                nonlocal transformed
+                if op not in (b'm', b'l'):
+                    return
+                if tuple(round(float(x), 3) for x in cm) != (1, 0, 0, 1, 0, 0):
+                    transformed = True
+                    return
+                if op == b'm':
+                    previous[:] = [(float(args[0]), float(args[1]))]
+                elif op == b'l' and previous:
+                    x, y = map(float, args); old_x, old_y = previous[0]; previous[:] = [(x, y)]
+                    if abs(y-old_y)<.2 and abs(x-old_x)>200:
+                        horizontal.append(round(y, 1))
+            def collect(value, cm, tm, font, size):
+                nonlocal transformed
+                value = self._normalize_spaces(value)
+                if not value:
+                    return
+                if tuple(round(float(x), 3) for x in cm) != (1, 0, 0, 1, 0, 0):
+                    transformed = True
+                    return
+                fragments.append((float(tm[4]), float(tm[5]), value))
+            page.extract_text(visitor_operand_before=operand, visitor_text=collect)
+            header = {value for _, _, value in fragments}
+            if transformed or not {'Lloc', 'Còdi', 'Centre', 'Localitat', 'Especialitat', 'Periode', 'Hores', 'Observacions'} <= header:
+                raise ValueError('specialist_table_geometry_unsupported')
+            anchors = sorted(((y, value) for x, y, value in fragments
+                              if 65 < x < 103 and re.fullmatch(r'\d{8}', value)), reverse=True)
+            if not anchors:
+                raise ValueError('specialist_table_page_without_rows')
+            borders = sorted(set(horizontal), reverse=True)[1:]
+            if len(borders) != len(anchors) + 1:
+                raise ValueError('specialist_table_row_boundaries_missing')
+            for index, (y, source_center) in enumerate(anchors):
+                high, low = borders[index:index + 2]
+                if not low < y < high:
+                    raise ValueError('specialist_table_anchor_outside_row')
+                cells: dict[str, list[tuple[float, float, str]]] = {}
+                for x, row_y, value in fragments:
+                    if not low < row_y < high:
+                        continue
+                    field = ('identifier' if 40 < x < 70 else 'code' if 70 <= x < 103 else
+                             'center' if 103 <= x < 260 else 'locality' if 260 <= x < 320 else
+                             'specialty' if 320 <= x < 520 else 'period' if 520 <= x < 605 else
+                             'hours' if 615 <= x < 635 and abs(row_y-y)<1.5 and re.fullmatch(r'\d{1,2}',value) else
+                             'observations' if 605 <= x < 800 else None)
+                    if field:
+                        cells.setdefault(field, []).append((row_y, x, value))
+                values = {key: self._normalize_spaces(' '.join(v for _, _, v in sorted(items, key=lambda t: (-t[0], t[1]))))
+                          for key, items in cells.items()}
+                identifier = values.get('identifier', '')
+                hours = values.get('hours', '')
+                if (not re.fullmatch(r'\d{1,5}', identifier) or identifier in seen
+                        or values.get('code') != source_center
+                        or not values.get('center') or not values.get('locality') or not values.get('specialty')
+                        or not re.fullmatch(r'\d{1,2}', hours)):
+                    raise ValueError('specialist_table_row_incomplete_or_ambiguous')
+                seen.add(identifier)
+                observations = ' | '.join(filter(None, [f'Lloc: {identifier}',
+                    f"Període: {values['period']}" if values.get('period') else None, values.get('observations')]))
+                result.append(ParsedOfferedPosition(
+                    source_type='personal_especialista', body_code=None, body_name='Personal especialista',
+                    specialty_code=None, specialty_name=values['specialty'], province=None,
+                    locality=values['locality'], center_code=source_center, center_name=values['center'],
+                    position_code=None, hours_text=hours, hours_value=float(hours), is_itinerant=None,
+                    valenciano_required_text=None, position_type=None, composition=None,
+                    observations=observations, raw_row_text=' | '.join(values.values()),
+                ))
+        return result
+
+    def _parse_expert_table(self, file_path: Path, source_type: str) -> list[ParsedOfferedPosition]:
+        """Read this FP table by its drawn cell borders; reject ambiguous pages.
+
+        The short `Puesto` identifier belongs to the source table; it is not
+        known to be the six-digit matching code used by other publications.
+        Its family, course and module are not a teacher specialty code.
+        """
+        reader = PdfReader(str(file_path))
+        rows: list[ParsedOfferedPosition] = []
+        seen: set[str] = set()
+        edges = (100.8, 140.7, 184.2, 317.0, 379.4, 709.8, 741.0)
+        for page in reader.pages:
+            horizontal: list[float] = []
+            vertical: list[float] = []
+            fragments: list[tuple[float, float, str]] = []
+            previous: list[tuple[float, float]] = []
+            transformed = False
+
+            def operand(op, args, cm, tm):
+                nonlocal transformed
+                if op not in (b'm', b'l'):
+                    return
+                if tuple(round(float(x), 3) for x in cm) != (1, 0, 0, 1, 0, 0):
+                    transformed = True
+                    return
+                x, y = map(float, args)
+                if op == b'm':
+                    previous[:] = [(x, y)]
+                elif previous:
+                    old_x, old_y = previous[0]
+                    previous[:] = [(x, y)]
+                    if abs(old_y-y) < .2 and abs(old_x-x) > 200 and 100 < old_x < 742 and 100 < x < 742:
+                        horizontal.append(round(y, 1))
+                    if abs(old_x-x) < .2 and abs(old_y-y) > 20 and 100 < x < 742:
+                        vertical.append(x)
+
+            def text(value, cm, tm, font, size):
+                nonlocal transformed
+                value = self._normalize_spaces(value)
+                if not value:
+                    return
+                if tuple(round(float(x), 3) for x in cm) != (1, 0, 0, 1, 0, 0):
+                    transformed = True
+                    return
+                fragments.append((float(tm[4]), float(tm[5]), value))
+
+            page.extract_text(visitor_operand_before=operand, visitor_text=text)
+            if transformed or any(not any(abs(value-edge) < .3 for value in vertical) for edge in edges):
+                raise ValueError('expert_table_geometry_unsupported')
+            borders = sorted(set(horizontal), reverse=True)
+            if len(borders) < 3:
+                raise ValueError('expert_table_boundaries_missing')
+            page_count = 0
+            for top, bottom in zip(borders[1:], borders[2:]):
+                cells: list[list[tuple[float, float, str]]] = [[] for _ in range(6)]
+                for x, y, value in fragments:
+                    if bottom < y < top:
+                        for index, (left, right) in enumerate(zip(edges, edges[1:])):
+                            if left <= x < right:
+                                cells[index].append((x, y, value))
+                                break
+                values = [' '.join(item[2] for item in sorted(cell, key=lambda item: (-item[1], item[0])))
+                          for cell in cells]
+                identifier, center_code, center, locality, composition, hours = values
+                if (not re.fullmatch(r'\d{1,5}', identifier) or identifier in seen
+                        or not re.fullmatch(r'\d{8}', center_code)
+                        or not center or not locality or not composition
+                        or not re.fullmatch(r'\d{1,2}', hours)):
+                    raise ValueError('expert_table_row_incomplete_or_ambiguous')
+                seen.add(identifier); page_count += 1
+                rows.append(ParsedOfferedPosition(
+                    source_type=source_type, body_code=None,
+                    body_name='Personal Experto en Sectores Productivos de la Formación Profesional',
+                    specialty_code=None, specialty_name=None, province=None,
+                    locality=locality, center_code=center_code, center_name=center,
+                    position_code=None, hours_text=hours, hours_value=float(hours),
+                    is_itinerant=None, valenciano_required_text=None, position_type=None,
+                    composition=composition, observations='Identificador de puesto en documento: '+identifier,
+                    raw_row_text=' | '.join(values)))
+            if not page_count:
+                raise ValueError('expert_table_page_without_rows')
+        if not rows:
+            raise ValueError('expert_table_no_rows')
+        return rows
 
     def _parse_row(
         self,
@@ -492,7 +774,7 @@ class OfferedPositionsParserService:
         hours = None
         requirements = []
         while remainder:
-            flag = re.match(r"^(SI|NO)(?=\s|\d|$)\s*", remainder, re.IGNORECASE)
+            flag = re.match(r"^(SI|NO)(?=\s|\d|$|(?:[A-Z]{2,3}-[ABC][12]|[ABC][12]\s*Val\.))\s*", remainder, re.IGNORECASE)
             language = re.match(r"^(?:[A-Z]{2,3}-[ABC][12]\.?|[ABC][12]\s*Val\.)(?=\s|$)", remainder, re.IGNORECASE)
             numeric = re.match(r"^(\d{1,2}(?:[,.]\d+)?)(?=\s|SI\b|NO\b|$)\s*", remainder, re.IGNORECASE)
             if flag and itinerant is None:
@@ -598,6 +880,32 @@ class OfferedPositionsParserService:
             "VALENCIA": "VALENCIA",
         }
         return mapping.get(normalized, value)
+
+    def _join_wrapped_center_lines(self, lines: list[str]) -> list[str]:
+        """Join a centre split after a hyphen only when it forms one row.
+
+        Do not merge an independently recognisable next row or a heading.
+        The ordinary completeness checks still reject any remaining ambiguity.
+        """
+        result: list[str] = []
+        index = 0
+        while index < len(lines):
+            line = lines[index]
+            if index + 1 < len(lines) and line.rstrip().endswith('-'):
+                following = lines[index + 1]
+                joined = f"{line} {following}"
+                if (not self._looks_like_row_start(line)
+                        and not self._looks_like_row_start(following)
+                        and not self._is_body_line(following)
+                        and not self._is_specialty_line(following)
+                        and not self._is_province_line(following)
+                        and self._looks_like_row_start(joined)):
+                    result.append(joined)
+                    index += 2
+                    continue
+            result.append(line)
+            index += 1
+        return result
 
     def _looks_like_row_start(self, line: str) -> bool:
         return ROW_START_RE.match(line) is not None

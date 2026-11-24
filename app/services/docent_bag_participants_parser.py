@@ -21,11 +21,12 @@ SERVICE_STATUS_RE = re.compile(r"(?P<status>AMB\s+SERVEIS|SENSE\s+SERVEIS)\b", r
 BAG_ROW_RE = re.compile(r"^(?P<order>\d{1,6})\s+(?P<rest>.+)$")
 SPECIALTY_HEADER_RE = re.compile(r"(?:Col·lectiu\s*)?\((?P<code>[0-9A-Z]{2,5})\)\s*(?P<name>.+)$", re.IGNORECASE)
 FC_FP_ROW_RE = re.compile(
-    r"^(?P<name>.+?)\s*(?P<masked_dni>\*{3}\d{4}\*{2})\s+(?P<order>\d{1,5})\s+(?P<collective>[A-ZÀ-Ý ]+)$"
+    r"^(?P<name>.+?)\s*(?P<masked_dni>(?:\*{3}\d{4}\*{2}|\*{4}\d{4}\*))\s+(?P<order>\d{1,5})\s+(?P<collective>[A-ZÀ-Ý ]+)$"
 )
 FC_FP_ROW_DNI_FIRST_RE = re.compile(
-    r"^(?P<masked_dni>\*{3}\d{4}\*{2})\s+(?P<name>.+?)\s+(?P<order>\d{1,5})\s+(?P<collective>[A-ZÀ-Ý ]+)$"
+    r"^(?P<masked_dni>(?:\*{3}\d{4}\*{2}|\*{4}\d{4}\*))\s*(?P<name>.+?)\s+(?P<order>\d{1,5})\s+(?P<collective>[A-ZÀ-Ý ]+)$"
 )
+FC_FP_MASK_RE = re.compile(r'(?:\*{3}\d{4}\*{2}|\*{4}\d{4}\*)')
 COURSE_YEAR_RE = re.compile(r"(?P<start>20\d{2})\s*/\s*(?P<end>20?\d{2})")
 SHORT_COURSE_YEAR_RE = re.compile(r"(?P<start>20\d{2})\s*/\s*(?P<end>\d{2})")
 
@@ -113,6 +114,8 @@ class DocentBagParticipantsParserService:
 
                 try:
                     rows = self._parse_document(document)
+                    if not rows:
+                        raise ValueError('empty_bag_extraction')
                     store.clear_for_document(int(document["document_id"]))
                     snapshot_ids: dict[SnapshotKey, int] = {}
 
@@ -222,12 +225,21 @@ class DocentBagParticipantsParserService:
             return self._parse_interino_secundaria(lines, course_year, list_stage)
 
         if doc_family == "docent_career_practice_participants":
-            return self._parse_fc_fp_participants(
+            rows = self._parse_fc_fp_participants(
                 lines=lines,
                 course_year=course_year,
                 list_stage=list_stage,
                 list_scope=list_scope or "maestros",
             )
+            expected = sum(len(FC_FP_MASK_RE.findall(line)) for line in lines)
+            if (not expected or expected != len(rows)
+                    or any(not row.masked_dni or not row.person_display_name.strip()
+                           or row.order_number < 1 or not row.collective
+                           or not row.snapshot_key.specialty_name
+                           or (list_scope == 'secundaria_otros' and not row.snapshot_key.body_name)
+                           for row in rows)):
+                raise ValueError('career_participants_extraction_incomplete')
+            return rows
 
         return []
 
@@ -353,6 +365,7 @@ class DocentBagParticipantsParserService:
             if match is not None and current_specialty_name is not None:
                 person_display_name = self._normalize_spaces(match.group("name"))
                 collective = self._normalize_spaces(match.group("collective"))
+                code_match = re.search(r'\(([0-9A-Z]{2,5})\)\s*$', current_specialty_name)
                 snapshot_key = SnapshotKey(
                     course_year=course_year,
                     list_stage=list_stage,
@@ -361,7 +374,7 @@ class DocentBagParticipantsParserService:
                     list_scope=list_scope,
                     body_code=None,
                     body_name=current_body_name,
-                    specialty_code=None,
+                    specialty_code=code_match.group(1) if list_scope == 'secundaria_otros' and code_match else None,
                     specialty_name=current_specialty_name,
                 )
                 rows.append(

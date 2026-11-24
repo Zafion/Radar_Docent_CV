@@ -18,6 +18,7 @@ from app.services.final_award_listing_secundaria_parser import (
 )
 from app.services.offered_positions_parser import OfferedPositionsParserService
 from app.services.non_docent_parser import NonDocentParserService
+from app.services.parse_selection import CURRENT_SELECTION
 
 
 @dataclass(slots=True)
@@ -41,7 +42,9 @@ class ParseDispatchRunResult:
 
 
 class DocumentParseDispatcherService:
-    def run(self) -> ParseDispatchRunResult:
+    def run(self, *, allow_global_matcher: bool = False) -> ParseDispatchRunResult:
+        if allow_global_matcher and (CURRENT_SELECTION.get().reprocess or CURRENT_SELECTION.get().selective_live):
+            raise ValueError('global_matcher_forbidden_for_explicit_document_selection')
         parser_definitions = [
             ("offered_positions", OfferedPositionsParserService()),
             ("final_award_listing_maestros", FinalAwardListingMaestrosParserService()),
@@ -82,7 +85,7 @@ class DocumentParseDispatcherService:
         matcher_ambiguous = 0
         matcher_no_match = 0
 
-        if should_run_matcher:
+        if should_run_matcher and allow_global_matcher:
             matcher_results = AssignmentMatcherService().match_all()
             matcher_total_assignments = len(matcher_results)
             matcher_matched_exact = sum(
@@ -108,7 +111,7 @@ class DocumentParseDispatcherService:
 
         return ParseDispatchRunResult(
             parser_summaries=parser_summaries,
-            matcher_executed=should_run_matcher,
+            matcher_executed=bool(should_run_matcher and allow_global_matcher),
             matcher_total_assignments=matcher_total_assignments,
             matcher_matched_exact=matcher_matched_exact,
             matcher_matched_refined=matcher_matched_refined,

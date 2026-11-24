@@ -5,22 +5,34 @@ from app.api.main import build_user_view
 PERSON={'display_name':'PERSONA SINTÉTICA'}
 def award(day,status='Adjudicat',**context):
     return {'document_date_iso':day,'status':status,'assignments_count':1 if status=='Adjudicat' else 0,
-            'assignments':[{'position_code':'123456'}] if status=='Adjudicat' else [],**context}
+            'assignments':[{'position_code':'123456'}] if status=='Adjudicat' else [],'publication_date_quality':'official',**context}
 
 class PersonSummaryTests(unittest.TestCase):
+    def test_document_date_is_not_publication_date_when_quality_unknown(self):
+        result=build_user_view(PERSON,[award('2026-11-03',publication_date_quality='unknown')],[])
+        self.assertEqual(result['current_result'],'no_data')
+        self.assertEqual(result['current_result_label'],'Cronología no acreditada')
+        self.assertIsNone(result['latest_date'])
+        self.assertIsNone(result['assigned_position'])
+
+    def test_missing_publication_quality_is_unverified(self):
+        row=award('2026-11-03')
+        del row['publication_date_quality']
+        self.assertEqual(build_user_view(PERSON,[row],[])['current_result'],'no_data')
+
     def test_input_order_does_not_override_chronology(self):
         result=build_user_view(PERSON,[award('2025-09-01'),award('2026-11-01','Desactivat')],[])
         self.assertEqual(result['current_result'],'deactivated')
         self.assertIsNone(result['assigned_position'])
 
     def test_later_bag_does_not_reuse_historical_assignment(self):
-        result=build_user_view(PERSON,[award('2025-09-01')],[],[{'document_date_iso':'2026-07-01','course_year':'2026/2027','order_number':7}])
+        result=build_user_view(PERSON,[award('2025-09-01')],[],[{'document_date_iso':'2026-07-01','course_year':'2026/2027','order_number':7,'staff_kind':'interino','publication_date_quality':'official'}])
         self.assertEqual(result['current_result'],'docent_bag_member')
         self.assertIsNone(result['assigned_position'])
 
     def test_later_difficult_result_does_not_reuse_old_selected(self):
-        result=build_user_view(PERSON,[],[{'document_date_iso':'2026-11-01','is_selected':False},
-                                         {'document_date_iso':'2025-09-01','is_selected':True,'position_code':'123456'}])
+        result=build_user_view(PERSON,[],[{'document_date_iso':'2026-11-01','is_selected':False,'publication_date_quality':'official'},
+                                         {'document_date_iso':'2025-09-01','is_selected':True,'position_code':'123456','publication_date_quality':'official'}])
         self.assertEqual(result['current_result'],'difficult_coverage_candidate')
         self.assertIsNone(result['assigned_position'])
 

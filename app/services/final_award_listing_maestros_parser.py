@@ -329,6 +329,18 @@ class FinalAwardListingMaestrosParserService:
         issues = []
         if source_status_counts != parsed_status_counts:
             issues.append("status_counts_mismatch")
+        # Compare ordinal multiplicities only where each source status can be
+        # paired with a recognizable entry header. Repeated source ordinals are
+        # preserved; unsupported layouts are not given a fabricated uniqueness rule.
+        source_ordinals=[]
+        for index,line in enumerate(lines):
+            if not self._is_entry_start(lines,index):
+                continue
+            marker=ENTRY_START_WITH_NAME_RE.match(line) or ENTRY_START_ONLY_ORDER_RE.match(line)
+            if marker:
+                source_ordinals.append(int(marker.group('order')))
+        if len(source_ordinals)==sum(source_status_counts.values()) and Counter(source_ordinals)!=Counter(row.order_number for row in rows):
+            issues.append('ordinal_counts_mismatch')
         if rejected_blocks:
             issues.append("rejected_blocks")
         if ambiguous_blocks:

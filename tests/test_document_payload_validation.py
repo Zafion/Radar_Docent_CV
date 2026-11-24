@@ -6,9 +6,10 @@ import unittest
 import httpx
 from scripts import fetch_ceice_remote as fetcher
 from tests.document_fixtures import pdf_bytes,docx_bytes
+from tests.test_fetcher_revalidation import policy
 
 ROOT=Path(__file__).resolve().parents[1]
-URL='https://example.invalid/documents/1/2/sample.pdf'
+URL='https://ceice.gva.es/documents/1/2/sample.pdf'
 
 
 class DocumentPayloadValidationTests(unittest.TestCase):
@@ -16,7 +17,7 @@ class DocumentPayloadValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=ROOT) as tmp:
             with httpx.Client(transport=httpx.MockTransport(lambda r:httpx.Response(200,content=body,headers=headers))) as client:
                 kwargs={} if limit is None else {'max_download_bytes':limit}
-                result=fetcher.download_asset(client=client,url=url,canonical_url=url,cache_files_dir=Path(tmp),**kwargs)
+                result=fetcher.download_asset(client=policy(client),url=url,canonical_url=url,cache_files_dir=Path(tmp),**kwargs)
             return result
 
     def test_html_success_response_is_not_a_pdf(self):
@@ -32,7 +33,7 @@ class DocumentPayloadValidationTests(unittest.TestCase):
         self.assertTrue(result['stored_filename'].endswith('.pdf'))
 
     def test_docx_uuid_url_is_not_renamed_as_pdf(self):
-        result=self.download(docx_bytes(),url='https://example.invalid/documents/1/2/ESPECIALISTAS.docx/opaque-uuid')
+        result=self.download(docx_bytes(),url='https://ceice.gva.es/documents/1/2/ESPECIALISTAS.docx/opaque-uuid')
         self.assertEqual(result['original_filename'],'ESPECIALISTAS.docx')
         self.assertTrue(result['stored_filename'].endswith('.docx'))
         self.assertIn('wordprocessingml',result['content_type'])
@@ -60,7 +61,7 @@ class DocumentPayloadValidationTests(unittest.TestCase):
                 seen.append(request)
                 return httpx.Response(200,content=body)
             with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-                result=fetcher.download_asset(client=client,url=URL,canonical_url=URL,cache_files_dir=cache,previous=previous)
+                result=fetcher.download_asset(client=policy(client),url=URL,canonical_url=URL,cache_files_dir=cache,previous=previous)
             self.assertNotIn('if-none-match',seen[0].headers)
             self.assertEqual(Path(result['cache_file_path']).read_bytes(),body)
 
@@ -73,7 +74,7 @@ class DocumentPayloadValidationTests(unittest.TestCase):
                 return httpx.Response(200,stream=httpx.ByteStream(pdf_bytes()))
             with httpx.Client(transport=httpx.MockTransport(handler)) as client:
                 with self.assertRaisesRegex(ValueError,'download_size_limit_exceeded'):
-                    fetcher.download_asset(client=client,url=URL,canonical_url=URL,cache_files_dir=Path(tmp),max_download_bytes=100)
+                    fetcher.download_asset(client=policy(client),url=URL,canonical_url=URL,cache_files_dir=Path(tmp),max_download_bytes=100)
             self.assertEqual(list(Path(tmp).iterdir()),[])
 
     def test_public_pdf_with_owner_permissions_is_still_readable(self):

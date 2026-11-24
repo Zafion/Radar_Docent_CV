@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 import re
 import unicodedata
 from typing import Optional
@@ -10,6 +11,7 @@ from urllib.parse import urljoin, urlparse, urlunparse
 
 import httpx
 from bs4 import BeautifulSoup, Tag
+from app.services.discovery.http_policy import PolicyClient, ResponseDecodingError
 
 
 DATE_RE = re.compile(r"\b(\d{2}/\d{2}/\d{4})\b")
@@ -37,9 +39,13 @@ class BaseDiscoveryAdapter(ABC):
     def __init__(self, timeout: float = 20.0) -> None:
         self.timeout = timeout
         self.discovery_errors: list[dict] = []
+        self.captured_pages: list[dict] = []
+        self._last_response_url: str | None = None
+        self._document_base_url: str | None = None
         self.headers = {
-            "User-Agent": "RadarDocentCV/0.7 (+https://ceice.gva.es/)"
+            "User-Agent": "RadarDocentCV/0.7 (+https://funkcionario.com)"
         }
+        self._network_client = PolicyClient(user_agent=self.headers['User-Agent'],timeout=timeout,max_bytes=5*1024*1024)
 
     @abstractmethod
     def discover_assets(self) -> list[DiscoveredAsset]:
@@ -52,23 +58,41 @@ class BaseDiscoveryAdapter(ABC):
         return response.text
 
     def _get_soup(self) -> BeautifulSoup:
-        return BeautifulSoup(self._fetch_html(), "html.parser")
+        soup=BeautifulSoup(self._fetch_html(), "html.parser")
+        self._document_base_url=self._page_base(soup,self._last_response_url or self.source_url)
+        return soup
+
+    def _page_base(self, soup: BeautifulSoup, final_url: str) -> str:
+        bases=soup.find_all('base',href=True)
+        if len(bases)>1:
+            raise ValueError('ambiguous_html_base')
+        return urljoin(final_url,bases[0]['href']) if bases else final_url
 
     def _fetch_response(self, url: str) -> httpx.Response | None:
         try:
-            response = httpx.get(
-                url,
-                headers=self.headers,
-                timeout=self.timeout,
-                follow_redirects=True,
-            )
+            with self._network_client.stream('GET',url,headers={'Accept-Encoding': 'identity'}) as response:
+                pass
             if response.status_code >= 400:
                 self.discovery_errors.append({
                     "url": url, "kind": "http_error", "status_code": response.status_code,
                     "retry_after": response.headers.get("retry-after"),
                 })
                 return None
+            if self._looks_like_html_response(response):
+                self._last_response_url=str(response.url)
+                self.captured_pages.append({'page_url':url,'final_page_url':str(response.url),
+                                            'observed_utc':datetime.now(timezone.utc).isoformat(),
+                                            'html':response.content})
             return response
+        except ResponseDecodingError as exc:
+            unexpected = exc.cause_type == 'UnexpectedContentEncoding'
+            self.discovery_errors.append({
+                'url': exc.url, 'kind': 'unexpected_content_encoding' if unexpected else 'decoding_error',
+                'status_code': exc.status_code, 'content_encoding': exc.content_encoding,
+                'error_type': 'UnexpectedContentEncoding' if unexpected else 'DecodingError',
+                'cause_type': exc.cause_type,
+            })
+            return None
         except httpx.HTTPError as exc:
             self.discovery_errors.append({
                 "url": url, "kind": "timeout" if isinstance(exc, httpx.TimeoutException) else "connection_error",
@@ -77,7 +101,7 @@ class BaseDiscoveryAdapter(ABC):
             return None
 
     def _absolute_url(self, href: str, base_url: str | None = None) -> str:
-        return urljoin(base_url or self.source_url, href)
+        return urljoin(base_url or self._document_base_url or self._last_response_url or self.source_url, href)
 
     def _canonicalize_url(self, url: str) -> str:
         parsed = urlparse(url)
@@ -435,6 +459,7 @@ class BaseDiscoveryAdapter(ABC):
                 continue
 
             soup = BeautifulSoup(response.text, "html.parser")
+            page_base = self._page_base(soup,str(response.url))
             page_title = self._extract_page_title(soup) or self.source_label or self.source_key
 
             for anchor in soup.find_all("a", href=True):
@@ -442,7 +467,7 @@ class BaseDiscoveryAdapter(ABC):
                 if self._is_ignorable_href(href):
                     continue
 
-                absolute_url = self._absolute_url(href, base_url=str(response.url))
+                absolute_url = self._absolute_url(href, base_url=page_base)
                 canonical_url = self._canonicalize_url(absolute_url)
 
                 if self._looks_like_downloadable_document(absolute_url):

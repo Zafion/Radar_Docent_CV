@@ -26,8 +26,7 @@ for item in results:
     print("-" * 80)
 
 
-from app.services.notification_eligibility import reconcile_if_configured
-reconcile_if_configured()
+# Reconciliation is a separate, explicitly authorized operation.
 
 if has_failures:
     sys.exit(1)

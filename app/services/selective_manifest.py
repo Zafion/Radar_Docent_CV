@@ -1,11 +1,15 @@
 """Read-only technical validation. Does not grant provenance or ingestion authority."""
 import hashlib
+import io
 import json
 import os
 import re
 import stat
+from datetime import datetime, timedelta
+from urllib.parse import urlsplit
 
 from app.services.remote_import_integrity import directory, regular, check_bytes
+from app.services.discovery.verified_evidence import verify_html_link
 
 
 class ManifestRejected(ValueError):
@@ -35,22 +39,28 @@ def validate_technical_manifest(staging, manifest_bytes, expected_digest):
         raise ManifestRejected('manifest_digest')
     try:
         data = json.loads(manifest_bytes, object_pairs_hook=_object)
-        if not isinstance(data, dict) or set(data) != {'format', 'entries'} or data['format'] not in {'funkcionario.selective-technical.v1', 'funkcionario.selective-technical.v2'}:
+        if not isinstance(data, dict) or set(data) != {'format', 'entries'} or data['format'] not in {'funkcionario.selective-technical.v1', 'funkcionario.selective-technical.v2', 'funkcionario.selective-technical.v3'}:
             raise ManifestRejected('manifest_schema')
         entries = data['entries']
         if not isinstance(entries, list) or not 1 <= len(entries) <= 1000:
             raise ManifestRejected('entry_count')
-        names, ids, digests = set(), set(), set()
+        names, ids, digests, evidence_files = set(), set(), set(), {}
         for entry in entries:
             expected = {'identity', 'file', 'sha256', 'size_bytes'}
-            if data['format'].endswith('.v2'):
+            if data['format'].endswith(('.v2','.v3')):
                 expected.add('asset')
+            if data['format'].endswith('.v3'):
+                expected.add('evidence')
             if not isinstance(entry, dict) or set(entry) != expected:
                 raise ManifestRejected('entry_schema')
             if 'asset' in entry:
                 asset = entry['asset']
                 fields = {'source_key', 'source_url', 'canonical_url', 'url', 'asset_role', 'title', 'publication_date_text'}
-                if not isinstance(asset, dict) or set(asset) != fields or any(not isinstance(asset[k], str) or not asset[k] for k in fields):
+                required=fields-({'publication_date_text'} if data['format'].endswith('.v3') else set())
+                if (not isinstance(asset, dict) or set(asset) != fields
+                        or any(not isinstance(asset[k], str) or not asset[k] for k in required)
+                        or (data['format'].endswith('.v3') and asset['publication_date_text'] is not None
+                            and (not isinstance(asset['publication_date_text'],str) or not asset['publication_date_text']))):
                     raise ManifestRejected('asset_metadata')
             identity, name, sha, size = (entry[k] for k in ('identity', 'file', 'sha256', 'size_bytes'))
             if not isinstance(identity, str) or not identity or len(identity) > 512:
@@ -64,14 +74,55 @@ def validate_technical_manifest(staging, manifest_bytes, expected_digest):
             if name in names or identity in ids or sha in digests:
                 raise ManifestRejected('duplicate_entry')
             names.add(name); ids.add(identity); digests.add(sha)
+            if 'evidence' in entry:
+                ev=entry['evidence']
+                basic={'html_file','html_sha256','final_page_url','linked_url'}
+                full=basic|{'page_url','observed_utc'}
+                with_download=full|{'downloaded_utc'}
+                if not isinstance(ev,dict) or set(ev) not in (basic,full,with_download):
+                    raise ManifestRejected('evidence_schema')
+                if set(ev) in (full,with_download):
+                    if not isinstance(ev['page_url'],str) or not isinstance(ev['observed_utc'],str):
+                        raise ManifestRejected('invalid_observation')
+                    page=urlsplit(ev['page_url'])
+                    if page.scheme!='https' or not page.hostname or page.username or page.password:
+                        raise ManifestRejected('invalid_source_page_url')
+                    if datetime.fromisoformat(ev['observed_utc'].replace('Z','+00:00')).utcoffset()!=timedelta(0):
+                        raise ManifestRejected('observation_utc_required')
+                if set(ev)==with_download:
+                    if (not isinstance(ev['downloaded_utc'],str)
+                            or datetime.fromisoformat(ev['downloaded_utc'].replace('Z','+00:00')).utcoffset()!=timedelta(0)):
+                        raise ManifestRejected('download_utc_required')
+                html=ev['html_file']; digest=ev['html_sha256']
+                if (not isinstance(html,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}',html)
+                        or not isinstance(digest,str) or not re.fullmatch('[0-9a-f]{64}',digest)
+                        or not isinstance(ev['final_page_url'],str) or not isinstance(ev['linked_url'],str)
+                        or ev['linked_url']!=entry['asset']['url']):
+                    raise ManifestRejected('invalid_evidence_metadata')
+                if html in evidence_files and evidence_files[html]!=digest:
+                    raise ManifestRejected('conflicting_evidence')
+                evidence_files[html]=digest
+        if names.intersection(evidence_files):
+            raise ManifestRejected('document_evidence_path_overlap')
         with directory(staging) as root:
-            if set(os.listdir(root)) != names:
+            if set(os.listdir(root)) != names | set(evidence_files):
                 raise ManifestRejected('unexpected_or_missing_file')
             for entry in entries:
                 with regular(root, entry['file']) as handle:
                     if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
                         raise ManifestRejected('not_regular')
                     check_bytes(handle, entry['sha256'], entry['size_bytes'])
+                if 'evidence' in entry:
+                    ev=entry['evidence']
+                    with regular(root,ev['html_file']) as handle:
+                        size=os.fstat(handle.fileno()).st_size
+                        if not 0 < size <= 5*1024*1024:
+                            raise ManifestRejected('invalid_html_capture')
+                        snapshot=io.BytesIO()
+                        check_bytes(handle,ev['html_sha256'],size,snapshot)
+                        html=snapshot.read()
+                    verify_html_link(html_bytes=html,expected_html_sha256=ev['html_sha256'],
+                                     final_page_url=ev['final_page_url'],linked_url=ev['linked_url'])
         return tuple(dict(entry) for entry in entries)
     except ManifestRejected:
         raise

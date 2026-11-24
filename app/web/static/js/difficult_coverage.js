@@ -7,6 +7,7 @@
   const selectedOnlyInput = document.getElementById("dc-selected-only");
   const orderInput = document.getElementById("dc-order");
   const latestOnlyInput = document.getElementById("dc-latest-only");
+  const includeHistoryInput = document.getElementById("dc-include-history");
   const filtersForm = document.getElementById("dc-filters-form");
 
   const locationStatusEl = document.getElementById("dc-location-status");
@@ -293,6 +294,7 @@
       order_by: "document_date",
       order_dir: "desc",
     });
+    if (includeHistoryInput?.checked) params.set("include_unavailable", "true");
 
     if (latestOnlyInput?.checked) {
       const latestDate = await ensureLatestPublicationDate();
@@ -336,10 +338,10 @@
   }
 
   function renderPositions(items, total) {
-    resultsMetaEl.textContent = t(`${total} puestos disponibles encontrados`);
+    resultsMetaEl.textContent = `${total} ${t("puestos registrados encontrados")}`;
 
     if (!items.length) {
-      tableBody.innerHTML = `<tr><td colspan="8" class="muted data-table__empty">${t("No hay puestos de difícil cobertura disponibles actualmente.")}</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="8" class="muted data-table__empty">${t("No hay puestos registrados para los filtros seleccionados.")}</td></tr>`;
       return;
     }
 
@@ -348,7 +350,10 @@
 
       return `
         <tr>
-          <td data-label="Fecha">${escapeHtml(formatDate(item.document_date_iso))}</td>
+          <td data-label="${t("Fecha del documento")}">${escapeHtml(formatDate(item.document_date_iso))}
+            ${item.validation_status === 'needs_validation' ? `<br><span class="muted">${escapeHtml(t("Validación documental pendiente"))}</span>` : ""}
+            ${item.historical_status === 'unknown' || item.publication_date_quality === 'unknown' ? `<br><span class="muted">${escapeHtml(t("Vigencia y fecha de publicación sin acreditar"))}</span>` : ""}
+          </td>
           <td data-label="Especialidad">${escapeHtml(specialty)}</td>
           <td data-label="Centro">
             <strong>${escapeHtml(item.center_name || "—")}</strong>
@@ -384,6 +389,7 @@
       }
 
       const params = appendOriginParams(new URLSearchParams({ limit: "50", order_by: orderBy, order_dir: orderDir }));
+      if (includeHistoryInput?.checked) params.set("include_unavailable", "true");
 
       if (latestOnlyInput?.checked) {
         const latestDate = await ensureLatestPublicationDate();
@@ -413,6 +419,12 @@
     await loadFilterOptions().catch((error) => {
       resultsMetaEl.textContent = `No se pudieron actualizar los filtros: ${error.message}`;
     });
+    await loadPositions();
+  });
+
+  includeHistoryInput?.addEventListener("change", async () => {
+    if (includeHistoryInput.checked && latestOnlyInput) latestOnlyInput.checked = false;
+    await loadFilterOptions();
     await loadPositions();
   });
 

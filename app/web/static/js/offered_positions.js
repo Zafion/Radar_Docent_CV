@@ -8,6 +8,7 @@
   const positionTypeInput = document.getElementById("op-position-type");
   const orderInput = document.getElementById("op-order");
   const latestOnlyInput = document.getElementById("op-latest-only");
+  const includeHistoryInput = document.getElementById("op-include-history");
   const filtersForm = document.getElementById("op-filters-form");
 
   const locationStatusEl = document.getElementById("op-location-status");
@@ -282,6 +283,7 @@
       order_by: "document_date",
       order_dir: "desc",
     });
+    if (includeHistoryInput?.checked) params.set("include_unavailable", "true");
 
     if (latestOnlyInput?.checked && latestOffersDate) {
       params.set("document_date", latestOffersDate);
@@ -351,12 +353,12 @@
 
   function renderPositions(items, total) {
     const latestLabel = latestOnlyInput.checked && latestOffersDate
-      ? ` · ${t("última publicación")} ${formatDate(latestOffersDate)}`
+      ? ` · ${t("fecha más reciente del documento")} ${formatDate(latestOffersDate)}`
       : "";
-    resultsMetaEl.textContent = t(`${total} plazas disponibles encontradas${latestLabel}`);
+    resultsMetaEl.textContent = `${total} ${t("plazas registradas encontradas")}${latestLabel}`;
 
     if (!items.length) {
-      tableBody.innerHTML = `<tr><td colspan="8" class="muted data-table__empty">${t("No hay plazas ofertadas disponibles actualmente para los filtros seleccionados.")}</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="8" class="muted data-table__empty">${t("No hay plazas registradas para los filtros seleccionados.")}</td></tr>`;
       return;
     }
 
@@ -364,7 +366,11 @@
       const specialty = [item.specialty_code, item.specialty_name].filter(Boolean).join(" - ") || "—";
       return `
         <tr>
-          <td data-label="Fecha">${escapeHtml(formatDate(item.document_date_iso))}</td>
+          <td data-label="${t("Fecha del documento")}">${escapeHtml(formatDate(item.document_date_iso))}
+            ${item.validation_status === 'needs_validation' ? `<br><span class="muted">${escapeHtml(t("Validación documental pendiente"))}</span>` : ""}
+            ${item.validation_status === 'validated_with_limitations' ? `<br><span class="muted">${escapeHtml(t("Validación documental con limitaciones"))}</span>` : ""}
+            ${item.historical_status === 'unknown' || item.publication_date_quality === 'unknown' ? `<br><span class="muted">${escapeHtml(t("Vigencia y fecha de publicación sin acreditar"))}</span>` : ""}
+          </td>
           <td data-label="Especialidad">${escapeHtml(specialty)}</td>
           <td data-label="Tipo">${escapeHtml(item.position_type || "—")}</td>
           <td data-label="Centro">
@@ -391,6 +397,7 @@
       }
 
       const params = appendOriginParams(new URLSearchParams({ limit: "100", order_by: orderBy, order_dir: orderDir }));
+      if (includeHistoryInput?.checked) params.set("include_unavailable", "true");
 
       if (latestOnlyInput.checked && latestOffersDate) params.set("document_date", latestOffersDate);
       if (localityInput.value.trim()) params.set("locality", localityInput.value.trim());
@@ -414,6 +421,12 @@
     await loadFilterOptions().catch((error) => {
       resultsMetaEl.textContent = `No se pudieron actualizar los filtros: ${error.message}`;
     });
+    await loadPositions();
+  });
+
+  includeHistoryInput?.addEventListener("change", async () => {
+    if (includeHistoryInput.checked && latestOnlyInput) latestOnlyInput.checked = false;
+    await loadFilterOptions();
     await loadPositions();
   });
 

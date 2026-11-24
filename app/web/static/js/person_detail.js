@@ -197,6 +197,8 @@
         return "status-pill status-pill--participated";
       case "difficult_coverage_candidate":
       case "docent_bag_member":
+      case "career_practice_participant":
+      case "participant_type_unknown":
         return "status-pill status-pill--candidate";
       default:
         return "status-pill status-pill--info";
@@ -225,22 +227,26 @@
     }
 
     if (firstBag) {
+      const isInterino = firstBag.staff_kind === "interino";
+      const isCareer = firstBag.staff_kind === "career_practice";
       return {
         display_name: profile.person.display_name,
-        current_result: "docent_bag_member",
-        current_result_label: t("Consta en bolsa docente"),
-        current_result_message: t("Figura en un listado de bolsa o participantes de inicio de curso cargado en la web."),
-        latest_scope_label: firstBag.position_scope === "general" ? t("Bolsa general") : t("Bolsa por especialidad"),
+        current_result: isInterino ? "docent_bag_member" : (isCareer ? "career_practice_participant" : "participant_type_unknown"),
+        current_result_label: t(isInterino ? "Consta en bolsa docente" : (isCareer ? "Participante de carrera/prácticas" : "Procedimiento sin identificar")),
+        current_result_message: t(isInterino ? "Figura en un listado de bolsa o participantes de inicio de curso cargado en la web." : (isCareer ? "Figura en un listado de participantes de carrera/prácticas." : "Figura en un listado cuyo tipo de procedimiento no está acreditado.")),
+        latest_scope_label: isInterino ? (firstBag.position_scope === "general" ? t("Bolsa general") : t("Bolsa por especialidad")) : t(isCareer ? "Carrera/prácticas" : "Procedimiento sin identificar"),
         latest_specialty_label: [firstBag.specialty_code, firstBag.specialty_name].filter(Boolean).join(" - ") || firstBag.list_scope || null,
         latest_date: firstBag.document_date_iso || null,
         assigned_position: null,
         assigned_center: null,
         assigned_locality: null,
         recommended_action: t("Revisa futuras publicaciones definitivas o adjudicaciones."),
-        bag_position: firstBag.order_number,
+        bag_position: isInterino ? firstBag.order_number : null,
+        participant_order: isInterino ? null : firstBag.order_number,
+        participant_collective: isInterino ? null : firstBag.collective,
         bag_course_year: firstBag.course_year,
         bag_list_stage: firstBag.list_stage,
-        bag_service_status: firstBag.service_status || firstBag.collective || null,
+        bag_service_status: isInterino ? (firstBag.service_status || firstBag.collective || null) : null,
         bag_habilitations: firstBag.habilitations || null,
       };
     }
@@ -279,14 +285,25 @@
     const awardsCount = profile.awards?.length || 0;
     const difficultCount = profile.difficult_coverage?.length || 0;
     const bagCount = profile.bag_memberships?.length || 0;
-    subtitleEl.textContent = `${awardsCount} ${t("adjudicaciones")} · ${difficultCount} ${t("registros de difícil cobertura")} · ${bagCount} ${t("registros de bolsa")}`;
+    const uncertain = [...(profile.awards || []), ...(profile.bag_memberships || [])].some(
+      row => row.historical_status === 'unknown' || row.publication_date_quality === 'unknown' || row.validation_status === 'needs_validation' || row.validation_status === 'validated_with_limitations');
+    function notice(row) {
+      const flags = [];
+      if (row.validation_status === 'needs_validation') flags.push(t('Validación documental pendiente'));
+      if (row.validation_status === 'validated_with_limitations') flags.push(t('Validación documental con limitaciones'));
+      if (row.extraction_completeness === 'partial') flags.push(t('Extracción parcial: quedan registros por revisar'));
+      if (row.historical_status === 'unknown' || row.publication_date_quality === 'unknown') flags.push(t('Vigencia y fecha de publicación sin acreditar'));
+      return flags.length ? `<br><span class="muted">${escapeHtml(flags.join(' · '))}</span>` : '';
+    }
+    subtitleEl.textContent = `${awardsCount} ${t("adjudicaciones")} · ${difficultCount} ${t("registros de difícil cobertura")} · ${bagCount} ${t("registros de participantes")}`;
 
     summaryEl.innerHTML = `
       <div class="status-card">
-        <span class="${buildStatusPillClass(userView.current_result)}">${escapeHtml(userView.current_result_label || t("Estado"))}</span>
+        <span class="${buildStatusPillClass(userView.current_result)}">${escapeHtml(t(userView.current_result_label || "Estado"))}</span>
+        ${uncertain ? `<p class="muted">${escapeHtml(t("La vigencia y la fecha de publicación de algunos registros no están acreditadas."))}</p>` : ""}
         <div>
           <h3>${escapeHtml(userView.display_name || profile.person.display_name)}</h3>
-          <p>${escapeHtml(userView.current_result_message || "")}</p>
+          <p>${escapeHtml(t(userView.current_result_message || ""))}</p>
         </div>
         <div class="status-grid">
           <div class="status-grid__item"><span>${t("Última fecha")}</span><strong>${escapeHtml(formatDate(userView.latest_date))}</strong></div>
@@ -295,6 +312,8 @@
           <div class="status-grid__item"><span>${t("Centro / localidad")}</span><strong>${escapeHtml([userView.assigned_center, userView.assigned_locality].filter(Boolean).join(" · ") || "—")}</strong></div>
           <div class="status-grid__item"><span>${t("Distancia")}</span><strong>${escapeHtml(formatDistance(userView.assigned_distance_km))}</strong></div>
           ${userView.bag_position ? `<div class="status-grid__item"><span>${t("Posición en bolsa")}</span><strong>${escapeHtml(userView.bag_position)}</strong></div>` : ""}
+          ${userView.participant_order ? `<div class="status-grid__item"><span>${t("Orden en el procedimiento")}</span><strong>${escapeHtml(userView.participant_order)}</strong></div>` : ""}
+          ${userView.participant_collective ? `<div class="status-grid__item"><span>${t("Colectivo")}</span><strong>${escapeHtml(userView.participant_collective)}</strong></div>` : ""}
           ${userView.bag_course_year ? `<div class="status-grid__item"><span>${t("Curso")}</span><strong>${escapeHtml(userView.bag_course_year)}</strong></div>` : ""}
           ${userView.bag_list_stage ? `<div class="status-grid__item"><span>${t("Listado")}</span><strong>${escapeHtml(userView.bag_list_stage)}</strong></div>` : ""}
           ${userView.bag_service_status ? `<div class="status-grid__item"><span>${t("Estado bolsa")}</span><strong>${escapeHtml(userView.bag_service_status)}</strong></div>` : ""}
@@ -322,9 +341,10 @@
 
     const bagRows = (profile.bag_memberships || []).map((row) => `
       <tr>
-        <td data-label="${t("Fecha")}">${escapeHtml(formatDate(row.document_date_iso))}</td>
+        <td data-label="${t("Fecha del documento")}">${escapeHtml(formatDate(row.document_date_iso))}${notice(row)}</td>
         <td data-label="${t("Curso")}">${escapeHtml(row.course_year || "—")}</td>
         <td data-label="${t("Listado")}">${escapeHtml(row.list_stage || "—")}</td>
+        <td data-label="${t("Procedimiento")}">${escapeHtml(t(row.staff_kind === 'interino' ? 'Interinos' : row.staff_kind === 'career_practice' ? 'Carrera/prácticas' : 'Procedimiento sin identificar'))}</td>
         <td data-label="${t("Ámbito")}">${escapeHtml(row.position_scope === "general" ? t("General") : t("Por especialidad"))}</td>
         <td data-label="${t("Cuerpo")}">${escapeHtml(row.body_name || "—")}</td>
         <td data-label="${t("Especialidad")}">${escapeHtml([row.specialty_code, row.specialty_name].filter(Boolean).join(" - ") || "—")}</td>
@@ -332,13 +352,13 @@
         <td data-label="${t("Estado")}">${escapeHtml(row.service_status || row.collective || "—")}</td>
         <td data-label="${t("Habilitaciones")}">${escapeHtml(formatList(row.habilitations))}${row.disabled_habilitation ? ` · ${t("habilitación desactivada")}` : ""}</td>
       </tr>
-    `).join("") || `<tr><td colspan="9" class="muted data-table__empty">${t("No hay registros de bolsa docente.")}</td></tr>`;
+    `).join("") || `<tr><td colspan="10" class="muted data-table__empty">${t("No hay registros de participantes.")}</td></tr>`;
 
     const awardsRows = (profile.awards || []).map((award) => {
       const firstAssignment = award.assignments?.[0] || null;
       return `
         <tr>
-          <td data-label="${t("Fecha")}">${escapeHtml(formatDate(award.document_date_iso))}</td>
+          <td data-label="${t("Fecha del documento")}">${escapeHtml(formatDate(award.document_date_iso))}${notice(award)}</td>
           <td data-label="${t("Estado")}">${escapeHtml(award.status || "—")}</td>
           <td data-label="${t("Especialidad")}">${escapeHtml([award.specialty_code, award.specialty_name].filter(Boolean).join(" - ") || "—")}</td>
           <td data-label="${t("Centro")}">${escapeHtml(firstAssignment?.center_name || "—")}</td>
@@ -368,7 +388,7 @@
       <div class="content-card section-space--sm">
         <div class="content-card__header">
           <div>
-            <h2>${t("Bolsa docente")}</h2>
+            <h2>${t("Listados de participantes")}</h2>
             <p>${t("Posiciones detectadas en listados de bolsa o participantes de inicio de curso.")}</p>
           </div>
         </div>
@@ -376,9 +396,10 @@
           <table class="data-table data-table--cards">
             <thead>
               <tr>
-                <th>${t("Fecha")}</th>
+                <th>${t("Fecha del documento")}</th>
                 <th>${t("Curso")}</th>
                 <th>${t("Listado")}</th>
+                <th>${t("Procedimiento")}</th>
                 <th>${t("Ámbito")}</th>
                 <th>${t("Cuerpo")}</th>
                 <th>${t("Especialidad")}</th>
@@ -403,7 +424,7 @@
           <table class="data-table data-table--cards">
             <thead>
               <tr>
-                <th>${t("Fecha")}</th>
+                <th>${t("Fecha del documento")}</th>
                 <th>${t("Estado")}</th>
                 <th>${t("Especialidad")}</th>
                 <th>${t("Centro")}</th>

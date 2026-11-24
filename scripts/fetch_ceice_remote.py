@@ -14,12 +14,13 @@ import sys
 import time
 import tempfile
 
-import httpx
-
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
 
 from app.services.discovery.registry import get_discovery_adapters
+from app.services.discovery.http_policy import PolicyClient
+from app.services.discovery.verified_evidence import verify_capture, verify_html_link
+from app.services.selective_manifest import validate_technical_manifest
 from app.services.document_payload import (
     MAX_DOWNLOAD_BYTES, atomic_write_document, filename_from_url as document_filename,
     read_document_bytes, validate_document,
@@ -116,14 +117,17 @@ def hardlink_or_copy(source: Path, destination: Path) -> None:
 
 def download_asset(
     *,
-    client: httpx.Client,
+    client: PolicyClient,
     url: str,
     canonical_url: str,
     cache_files_dir: Path,
     previous: dict | None = None,
     use_conditional_headers: bool = True,
     max_download_bytes: int = MAX_DOWNLOAD_BYTES,
+    preserve_partial: bool = False,
 ) -> dict:
+    if not isinstance(client, PolicyClient):
+        raise ValueError('network_policy_required')
     cache_valid = False
     if previous and previous.get("stored_filename"):
         try:
@@ -139,7 +143,7 @@ def download_asset(
             conditional["If-None-Match"] = previous["etag"]
         if previous.get("last_modified"):
             conditional["If-Modified-Since"] = previous["last_modified"]
-    with client.stream("GET", url, headers=conditional) as response:
+    with client.stream("GET", url, headers=conditional, max_bytes=max_download_bytes) as response:
         checked_at = utc_now_iso()
         if response.status_code == 304:
             if not previous or not cache_valid:
@@ -161,7 +165,10 @@ def download_asset(
     stored_filename = build_versioned_filename(original_filename, sha256)
     cache_file_path = cache_files_dir / stored_filename
 
-    atomic_write_document(cache_file_path, content)
+    if preserve_partial:
+        atomic_write_document(cache_file_path, content, preserve_partial=True)
+    else:
+        atomic_write_document(cache_file_path, content)
 
     history = list((previous or {}).get("previous_versions") or [])
     hash_changes = list((previous or {}).get("hash_changes") or [])
@@ -190,8 +197,61 @@ def download_asset(
 
 CACHE_METADATA_KEYS = (
     "sha256", "original_filename", "stored_filename", "content_type", "size_bytes",
-    "downloaded_at", "last_checked_at", "etag", "last_modified", "previous_versions", "hash_changes",
+    "downloaded_at", "last_checked_at", "etag", "last_modified", "previous_versions", "hash_changes", "evidence",
 )
+
+
+def _matching_capture(adapter, asset):
+    for capture in getattr(adapter,'captured_pages',[]):
+        page=capture.get('html')
+        if not isinstance(page,bytes): continue
+        digest=hashlib.sha256(page).hexdigest()
+        try:
+            verify_html_link(html_bytes=page,expected_html_sha256=digest,
+                             final_page_url=capture['final_page_url'],linked_url=asset.url)
+        except (KeyError,ValueError):
+            continue
+        return capture,digest
+    raise ValueError('linked_html_capture_not_available')
+
+
+def _prepare_v3_entry(adapter, asset, result, cached, cache_dir, stage, *, fresh_download, max_bytes):
+    if result.get('content_type')!='application/pdf':
+        raise ValueError('v3_pdf_required')
+    pdf_path=cache_dir/'files'/result['stored_filename']
+    if pdf_path.stat().st_size>max_bytes:
+        raise ValueError('cached_pdf_size_limit')
+    pdf=pdf_path.read_bytes()
+    if len(pdf)>max_bytes or hashlib.sha256(pdf).hexdigest()!=result['sha256']:
+        raise ValueError('cached_pdf_integrity')
+    evidence_dir=cache_dir/'evidence'
+    evidence_dir.mkdir(parents=True,exist_ok=True)
+    if fresh_download:
+        capture,html_sha=_matching_capture(adapter,asset)
+        html=capture['html']
+        evidence={'html_sha256':html_sha,'final_page_url':capture['final_page_url'],
+                  'page_url':capture['page_url'],'observed_utc':capture['observed_utc'],
+                  'linked_url':asset.url,'downloaded_utc':result['downloaded_at']}
+        html_path=evidence_dir/(html_sha+'.html')
+        atomic_write_document(html_path,html)
+    else:
+        evidence=(cached or {}).get('evidence')
+        if not isinstance(evidence,dict) or evidence.get('linked_url')!=asset.url:
+            raise ValueError('previous_verified_evidence_required')
+        html_path=evidence_dir/(evidence['html_sha256']+'.html')
+        html=html_path.read_bytes()
+    verify_capture(html_bytes=html,expected_html_sha256=evidence['html_sha256'],
+                   final_page_url=evidence['final_page_url'],linked_url=asset.url,
+                   pdf_bytes=pdf,expected_pdf_sha256=result['sha256'])
+    pdf_name='doc-'+result['sha256']+'.pdf'; html_name='page-'+evidence['html_sha256']+'.html'
+    (stage/pdf_name).write_bytes(pdf)
+    (stage/html_name).write_bytes(html)
+    v3asset={k:getattr(asset,k) for k in ('source_key','source_url','canonical_url','url','asset_role','title')}
+    # Existing heuristic dates are not evidence of an explicit official date.
+    v3asset['publication_date_text']=None
+    entry={'identity':asset.canonical_url,'file':pdf_name,'sha256':result['sha256'],'size_bytes':len(pdf),
+           'asset':v3asset,'evidence':dict(evidence,html_file=html_name)}
+    return entry,evidence
 
 
 def cache_metadata(downloaded: dict) -> dict:
@@ -230,7 +290,7 @@ def select_adapters(source_keys: list[str] | None):
     return selected
 
 
-def main() -> int:
+def main(*, policy_factory=None) -> int:
     parser = argparse.ArgumentParser(
         description="Fetch CEICE assets from a local network and build a manifest for Hetzner import."
     )
@@ -288,6 +348,7 @@ def main() -> int:
     cache_files_dir = cache_dir / "files"
     current_dir = output_dir / "current"
     current_files_dir = current_dir / "files"
+    v3_stage = current_dir / "selective_v3"
     state_path = output_dir / "state.json"
 
     cache_files_dir.mkdir(parents=True, exist_ok=True)
@@ -295,6 +356,7 @@ def main() -> int:
     if current_dir.exists():
         shutil.rmtree(current_dir)
     current_files_dir.mkdir(parents=True, exist_ok=True)
+    v3_stage.mkdir(parents=True, exist_ok=True)
 
     state = read_json(
         state_path,
@@ -325,13 +387,12 @@ def main() -> int:
         "sources": [],
     }
 
-    client = httpx.Client(
-        headers=HEADERS,
-        timeout=args.timeout,
-        follow_redirects=True,
-    )
+    client = (policy_factory or PolicyClient)(user_agent=HEADERS['User-Agent'],timeout=args.timeout,max_bytes=max_download_bytes)
 
     has_source_failures = False
+    v3_entries=[]
+    v3_urls=set()
+    v3_hashes=set()
 
     try:
         for adapter in adapters:
@@ -356,6 +417,8 @@ def main() -> int:
             processed_urls: dict[str, dict] = {}
 
             try:
+                if isinstance(getattr(adapter,'captured_pages',None),list):
+                    adapter.captured_pages.clear()
                 assets = adapter.discover_assets()
                 diagnostics = getattr(adapter, "discovery_errors", [])
                 diagnostics = diagnostics if isinstance(diagnostics, list) else []
@@ -537,6 +600,20 @@ def main() -> int:
                                 "error_message": error_message,
                             }
 
+                    if result.get('sha256') and not result.get('revalidation_error'):
+                        if canonical_url in v3_urls or result['sha256'] in v3_hashes:
+                            result['evidence_status']='duplicate_excluded'
+                        else:
+                            try:
+                                entry,evidence=_prepare_v3_entry(adapter,asset,result,cached,cache_dir,v3_stage,
+                                    fresh_download=result['status']=='downloaded',max_bytes=max_download_bytes)
+                                v3_entries.append(entry);v3_urls.add(canonical_url);v3_hashes.add(result['sha256'])
+                                assets_by_canonical_url[canonical_url]['evidence']=evidence
+                                result['evidence_status']='verified_capture'
+                            except Exception:
+                                result['evidence_status']='evidence_incomplete'
+                    else:
+                        result['evidence_status']='evidence_incomplete'
                     processed_urls[canonical_url] = result
                     source_summary["results"].append(result)
 
@@ -573,6 +650,13 @@ def main() -> int:
                     source_summary["counts"]["discovery_error_count"] = len(source_summary["discovery_errors"])
                     has_source_failures = True
 
+                evidence_failures=sum(r.get('evidence_status')=='evidence_incomplete' for r in results)
+                if evidence_failures:
+                    source_summary['status']='partial'
+                    source_summary['counts']['evidence_failure_count']=evidence_failures
+                    source_summary['error_message']='evidence_incomplete'
+                    has_source_failures=True
+
                 print(f"Assets descubiertos: {source_summary['counts']['discovered_assets_count']}")
                 print(f"Descargables:         {source_summary['counts']['downloadable_assets_count']}")
                 print(f"Descargados:          {source_summary['counts']['downloaded_count']}")
@@ -600,6 +684,20 @@ def main() -> int:
     finally:
         client.close()
 
+    v3_status={'status':'NO_VERIFIED_ENTRIES','count':0}
+    if v3_entries:
+        v3={'format':'funkcionario.selective-technical.v3','entries':v3_entries}
+        raw=json.dumps(v3,ensure_ascii=False,indent=2).encode('utf-8')
+        digest=hashlib.sha256(raw).hexdigest()
+        try:
+            validate_technical_manifest(v3_stage,raw,digest)
+            write_json(current_dir/'selective_v3_manifest.json',v3)
+            v3_status={'status':'VERIFIED_PARTIAL' if has_source_failures else 'VERIFIED',
+                       'count':len(v3_entries),'sha256':digest}
+        except Exception:
+            v3_status={'status':'VALIDATION_FAILED','count':0}
+            has_source_failures=True
+    write_json(current_dir/'selective_v3_status.json',v3_status)
     write_json(current_dir / "manifest.json", manifest)
     write_json(state_path, state)
 

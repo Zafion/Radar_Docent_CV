@@ -26,6 +26,16 @@ def reply(url,text='',status=200):
 
 
 class DiscoveryFailureStateTests(unittest.TestCase):
+    def setUp(self):
+        # Existing adapter tests simulate HTTP statuses; the separate loopback
+        # integration test exercises PolicyClient's actual redirect policy.
+        @contextlib.contextmanager
+        def simulated_stream(client,method,url,**kwargs):
+            yield httpx.get(url)
+        patcher=patch('app.services.discovery.http_policy.PolicyClient.stream',simulated_stream)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_http_failures_preserve_status_and_retry_context(self):
         for status in (403,404,429,500):
             adapter=RrhhMainDiscoveryAdapter()

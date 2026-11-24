@@ -1,4 +1,5 @@
 (function () {
+  function t(value) { return window.FunkI18n ? window.FunkI18n.t(value) : value; }
   const SELECTED_POSITION_KEY = "radar_docent_selected_difficult_coverage_position";
 
   const titleEl = document.getElementById("dc-candidates-title");
@@ -212,8 +213,10 @@
 
     summaryEl.innerHTML = `
       <div class="status-card">
+        ${position.validation_status === 'needs_validation' ? `<p class="muted">${escapeHtml(t("Validación documental pendiente"))}</p>` : ""}
+        ${position.historical_status === 'unknown' || position.publication_date_quality === 'unknown' ? `<p class="muted">${escapeHtml(t("Vigencia y fecha de publicación sin acreditar"))}</p>` : ""}
         <div class="status-grid">
-          <div class="status-grid__item"><span>Fecha</span><strong>${escapeHtml(formatDate(position.document_date_iso))}</strong></div>
+          <div class="status-grid__item"><span>${escapeHtml(t("Fecha del documento"))}</span><strong>${escapeHtml(formatDate(position.document_date_iso))}</strong></div>
           <div class="status-grid__item"><span>Especialidad</span><strong>${escapeHtml(specialty)}</strong></div>
           <div class="status-grid__item"><span>Centro</span><strong>${escapeHtml(position.center_name || "—")}</strong></div>
           <div class="status-grid__item"><span>Localidad</span><strong>${escapeHtml(position.locality || "—")}</strong></div>

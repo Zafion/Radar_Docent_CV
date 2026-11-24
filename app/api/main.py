@@ -26,7 +26,6 @@ from app.services.push_notifications import (
     get_vapid_public_key,
     is_push_configured,
 )
-from app.storage.centers_store import get_center_by_code
 from app.storage.db import get_pool, close_pool
 from app.storage.push_subscription_store import (
     upsert_push_subscription,
@@ -38,6 +37,7 @@ from app.api.rate_limit import ApiRateLimitMiddleware
 
 DB_URL = os.getenv("RADAR_DOCENT_DB_URL", "").strip()
 DB_PATH = "postgresql"
+RECOVERY_READ_ONLY = os.getenv("FUNK_RECOVERY_READ_ONLY", "0") == "1"
 
 
 app = FastAPI(
@@ -58,7 +58,43 @@ app.include_router(web_router)
 def startup_event() -> None:
     if not DB_URL:
         raise RuntimeError("RADAR_DOCENT_DB_URL is not configured")
-    get_pool()
+    if RECOVERY_READ_ONLY and os.getenv('ENABLE_NOTIFICATIONS', '').strip() != '0':
+        raise RuntimeError('recovery_notifications_must_be_disabled')
+    pool = get_pool()
+    if RECOVERY_READ_ONLY:
+        with pool.connection() as conn:
+            verify_recovery_database_role(conn)
+
+
+def verify_recovery_database_role(conn) -> None:
+    """Fail closed: the application DB identity must itself lack write authority."""
+    role = conn.execute("SELECT rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls FROM pg_roles WHERE rolname=current_user").fetchone()
+    if not role or any(role.values()):
+        raise RuntimeError('recovery_role_has_elevated_privileges')
+    elevated = conn.execute("SELECT EXISTS (SELECT 1 FROM pg_roles r WHERE (r.rolsuper OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication OR r.rolbypassrls) AND pg_has_role(current_user,r.oid,'MEMBER')) AS unsafe").fetchone()
+    if elevated['unsafe']:
+        raise RuntimeError('recovery_role_has_elevated_membership')
+    if conn.execute("SELECT current_setting('transaction_read_only') AS value").fetchone()['value'] != 'on':
+        raise RuntimeError('recovery_transaction_not_read_only')
+    unsafe = conn.execute("""SELECT EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%'
+        AND c.relkind IN ('r','p','v','m','f','S')
+        AND has_table_privilege(current_user,c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+    ) OR EXISTS (SELECT 1 FROM pg_namespace n WHERE n.nspname NOT LIKE 'pg_%'
+       AND n.nspname <> 'information_schema' AND has_schema_privilege(current_user,n.oid,'CREATE'))
+      OR EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND p.prosecdef
+       AND has_function_privilege(current_user,p.oid,'EXECUTE')) AS unsafe""").fetchone()
+    if unsafe['unsafe']:
+        raise RuntimeError('recovery_role_has_write_capabilities')
+
+
+@app.middleware('http')
+async def recovery_read_only_http(request: Request, call_next):
+    if RECOVERY_READ_ONLY and request.method not in ('GET', 'HEAD', 'OPTIONS'):
+        return JSONResponse({'detail': 'read_only_recovery_mode'}, status_code=405)
+    return await call_next(request)
 
 
 @app.on_event("shutdown")
@@ -423,6 +459,8 @@ def center_row_to_payload(
     origin_lon: float | None = None,
 ) -> dict[str, Any]:
     item = dict(row)
+    if item.get('data_source') == 'offered_positions':
+        item['validation_status'] = 'needs_validation'
 
     lat = item.get("latitude")
     lon = item.get("longitude")
@@ -481,6 +519,8 @@ def build_user_view(
         "assigned_center_directions_url": None,
         "assigned_distance_km": None,
         "bag_position": None,
+        "participant_order": None,
+        "participant_collective": None,
         "bag_course_year": None,
         "bag_list_stage": None,
         "bag_service_status": None,
@@ -497,6 +537,10 @@ def build_user_view(
         + [("difficult", row) for row in difficult_coverage]
         + [("bag", row) for row in bag_memberships]
     )
+
+    if any(row.get('publication_date_quality') != 'official' for _, row in records):
+        return {**base, 'current_result_label': 'Cronología no acreditada',
+                'current_result_message': 'La fecha de publicación no está acreditada. Consulta cada documento; no se puede determinar la situación actual.'}
 
     def date_key(row: dict[str, Any]) -> str | None:
         try:
@@ -543,7 +587,7 @@ def build_user_view(
         else None
     )
     selected_difficult = latest_row if kind == "difficult" and latest_row.get("is_selected") is True else None
-    base["result_context"] = {"course_year": course(latest_row), "procedure": latest_row.get("procedure"),
+    base["result_context"] = {"course_year": course(latest_row), "procedure": latest_row.get("procedure") or latest_row.get("staff_kind"),
                               "list_scope": latest_row.get("list_scope"), "specialty_code": latest_row.get("specialty_code")}
 
     if latest_awarded:
@@ -575,6 +619,22 @@ def build_user_view(
         }
 
     if latest_bag:
+        staff_kind = latest_bag.get("staff_kind")
+        if staff_kind != "interino":
+            career = staff_kind == "career_practice"
+            return {
+                **base,
+                "current_result": "career_practice_participant" if career else "participant_type_unknown",
+                "current_result_label": "Participante de carrera/prácticas" if career else "Procedimiento sin identificar",
+                "current_result_message": "Figura en un listado de participantes de carrera/prácticas." if career else "Figura en un listado cuyo tipo de procedimiento no está acreditado.",
+                "latest_scope_label": "Carrera/prácticas" if career else "Procedimiento sin identificar",
+                "latest_specialty_label": make_label(latest_bag.get("specialty_code"), latest_bag.get("specialty_name")),
+                "latest_date": latest_bag.get("document_date_iso"),
+                "participant_order": latest_bag.get("order_number"),
+                "participant_collective": latest_bag.get("collective"),
+                "bag_course_year": latest_bag.get("course_year"),
+                "bag_list_stage": latest_bag.get("list_stage"),
+            }
         position_scope = latest_bag.get("position_scope")
         scope_label = "Bolsa general" if position_scope == "general" else "Bolsa por especialidad"
         service_or_collective = latest_bag.get("service_status") or latest_bag.get("collective")
@@ -881,23 +941,49 @@ def get_center_filter_options() -> dict[str, Any]:
         provinces = [
             row[0]
             for row in conn.execute(
-                "SELECT DISTINCT province FROM centers WHERE province IS NOT NULL AND province <> '' ORDER BY province ASC"
+                _CENTER_SEARCH_SOURCE + " SELECT DISTINCT province FROM center_source WHERE province IS NOT NULL AND province <> '' ORDER BY province ASC"
             ).fetchall()
         ]
         localities = [
             row[0]
             for row in conn.execute(
-                "SELECT DISTINCT locality FROM centers WHERE locality IS NOT NULL AND locality <> '' ORDER BY locality ASC"
+                _CENTER_SEARCH_SOURCE + " SELECT DISTINCT locality FROM center_source WHERE locality IS NOT NULL AND locality <> '' ORDER BY locality ASC"
             ).fetchall()
         ]
         regimes = [
             row[0]
             for row in conn.execute(
-                "SELECT DISTINCT regime FROM centers WHERE regime IS NOT NULL AND regime <> '' ORDER BY regime ASC"
+                _CENTER_SEARCH_SOURCE + " SELECT DISTINCT regime FROM center_source WHERE regime IS NOT NULL AND regime <> '' ORDER BY regime ASC"
             ).fetchall()
         ]
 
     return {"provinces": provinces, "localities": localities, "regimes": regimes}
+
+
+_CENTER_SEARCH_SOURCE = """
+WITH center_source AS (
+    SELECT center_code, denomination, generic_name_es, generic_name_val,
+           specific_name, regime, postal_code, locality, province, comarca,
+           phone, fax, latitude, longitude, full_address, 'catalog'::text AS data_source
+    FROM centers
+    UNION ALL
+    SELECT op.center_code,
+           CASE WHEN count(DISTINCT NULLIF(trim(op.center_name), '')) = 1
+                THEN min(NULLIF(trim(op.center_name), '')) END,
+           NULL::text, NULL::text, NULL::text, NULL::text, NULL::text,
+           CASE WHEN count(DISTINCT NULLIF(trim(op.locality), '')) = 1
+                THEN min(NULLIF(trim(op.locality), '')) END,
+           CASE WHEN count(DISTINCT NULLIF(trim(op.province), '')) = 1
+                THEN min(NULLIF(trim(op.province), '')) END,
+           NULL::text, NULL::text, NULL::text, NULL::double precision,
+           NULL::double precision, NULL::text, 'offered_positions'::text
+    FROM offered_positions op
+    WHERE op.center_code IS NOT NULL AND trim(op.center_code) <> ''
+      AND NOT EXISTS (SELECT 1 FROM centers known WHERE known.center_code = op.center_code)
+    GROUP BY op.center_code
+    HAVING count(DISTINCT NULLIF(trim(op.center_name), '')) = 1
+)
+"""
 
 
 @app.get("/api/centers")
@@ -942,8 +1028,8 @@ def search_centers(
         params.append(regime)
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
-    base_sql = f"FROM centers c {where_sql}"
-    count_sql = "SELECT COUNT(*) " + base_sql
+    base_sql = f"FROM center_source c {where_sql}"
+    count_sql = _CENTER_SEARCH_SOURCE + " SELECT COUNT(*) " + base_sql
 
     distance_sort = order_by == "distance" and origin_lat is not None and origin_lon is not None
     if distance_sort:
@@ -964,7 +1050,8 @@ def search_centers(
                 c.fax,
                 c.latitude,
                 c.longitude,
-                c.full_address
+                c.full_address,
+                c.data_source
             """
             + base_sql
         )
@@ -987,13 +1074,15 @@ def search_centers(
                 c.fax,
                 c.latitude,
                 c.longitude,
-                c.full_address
+                c.full_address,
+                c.data_source
             """
             + base_sql
             + order_sql
             + " LIMIT ? OFFSET ? "
         )
 
+    items_sql = _CENTER_SEARCH_SOURCE + items_sql
     with get_connection() as conn:
         _register_normalize_function(conn)
         total = conn.execute(count_sql, params).fetchone()[0]
@@ -1026,13 +1115,145 @@ def get_center_detail(
 ) -> dict[str, Any]:
     with get_connection() as conn:
         _register_normalize_function(conn)
-        center = get_center_by_code(conn, center_code)
+        center = conn.execute(_CENTER_SEARCH_SOURCE + " SELECT * FROM center_source WHERE center_code = ?", [center_code]).fetchone()
         if center is None:
             raise HTTPException(status_code=404, detail="center_code no encontrado")
 
     return {
         "center": center_row_to_payload(center, origin_lat, origin_lon),
     }
+
+
+def enrich_document_provenance(conn, items: list[dict[str, Any]]) -> None:
+    """Attach only attestations tied to the current successful parse run.
+
+    JSON access keeps older schemas readable until an explicit migration adds the
+    optional attestation fields. Missing or stale attestations never imply validity.
+    """
+    ids = sorted({x['document_id'] for x in items if x.get('document_id') is not None})
+    if not ids:
+        return
+    rows = conn.execute("""
+        SELECT d.id, v.sha256, to_jsonb(d)->>'validation_status' AS validation_status,
+               to_jsonb(d)->>'validation_parse_run_id' AS validation_run,
+               to_jsonb(d)->>'historical_status' AS historical_status,
+               to_jsonb(d)->>'publication_date_quality' AS publication_date_quality,
+               (SELECT r.id::text FROM document_parse_runs r
+                WHERE r.document_version_id=d.document_version_id AND r.status='success'
+                ORDER BY r.id DESC LIMIT 1) AS latest_success
+        FROM documents d JOIN document_versions v ON v.id=d.document_version_id
+        WHERE d.id = ANY(?)
+    """, [ids]).fetchall()
+    evidence = {row['id']: row for row in rows}
+    relationships: dict[int, list[dict[str, Any]]] = {}
+    batch_evidence: dict[int, dict[str, Any]] = {}
+    if conn.execute("SELECT to_regclass('recovery_batch.documents')").fetchone()[0] is not None:
+        batch_rows=conn.execute('''SELECT target_document_id,source_rows,source_total,quality FROM recovery_batch.documents
+            WHERE target_document_id=ANY(?)''',[ids]).fetchall()
+        batch_evidence={r['target_document_id']:r for r in batch_rows}
+    if conn.execute("SELECT to_regclass('public.historical_procedure_documents')").fetchone()[0] is not None:
+        relations = conn.execute('''SELECT pd.document_id, p.procedure_key, p.procedure_kind,
+                    p.procedure_date::text AS procedure_date, p.date_evidence,
+                    p.publication_date::text AS publication_date, p.publication_date_quality,
+                    pd.document_role, pd.relationship_evidence
+                FROM historical_procedure_documents pd
+                JOIN historical_procedures p ON p.procedure_key=pd.procedure_key
+                WHERE pd.document_id=ANY(?) ORDER BY p.procedure_date,p.procedure_key''', [ids]).fetchall()
+        for relation in relations:
+            item = dict(relation)
+            relationships.setdefault(item.pop('document_id'), []).append(item)
+    for item in items:
+        row = evidence.get(item.get('document_id'))
+        if row is None:
+            continue
+        valid = row['validation_run'] is not None and row['validation_run'] == row['latest_success']
+        item['validation_status'] = row['validation_status'] if valid and row['validation_status'] in ('validated', 'validated_with_limitations', 'needs_validation') else 'needs_validation'
+        item['historical_status'] = row['historical_status'] if row['historical_status'] in ('accredited', 'quarantine', 'unknown') else 'unknown'
+        item['publication_date_quality'] = row['publication_date_quality'] if row['publication_date_quality'] in ('official', 'inferred', 'unknown') else 'unknown'
+        item['source_document_sha256'] = row['sha256']
+        item['procedures'] = relationships.get(item['document_id'], [])
+        batch=batch_evidence.get(item['document_id'])
+        if batch and batch['source_total'] is not None:
+            item['extraction_completeness']='partial' if batch['source_rows']<batch['source_total'] else 'complete_with_limitations'
+            item['pending_source_rows']=batch['source_total']-batch['source_rows']
+            item['reconciliation_quality']=batch['quality']
+
+
+def mask_unaccredited_availability(items: list[dict[str, Any]]) -> None:
+    """A historical extraction is not evidence of present availability."""
+    for item in items:
+        if item.get('historical_status') != 'accredited' and item.get('availability_status') == 'available':
+            item['availability_status'] = 'unknown'
+            item['availability_reason'] = 'vigencia_no_acreditada'
+
+
+@app.get('/api/historical-procedures')
+def list_historical_procedures() -> dict[str, Any]:
+    with get_connection() as conn:
+        if conn.execute("SELECT to_regclass('public.historical_procedures')").fetchone()[0] is None:
+            return {'items': [], 'status': 'not_configured'}
+        items = rows_to_dicts(conn.execute('''SELECT procedure_key, procedure_kind,
+            procedure_date::text AS procedure_date, date_evidence,
+            publication_date::text AS publication_date, publication_date_quality
+            FROM historical_procedures ORDER BY procedure_date,procedure_key''').fetchall())
+    return {'items':items, 'status':'available'}
+
+
+@app.get('/api/historical-procedures/{procedure_key}')
+def get_historical_procedure(procedure_key: str) -> dict[str, Any]:
+    with get_connection() as conn:
+        if conn.execute("SELECT to_regclass('public.historical_procedures')").fetchone()[0] is None:
+            raise HTTPException(status_code=404, detail='procedimientos históricos no configurados')
+        procedure=conn.execute('''SELECT procedure_key,procedure_kind,procedure_date::text AS procedure_date,
+            date_evidence,publication_date::text AS publication_date,publication_date_quality
+            FROM historical_procedures WHERE procedure_key=?''',[procedure_key]).fetchone()
+        if procedure is None:
+            raise HTTPException(status_code=404,detail='procedimiento no encontrado')
+        docs=rows_to_dicts(conn.execute('''SELECT d.id AS document_id,pd.document_role,pd.relationship_evidence,
+            d.doc_family,d.title, CASE
+              WHEN d.doc_family IN ('final_award_listing','displaced_award_listing','religion_award_listing')
+                THEN (SELECT count(*) FROM award_results r WHERE r.document_id=d.id)
+              WHEN d.doc_family='offered_positions'
+                THEN (SELECT count(*) FROM offered_positions op WHERE op.document_id=d.id)
+              WHEN d.doc_family='unawarded_expert_vacancies'
+                THEN (SELECT count(*) FROM historical_unawarded_expert_vacancies u WHERE u.document_id=d.id)
+              WHEN EXISTS (SELECT 1 FROM historical_unawarded_expert_vacancies u WHERE u.document_id=d.id)
+                THEN (SELECT count(*) FROM historical_unawarded_expert_vacancies u WHERE u.document_id=d.id)
+              ELSE NULL END AS extracted_rows
+            FROM historical_procedure_documents pd JOIN documents d ON d.id=pd.document_id
+            WHERE pd.procedure_key=? ORDER BY d.id''',[procedure_key]).fetchall())
+        enrich_document_provenance(conn,docs)
+        source_links={}
+        if conn.execute("SELECT to_regclass('recovery_03nov.document_evidence')").fetchone()[0] is not None:
+            links=conn.execute('''SELECT m.target_document_id,e.canonical_url FROM recovery_03nov.document_evidence e
+                JOIN recovery_03nov.document_map m ON m.source_sha=e.source_sha''').fetchall()
+            source_links.update({r['target_document_id']:(r['canonical_url'],'verified_inventory_reference') for r in links})
+        if conn.execute("SELECT to_regclass('recovery_0519.document_map')").fetchone()[0] is not None:
+            links=conn.execute('SELECT target_document_id,canonical_url,page_url,html_sha,evidence_quality FROM recovery_0519.document_map').fetchall()
+            source_links.update({r['target_document_id']:(r['canonical_url'],r['evidence_quality']) for r in links})
+        for item in docs:
+            if item['document_id'] in source_links:
+                item['official_document_url'],item['document_url_evidence']=source_links[item['document_id']]
+        # Historical alternate offer lists can be retained without presenting
+        # either version as a current offer. The table is optional on older DBs.
+        if conn.execute("SELECT to_regclass('recovery_quarantine.positions_19nov')").fetchone()[0] is not None:
+            pending=conn.execute('''SELECT document_id,count(*) AS n,min(stage_label) AS stage
+                FROM recovery_quarantine.positions_19nov GROUP BY document_id''').fetchall()
+            pending_by_document={row['document_id']:row for row in pending}
+            for item in docs:
+                row=pending_by_document.get(item['document_id'])
+                if row:
+                    item['quarantined_rows']=row['n']
+                    item['extracted_rows']=row['n']
+                    item['extraction_storage']='quarantined'
+                    item['document_stage_label']=row['stage']
+                    item['stage_evidence']='url_label_observed_bytes_at_capture_unverified'
+        unawarded=rows_to_dicts(conn.execute('''SELECT u.document_id,u.center_code,u.source_position_id,
+            u.province,u.locality,u.center_name,u.cycle,u.modules,u.teaching_hours,u.total_hours,u.result_status
+            FROM historical_unawarded_expert_vacancies u JOIN historical_procedure_documents pd ON pd.document_id=u.document_id
+            WHERE pd.procedure_key=? ORDER BY u.center_code,u.source_position_id''',[procedure_key]).fetchall())
+        enrich_document_provenance(conn,unawarded)
+    return {'procedure':dict(procedure),'documents':docs,'unawarded_vacancies':unawarded}
 
 
 # ---------- persons search ----------
@@ -1053,7 +1274,9 @@ def search_persons(
                 COUNT(*) AS total_records,
                 SUM(CASE WHEN ar.status = 'Adjudicat' THEN 1 ELSE 0 END) AS total_awarded,
                 0::bigint AS total_difficult_positions,
-                0::bigint AS total_bag_records
+                0::bigint AS total_bag_records,
+                0::bigint AS total_career_practice_records,
+                0::bigint AS total_unidentified_procedure_records
             FROM award_results ar
             WHERE normalize_text(ar.person_display_name) LIKE normalize_text(?)
                OR normalize_text(ar.person_name_normalized) LIKE normalize_text(?)
@@ -1067,7 +1290,9 @@ def search_persons(
                 COUNT(*) AS total_records,
                 SUM(CASE WHEN dc.is_selected IS TRUE THEN 1 ELSE 0 END) AS total_awarded,
                 COUNT(DISTINCT dc.position_id) AS total_difficult_positions,
-                0::bigint AS total_bag_records
+                0::bigint AS total_bag_records,
+                0::bigint AS total_career_practice_records,
+                0::bigint AS total_unidentified_procedure_records
             FROM difficult_coverage_candidates dc
             WHERE normalize_text(dc.full_name) LIKE normalize_text(?)
                OR normalize_text(dc.full_name_normalized) LIKE normalize_text(?)
@@ -1081,8 +1306,11 @@ def search_persons(
                 COUNT(*) AS total_records,
                 0::bigint AS total_awarded,
                 0::bigint AS total_difficult_positions,
-                COUNT(*) AS total_bag_records
+                COUNT(*) FILTER (WHERE dbs.staff_kind = 'interino') AS total_bag_records,
+                COUNT(*) FILTER (WHERE dbs.staff_kind = 'career_practice') AS total_career_practice_records,
+                COUNT(*) FILTER (WHERE dbs.staff_kind IS NULL OR dbs.staff_kind NOT IN ('interino','career_practice')) AS total_unidentified_procedure_records
             FROM docent_bag_members dbm
+            JOIN docent_bag_snapshots dbs ON dbs.id = dbm.snapshot_id
             WHERE normalize_text(dbm.person_display_name) LIKE normalize_text(?)
                OR normalize_text(dbm.person_name_normalized) LIKE normalize_text(?)
             GROUP BY normalize_text(dbm.person_display_name)
@@ -1101,6 +1329,8 @@ def search_persons(
             SUM(total_awarded) AS total_awarded,
             SUM(total_difficult_positions) AS total_difficult_positions,
             SUM(total_bag_records) AS total_bag_records,
+            SUM(total_career_practice_records) AS total_career_practice_records,
+            SUM(total_unidentified_procedure_records) AS total_unidentified_procedure_records,
             string_agg(source_kind, ',' ORDER BY source_kind) AS source_kinds
         FROM unioned
         GROUP BY normalized_name
@@ -1234,10 +1464,14 @@ def get_person_profile(
         bag_summary = conn.execute(
             """
             SELECT
-                COUNT(*) AS total_bag_records,
-                COUNT(DISTINCT dbm.snapshot_id) AS total_bag_snapshots,
-                MIN(dbm.order_number) AS best_bag_position,
-                MAX(d.document_date_iso) AS last_bag_date
+                COUNT(*) FILTER (WHERE dbs.staff_kind = 'interino') AS total_bag_records,
+                COUNT(DISTINCT dbm.snapshot_id) FILTER (WHERE dbs.staff_kind = 'interino') AS total_bag_snapshots,
+                MIN(dbm.order_number) FILTER (WHERE dbs.staff_kind = 'interino') AS best_bag_position,
+                MAX(d.document_date_iso) FILTER (WHERE dbs.staff_kind = 'interino') AS last_bag_date,
+                COUNT(*) FILTER (WHERE dbs.staff_kind = 'career_practice') AS total_career_practice_records,
+                MAX(d.document_date_iso) FILTER (WHERE dbs.staff_kind = 'career_practice') AS last_career_practice_date,
+                COUNT(*) FILTER (WHERE dbs.staff_kind IS NULL OR dbs.staff_kind NOT IN ('interino','career_practice')) AS total_unidentified_procedure_records,
+                MAX(d.document_date_iso) FILTER (WHERE dbs.staff_kind IS NULL OR dbs.staff_kind NOT IN ('interino','career_practice')) AS last_unidentified_procedure_date
             FROM docent_bag_members dbm
             JOIN docent_bag_snapshots dbs ON dbs.id = dbm.snapshot_id
             JOIN documents d ON d.id = dbs.document_id
@@ -1252,6 +1486,8 @@ def get_person_profile(
             for value in (
                 summary_dict.get("last_seen_date"),
                 summary_dict.get("last_bag_date"),
+                summary_dict.get("last_career_practice_date"),
+                summary_dict.get("last_unidentified_procedure_date"),
             )
         ) or None
 
@@ -1372,6 +1608,7 @@ def get_person_profile(
                 SELECT
                     dc.id,
                     dc.position_id,
+                    d.id AS document_id,
                     d.document_date_iso,
                     d.title AS document_title,
                     s.source_key,
@@ -1427,6 +1664,7 @@ def get_person_profile(
                 SELECT
                     dbm.id,
                     dbm.snapshot_id,
+                    d.id AS document_id,
                     d.document_date_iso,
                     d.title AS document_title,
                     s.source_key,
@@ -1465,6 +1703,10 @@ def get_person_profile(
                 [normalized_name, normalized_name],
             ).fetchall()
         )
+
+        enrich_document_provenance(conn, awards)
+        enrich_document_provenance(conn, difficult_coverage)
+        enrich_document_provenance(conn, bag_memberships)
 
     user_view = build_user_view(dict(person), awards, difficult_coverage, bag_memberships)
 
@@ -1581,6 +1823,7 @@ def list_awards(
         _register_normalize_function(conn)
         total = conn.execute(count_sql, params).fetchone()[0]
         items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
+        enrich_document_provenance(conn, items)
 
     return {
         "items": items,
@@ -1623,6 +1866,8 @@ def get_award_detail(award_result_id: int) -> dict[str, Any]:
         ).fetchone()
         if award is None:
             raise HTTPException(status_code=404, detail="award_result_id no encontrado")
+        award = dict(award)
+        enrich_document_provenance(conn, [award])
 
         assignments = rows_to_dicts(
             conn.execute(
@@ -1733,7 +1978,7 @@ def list_offered_positions(
     elif only_unmatched is False:
         where.append("EXISTS (SELECT 1 FROM award_assignments aa WHERE aa.matched_offered_position_id = op.id)")
     if not include_unavailable:
-        where.append("op.availability_status = 'available'")
+        where.append("op.availability_status = 'available' AND COALESCE(to_jsonb(d)->>'historical_status', 'unknown') = 'accredited'")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     order_params: list[Any] = []
@@ -1815,6 +2060,8 @@ def list_offered_positions(
         items = rows_to_dicts(
             conn.execute(items_sql, [*params, *order_params, limit, offset]).fetchall()
         )
+        enrich_document_provenance(conn, items)
+        mask_unaccredited_availability(items)
     items = [enrich_center_geo_fields(item, origin_lat, origin_lon) for item in items]
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
@@ -1873,7 +2120,7 @@ def list_difficult_positions(
     elif selected_only is False:
         where.append("NOT EXISTS (SELECT 1 FROM difficult_coverage_candidates dc WHERE dc.position_id = p.id AND dc.is_selected IS TRUE)")
     if not include_unavailable:
-        where.append("p.availability_status = 'available'")
+        where.append("p.availability_status = 'available' AND COALESCE(to_jsonb(d)->>'historical_status', 'unknown') = 'accredited'")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     order_params: list[Any] = []
@@ -1954,6 +2201,8 @@ def list_difficult_positions(
         _register_normalize_function(conn)
         total = conn.execute(count_sql, params).fetchone()[0]
         items = rows_to_dicts(conn.execute(items_sql, [*params, *order_params, limit, offset]).fetchall())
+        enrich_document_provenance(conn, items)
+        mask_unaccredited_availability(items)
 
     items = [enrich_center_geo_fields(item, origin_lat, origin_lon) for item in items]
 
@@ -1997,6 +2246,8 @@ def get_difficult_candidates(
         ).fetchone()
         if position is None:
             raise HTTPException(status_code=404, detail="position_id no encontrado")
+        position = dict(position)
+        enrich_document_provenance(conn, [position])
 
         where = ["dc.position_id = ?"]
         params: list[Any] = [position_id]

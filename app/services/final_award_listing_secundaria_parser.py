@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.services.parse_selection import locked_documents
 
 from dataclasses import dataclass
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 import re
@@ -18,13 +19,14 @@ from app.services.career_practice_award_parser import (
 
 
 PARSER_KEY = "final_award_listing_secundaria_parser"
-PARSER_VERSION = "0.4.0"
+PARSER_VERSION = "0.4.2"
 
 ENTRY_START_WITH_NAME_RE = re.compile(
     r"^(?P<order>\d{1,5})(?:\s*/\s*\d{1,5})?\s*"
     r"(?P<name>[A-ZÁÉÍÓÚÀÈÌÒÙÄËÏÖÜÑÇ][^,]+,\s*.+)$"
 )
 ENTRY_START_ONLY_ORDER_RE = re.compile(r"^(?P<order>\d{1,5})(?:\s*/\s*\d{1,5})?$")
+ENTRY_NAME_TRAILING_ORDER_RE = re.compile(r"^(?P<name>[A-ZÁÉÍÓÚÀÈÌÒÙÄËÏÖÜÑÇ][^,]+,\s*.+?)\s+(?P<order>\d{1,5})(?:\s*/\s*\d{1,5})?$")
 
 CENTER_LINE_RE = re.compile(
     r"^(?P<locality>.+?)\((?P<center_code>\d{8})\)(?P<center_name>.+)$"
@@ -90,6 +92,10 @@ class ParsedAwardResult:
     specialty_name: Optional[str]
     raw_block_text: str
     assignment: ParsedAssignment | None
+
+
+class SecundariaExtractionValidationError(ValueError):
+    """Aggregate diagnostics only; no document text or personal data."""
 
 
 class FinalAwardListingSecundariaParserService:
@@ -295,7 +301,10 @@ class FinalAwardListingSecundariaParserService:
 
         parsed: list[ParsedAwardResult] = []
 
+        rejected = 0
+        ambiguous = 0
         for block_lines, body_name, specialty_code, specialty_name in blocks:
+            ambiguous += sum(line in STATUS_VALUES for line in block_lines) != 1
             row = self._parse_block(
                 block_lines=block_lines,
                 body_name=body_name,
@@ -304,6 +313,25 @@ class FinalAwardListingSecundariaParserService:
             )
             if row is not None:
                 parsed.append(row)
+            else:
+                rejected += 1
+
+        expected = Counter(line for line in lines if line in STATUS_VALUES)
+        actual = Counter(row.status for row in parsed)
+        missing = sum(
+            not row.person_display_name.strip() or not row.person_name_normalized.strip()
+            or row.order_number is None or row.order_number <= 0
+            or (row.status == 'Adjudicat' and (
+                row.assignment is None
+                or not re.fullmatch(r'\d{8}', row.assignment.center_code or '')
+                or not re.fullmatch(r'\d{6}', row.assignment.position_code or '')))
+            for row in parsed
+        )
+        if not expected or expected != actual or rejected or ambiguous or missing:
+            raise SecundariaExtractionValidationError(
+                f'secundaria_extraction_incomplete: statuses_match={expected == actual}; '
+                f'rejected_blocks={rejected}; ambiguous_blocks={ambiguous}; missing_fields={missing}'
+            )
 
         return parsed
 
@@ -333,11 +361,20 @@ class FinalAwardListingSecundariaParserService:
             person_display_name = match.group("name").strip()
             remaining_lines = cleaned_lines[1:]
         else:
-            match = ENTRY_START_ONLY_ORDER_RE.match(first_line)
-            if not match:
-                return None
-            order_number = int(match.group("order"))
-            remaining_lines = cleaned_lines[1:]
+            trailing = ENTRY_NAME_TRAILING_ORDER_RE.match(first_line)
+            if (trailing and len(cleaned_lines) > 1
+                    and cleaned_lines[1] in STATUS_VALUES
+                    and cleaned_lines[1] != "Adjudicat"
+                    and not self._looks_like_petition_line(first_line)):
+                order_number = int(trailing.group("order"))
+                person_display_name = trailing.group("name").strip()
+                remaining_lines = cleaned_lines[1:]
+            else:
+                match = ENTRY_START_ONLY_ORDER_RE.match(first_line)
+                if not match:
+                    return None
+                order_number = int(match.group("order"))
+                remaining_lines = cleaned_lines[1:]
 
         status = self._extract_status(cleaned_lines)
         if status is None:
@@ -349,6 +386,11 @@ class FinalAwardListingSecundariaParserService:
             assignment = self._parse_assignment(remaining_lines)
             if assignment is not None and assignment.petition_text:
                 person_display_name = assignment.petition_text
+
+        if not person_display_name and status != 'Adjudicat':
+            petitions = [line for line in remaining_lines if self._looks_like_petition_line(line)]
+            if len(petitions) == 1:
+                person_display_name, _, _ = self._parse_petition_line(petitions[0])
 
         if not person_display_name:
             return None
@@ -568,6 +610,12 @@ class FinalAwardListingSecundariaParserService:
         if ENTRY_START_WITH_NAME_RE.match(line):
             return True
 
+        next_line = lines[index + 1] if index + 1 < len(lines) else ""
+        if (ENTRY_NAME_TRAILING_ORDER_RE.match(line)
+                and next_line in STATUS_VALUES and next_line != "Adjudicat"
+                and not self._looks_like_petition_line(line)):
+            return True
+
         only_order_match = ENTRY_START_ONLY_ORDER_RE.match(line)
         if not only_order_match:
             return False
@@ -580,6 +628,7 @@ class FinalAwardListingSecundariaParserService:
         return (
             upper in ASSIGNMENT_KIND_VALUES
             or upper.startswith("VACANT")
+            or bool(re.fullmatch(r"SUBSTITUCIÓ (?:DETERMINADA|INDETERMINADA) ITINERANTE", upper))
         )
 
     def _looks_like_hours_line(self, line: str) -> bool:

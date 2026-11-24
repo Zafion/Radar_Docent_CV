@@ -10,6 +10,30 @@ VALID_ROW = '1 VACANTE LOCALIDAD - 00000001 - CENTRO SINTÉTICO 123456'
 
 
 class OfferedPositionsSafetyTests(unittest.TestCase):
+    def test_numbered_row_without_a_readable_center_fails_closed(self):
+        parser=module.OfferedPositionsParserService()
+        lines=['1 VACANTE LOCALIDAD - 00000001 - CENTRO 123456 NO',
+               '2 VACANTE OTRA LOCALIDAD - CENTRO SIN CÓDIGO 234567 NO']
+        with patch.object(parser,'_extract_clean_lines',return_value=lines):
+            with self.assertRaisesRegex(ValueError,'offered_unrecognized_numbered_row'):
+                parser._parse_document({'file_path':'fixture.pdf','list_scope':'continua'})
+
+    def test_unrecognized_center_line_cannot_be_silently_appended(self):
+        parser = module.OfferedPositionsParserService()
+        lines = ['LOCALIDAD - 00000001 - CENTRO 123456 NO',
+                 'OTRA LOCALIDAD / 00000002 - CENTRO 234567 NO']
+        with patch.object(parser, '_extract_clean_lines', return_value=lines):
+            with self.assertRaisesRegex(ValueError, 'offered_unrecognized_center_line'):
+                parser._parse_document({'file_path':'fixture.pdf','list_scope':'continua'})
+
+    def test_partially_unparseable_document_is_rejected(self):
+        parser = module.OfferedPositionsParserService()
+        lines = ['LOCALIDAD - 00000001 - CENTRO 123456 NO',
+                 'LOCALIDAD - 00000002 - CENTRO SIN CODIGO NO']
+        with patch.object(parser, '_extract_clean_lines', return_value=lines):
+            with self.assertRaisesRegex(ValueError, 'offered_extraction_incomplete'):
+                parser._parse_document({'file_path':'fixture.pdf','list_scope':'continua'})
+
     def setUp(self):
         # Parser transactions are isolated; claims have real PostgreSQL coverage.
         claim = patch("app.services.offered_positions_parser.locked_documents",

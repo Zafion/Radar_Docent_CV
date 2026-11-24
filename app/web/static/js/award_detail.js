@@ -1,4 +1,5 @@
 (function () {
+  function t(value) { return window.FunkI18n ? window.FunkI18n.t(value) : value; }
   const config = window.AWARD_DETAIL_CONFIG || {};
   const awardResultId = config.awardResultId;
 
@@ -179,10 +180,13 @@
 
     summaryEl.innerHTML = `
       <div class="status-card">
+        ${award.validation_status === 'needs_validation' ? `<p class="muted">${escapeHtml(t("Validación documental pendiente"))}</p>` : ""}
+        ${award.validation_status === 'validated_with_limitations' ? `<p class="muted">${escapeHtml(t("Validación documental con limitaciones"))}</p>` : ""}
+        ${award.historical_status === 'unknown' || award.publication_date_quality === 'unknown' ? `<p class="muted">${escapeHtml(t("Vigencia y fecha de publicación sin acreditar"))}</p>` : ""}
         <div class="status-grid">
           <div class="status-grid__item"><span>Persona</span><strong>${escapeHtml(award.person_display_name || "—")}</strong></div>
           <div class="status-grid__item"><span>Estado</span><strong>${escapeHtml(award.status || "—")}</strong></div>
-          <div class="status-grid__item"><span>Fecha</span><strong>${escapeHtml(formatDate(award.document_date_iso))}</strong></div>
+          <div class="status-grid__item"><span>${escapeHtml(t("Fecha del documento"))}</span><strong>${escapeHtml(formatDate(award.document_date_iso))}</strong></div>
           <div class="status-grid__item"><span>Ámbito</span><strong>${escapeHtml(scope)}</strong></div>
           <div class="status-grid__item"><span>Especialidad</span><strong>${escapeHtml(specialty)}</strong></div>
           <div class="status-grid__item"><span>Documento</span><strong>${escapeHtml(award.document_title || "—")}</strong></div>

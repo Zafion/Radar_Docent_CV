@@ -78,6 +78,48 @@ class FullSyntheticFlow(unittest.TestCase):
                     with self.assertRaises(ValueError): run_fixture(cluster,stage,raw,'0'*64)
                     db.rollback(); self.assertEqual(counts(),before)
                     self.assertEqual(db.execute('SELECT to_jsonb(d)::text AS row FROM documents d WHERE id=%s',(old_id,)).fetchone()['row'],old_before)
+                # A new hash at an existing URL is a correction. F07 must hold
+                # it instead of treating the changed bytes as an ordinary new publication.
+                replacement = pdf_bytes('synthetic replacement')
+                (stage/'synthetic.pdf').write_bytes(replacement)
+                manifest['entries'][0]['sha256']=hashlib.sha256(replacement).hexdigest()
+                manifest['entries'][0]['size_bytes']=len(replacement)
+                changed=json.dumps(manifest).encode()
+                result=run_fixture(cluster,stage,changed,hashlib.sha256(changed).hexdigest())
+                self.assertEqual(result['processed'],0)
+                with psycopg.connect(cluster.dsn(),row_factory=dict_row) as db:
+                    row=db.execute('''SELECT ns.corrected_url,ns.intent FROM notification_document_state ns
+                        JOIN document_versions v ON v.id=ns.document_version_id WHERE v.sha256=%s''',
+                        (hashlib.sha256(replacement).hexdigest(),)).fetchone()
+                    self.assertTrue(row['corrected_url'])
+                    self.assertEqual(row['intent'],'live_new')
+                    self.assertEqual(db.execute('SELECT count(*) AS n FROM public_alerts').fetchone()['n'],0)
+                # Failure after both imports but before registration: retry must
+                # reuse exactly those versions and register each only once.
+                (stage/'synthetic.pdf').unlink()
+                batch=[]
+                for number in (1,2):
+                    data=pdf_bytes('batch-'+str(number)); name='batch'+str(number)+'.pdf'
+                    (stage/name).write_bytes(data)
+                    u='https://example.invalid/batch'+str(number)+'.pdf'
+                    asset=dict(manifest['entries'][0]['asset'],url=u,canonical_url=u)
+                    batch.append(dict(identity=u,file=name,sha256=hashlib.sha256(data).hexdigest(),size_bytes=len(data),asset=asset))
+                batch_raw=json.dumps({'format':'funkcionario.selective-technical.v2','entries':batch}).encode()
+                batch_sha=hashlib.sha256(batch_raw).hexdigest()
+                with patch('tests.selective_synthetic_runner.DocumentRegistryService.register_selected_live',side_effect=RuntimeError('after_imports')):
+                    with self.assertRaisesRegex(RuntimeError,'after_imports'):
+                        run_fixture(cluster,stage,batch_raw,batch_sha)
+                with psycopg.connect(cluster.dsn(),row_factory=dict_row) as db:
+                    for item in batch:
+                        self.assertEqual(db.execute('SELECT count(*) AS n FROM document_versions WHERE sha256=%s',(item['sha256'],)).fetchone()['n'],1)
+                resumed=run_fixture(cluster,stage,batch_raw,batch_sha)
+                self.assertEqual(resumed['failed'],0)
+                with psycopg.connect(cluster.dsn(),row_factory=dict_row) as db:
+                    for item in batch:
+                        self.assertEqual(db.execute('SELECT count(*) AS n FROM document_versions WHERE sha256=%s',(item['sha256'],)).fetchone()['n'],1)
+                        self.assertEqual(db.execute('''SELECT count(*) AS n FROM documents d
+                            JOIN document_versions v ON v.id=d.document_version_id WHERE v.sha256=%s''',(item['sha256'],)).fetchone()['n'],1)
+                    self.assertEqual(db.execute('SELECT count(*) AS n FROM public_alerts').fetchone()['n'],0)
 
 
 if __name__ == '__main__':
