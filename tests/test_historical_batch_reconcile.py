@@ -71,4 +71,9 @@ class BatchReconciliationTests(unittest.TestCase):
         plan=service.plan_mixed_rows([{'source_id':1,'order':None}],[{'source_id':2,'order':2}],['order'],[])
         self.assertEqual(plan['actions'][0]['category'],'E')
 
+    def test_absent_field_is_not_equivalent_to_sql_null(self):
+        plan=service.plan_mixed_rows([{'source_id':1,'order':1}],[{'source_id':2,'order':1,'value':None}],['order'],['value'])
+        self.assertEqual(plan['actions'][0]['category'],'C')
+        self.assertEqual(plan['actions'][0]['changed_fields'],['value'])
+
 if __name__=='__main__':unittest.main()

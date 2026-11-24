@@ -38,7 +38,7 @@ def plan_mixed_rows(baseline,reconstructed,required_key_fields,compared_fields):
             # Missing keys in the target make absence unprovable; do not insert.
             category='E' if old_invalid else 'B'
             actions.append({'source_id':current['source_id'],'category':category,'reason':'target_has_unkeyed_rows' if old_invalid else 'verified_documentary_key_absent_in_target'});continue
-        changed=[field for field in compared_fields if prior[0].get(field)!=current.get(field)]
+        changed=[field for field in compared_fields if field not in prior[0] or field not in current or prior[0][field]!=current[field]]
         actions.append({'source_id':current['source_id'],'category':'C' if changed else 'A','changed_fields':changed})
     return {'actions':actions,'unkeyed_baseline':len(old_invalid),'baseline_only_keys':len(old.keys()-new.keys())}
 
