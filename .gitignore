@@ -7,3 +7,5 @@ data/
 env.local.sh
 auditoria_local/recuperacion_17nov_luks.img
 auditoria_local/recuperacion_17nov_luks/
+auditoria_local/recovery_final_capacity.luks
+auditoria_local/recovery_final_capacity/

@@ -11,7 +11,7 @@ from app.services.encrypted_baseline_copy import decrypt_verified
 
 ROOT=Path(__file__).resolve().parents[1]
 WORKER=ROOT/'scripts/restore_baseline_worker.py'
-NORMALIZE=ROOT/'auditoria_local/resultados/restauracion_owner_preparada_20261116T154903Z/20261106_normalize_text_restore.sql'
+NORMALIZE=ROOT/'app/storage/migrations/20261106_normalize_text_restore.sql'
 
 def validate_volatile_storage(minimum_bytes=4*1024**3):
     # Sensitive decrypted pages must not be written to unencrypted swap.
