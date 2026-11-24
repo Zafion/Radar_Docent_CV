@@ -58,15 +58,20 @@ def verify_evidence(entries):
             if entry['family']=='difficult_candidates' and (report.get('source_only')!=0 or report.get('stored_only')!=0 or report.get('ordered_differences')!=0):raise ValueError('candidate_census_mismatch')
             entry['validation']=report
 
-def run(new,socket,manifest_path=MANIFEST,*,target_db='baseline_trial_20261123',baseline17=False):
-    if baseline17 and target_db not in ('baseline17_trial','baseline17_reproduction','baseline17_fresh'):raise ValueError('baseline17_trial_identity_required')
+def validate_trial_target(target_db,baseline17):
+    if baseline17 and target_db not in ('baseline17_trial','baseline17_reproduction','baseline17_fresh','baseline_future_trial'):raise ValueError('baseline17_trial_identity_required')
     if not baseline17 and target_db!='baseline_trial_20261123':raise ValueError('legacy_trial_identity_required')
+
+def run(new,socket,manifest_path=MANIFEST,*,target_db='baseline_trial_20261123',baseline17=False):
+    validate_trial_target(target_db,baseline17)
     manifest_bytes=manifest_path.read_bytes();manifest=json.loads(manifest_bytes)
     if manifest.get('format')!='historical-reconciliation-batch-v1':raise ValueError('manifest_format_invalid')
     entries=manifest['documents'];verify_evidence(entries)
     kw={'host':str(socket),'port':55467,'user':'baseline_owner','connect_timeout':5}
     with psycopg.connect(**kw,dbname='postgres',autocommit=True) as admin:
-        backup=({'baseline17_fresh':'baseline17_fresh_prebatch','baseline17_reproduction':'baseline17_reproduction_prebatch'}.get(target_db,'baseline17_trial_prebatch')) if baseline17 else 'baseline_trial_prebatch_20261123'
+        identity=admin.execute("SELECT current_setting('data_directory') AS data,current_setting('listen_addresses') AS net,current_setting('server_version_num') AS version").fetchone()
+        if identity[0]!='/work/data' or identity[1]!='' or not 160000<=int(identity[2])<170000:raise ValueError('isolated_cluster_identity_required')
+        backup=({'baseline_future_trial':'baseline_future_trial_prebatch','baseline17_fresh':'baseline17_fresh_prebatch','baseline17_reproduction':'baseline17_reproduction_prebatch'}.get(target_db,'baseline17_trial_prebatch')) if baseline17 else 'baseline_trial_prebatch_20261123'
         if not admin.execute('SELECT 1 FROM pg_database WHERE datname=%s',(backup,)).fetchone():
             from psycopg import sql
             admin.execute(sql.SQL('CREATE DATABASE {} TEMPLATE {}').format(sql.Identifier(backup),sql.Identifier(target_db)))
