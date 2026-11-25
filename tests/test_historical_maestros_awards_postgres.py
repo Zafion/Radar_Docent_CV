@@ -23,6 +23,31 @@ FIELDS=('assignment_kind','locality','center_code','center_name','position_speci
 
 
 class MaestrosAwardTests(unittest.TestCase):
+    def test_quarantine_is_scoped_by_document_sha(self):
+        with FreshCluster() as cluster,tempfile.TemporaryDirectory() as temp:
+            pdf1=Path(temp)/'first.pdf';pdf1.write_bytes(b'first fixture');sha1=hashlib.sha256(pdf1.read_bytes()).hexdigest()
+            pdf2=Path(temp)/'second.pdf';pdf2.write_bytes(b'second fixture');sha2=hashlib.sha256(pdf2.read_bytes()).hexdigest()
+            with psycopg.connect(cluster.dsn('postgres'),autocommit=True) as admin:
+                admin.execute('CREATE DATABASE source_fixture');admin.execute('CREATE DATABASE funk_validation')
+            with psycopg.connect(cluster.dsn('source_fixture'),row_factory=dict_row) as src,psycopg.connect(cluster.dsn(),row_factory=dict_row) as dst:
+                for db in (src,dst):
+                    db.execute(SCHEMA)
+                    db.execute('INSERT INTO document_versions(id,sha256) VALUES(10,%s),(11,%s)',(sha1,sha2))
+                    db.execute('INSERT INTO documents(id,document_version_id) VALUES(20,10),(21,11)')
+                    db.commit()
+                for did in (20,21):
+                    src.execute("INSERT INTO award_results(document_id,order_number,status,raw_block_text,person_display_name,person_name_normalized,specialty_code,list_scope) VALUES(%s,99,'No adjudicat','source','fixture','FIXTURE','001','maestros')",(did,))
+                src.commit()
+                dst.execute("INSERT INTO award_results(document_id,order_number,status,raw_block_text,person_display_name,person_name_normalized,specialty_code,list_scope) VALUES(20,99,'No adjudicat','different','fixture','FIXTURE','001','maestros')");dst.commit()
+                parsed=[SimpleNamespace(order_number=99,status='No adjudicat',raw_block_text='source',person_display_name='fixture',person_name_normalized='FIXTURE',specialty_code='001',assignment=None)]
+                with patch('app.services.historical_unawarded_reconcile.FinalAwardListingMaestrosParserService') as parser:
+                    parser.return_value._parse_document.return_value=parsed
+                    first=reconcile_unawarded(src,dst,document_sha=sha1,pdf_path=pdf1,family='maestros',synthetic_token=cluster.token,include_awards=True)
+                    second=reconcile_unawarded(src,dst,document_sha=sha2,pdf_path=pdf2,family='maestros',synthetic_token=cluster.token,include_awards=True)
+                self.assertEqual(first['quarantined'],1);self.assertEqual(second['inserted'],1)
+                self.assertEqual(dst.execute('SELECT count(*) AS n FROM recovery_unawarded.quarantine WHERE document_sha=%s',(sha1,)).fetchone()['n'],1)
+                self.assertEqual(dst.execute('SELECT count(*) AS n FROM recovery_unawarded.quarantine WHERE document_sha=%s',(sha2,)).fetchone()['n'],0)
+
     def test_partial_conflict_existing_award_link_idempotence_and_rollback(self):
         with FreshCluster() as cluster,tempfile.TemporaryDirectory() as temp:
             pdf=Path(temp)/'document.pdf';pdf.write_bytes(b'fixture');sha=hashlib.sha256(pdf.read_bytes()).hexdigest();offer_sha='f'*64
@@ -67,7 +92,8 @@ class MaestrosAwardTests(unittest.TestCase):
                 dst.execute('CREATE TRIGGER fail_assignment BEFORE INSERT ON award_assignments FOR EACH ROW EXECUTE FUNCTION fail_assignment()');dst.commit()
                 with self.assertRaises(psycopg.Error):run()
                 self.assertEqual(dst.execute('SELECT count(*) AS n FROM award_results').fetchone()['n'],2)
-                self.assertIsNone(dst.execute('SELECT matched_offered_position_id FROM award_assignments').fetchone()['matched_offered_position_id']);dst.commit()
+                self.assertIsNone(dst.execute('SELECT matched_offered_position_id FROM award_assignments').fetchone()['matched_offered_position_id'])
+                self.assertIsNone(dst.execute("SELECT to_regnamespace('recovery_unawarded') AS n").fetchone()['n']);dst.commit()
                 dst.execute('DROP TRIGGER fail_assignment ON award_assignments');dst.commit()
                 first=run();self.assertEqual(first['inserted'],1);self.assertEqual(first['quarantined'],1)
                 self.assertEqual(first['awards_inserted'],1);self.assertEqual(first['awards_reused'],1);self.assertEqual(first['associations_inserted'],2)
