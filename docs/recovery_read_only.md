@@ -30,8 +30,14 @@ BEGIN TRANSACTION READ ONLY;
 SET LOCAL statement_timeout = '30s';
 SELECT current_database(), current_user, current_setting('server_version'),
        current_setting('transaction_read_only');
+SELECT rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls
+  FROM pg_roles WHERE rolname=current_user;
 SELECT d.datname, has_database_privilege(current_user,d.oid,'CONNECT') AS can_connect
   FROM pg_database d WHERE d.datallowconn ORDER BY d.datname;
+SELECT count(*) FILTER (WHERE NOT has_table_privilege(current_user,c.oid,'SELECT')) AS tables_without_select,
+       count(*) FILTER (WHERE has_table_privilege(current_user,c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')) AS tables_with_write
+  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+ WHERE n.nspname='public' AND c.relkind IN ('r','p');
 SELECT count(*) AS documents FROM public.documents;
 SELECT count(*) AS document_versions FROM public.document_versions;
 SELECT count(*) AS award_results FROM public.award_results;
