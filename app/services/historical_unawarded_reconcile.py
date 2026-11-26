@@ -27,7 +27,7 @@ def _trial_fence(db, synthetic_token):
     synthetic = bool(synthetic_token and info['name'] == 'funk_validation' and info['token'] == synthetic_token)
     isolated = info['directory'] == '/work/data' and info['name'] in (
         'baseline_future_trial', 'baseline_700_full_trial', 'baseline_700_rollback_trial',
-        'baseline_700_full_trial_v2', 'baseline_700_rollback_trial_v2', 'baseline_maestros_cumulative')
+        'baseline_700_full_trial_v2', 'baseline_700_rollback_trial_v2', 'baseline_maestros_cumulative', 'baseline_19nov_trial')
     if not (synthetic or isolated):
         raise ValueError('destination_not_authorized_trial')
 

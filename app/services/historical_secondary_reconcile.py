@@ -26,7 +26,7 @@ def _trial_fence(db, token):
                     "current_setting('listen_addresses') AS listen,current_setting('server_version_num') AS version,"
                     "current_setting('funkcionario.validation_token',true) AS token").fetchone()
     synthetic=bool(token and info['name']=='funk_validation' and info['token']==token)
-    isolated=info['name'] in ('baseline_secondary_cumulative','baseline_700_full_trial_v2') and info['directory']=='/work/data'
+    isolated=info['name'] in ('baseline_secondary_cumulative','baseline_700_full_trial_v2','baseline_19nov_trial','baseline_future_trial') and info['directory']=='/work/data'
     if info['listen'] or not 160000<=int(info['version'])<170000 or not (synthetic or isolated):
         raise ValueError('destination_not_authorized_trial')
 

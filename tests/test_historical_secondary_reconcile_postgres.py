@@ -8,6 +8,7 @@ from unittest.mock import patch
 import psycopg
 from psycopg.rows import dict_row
 from app.services.historical_secondary_reconcile import reconcile_secondary, AWARD_FIELDS
+from app.services.historical_19nov_reconcile import reconcile_19nov
 from tests.postgres_isolated_validation import FreshCluster
 from tests.test_historical_maestros_awards_postgres import SCHEMA
 
@@ -57,6 +58,17 @@ class SecondaryAdapterTests(unittest.TestCase):
                 self.assertIsNone(dst.execute("SELECT to_regnamespace('recovery_secondary') AS n").fetchone()['n']);dst.commit()
                 dst.execute('DROP TRIGGER fail_secondary ON award_results');dst.commit()
                 first=run();self.assertEqual(first['inserted'],2);self.assertEqual(first['awards_reused'],1);self.assertEqual(first['links_pending'],1)
+                # The 19-Nov entrypoint must isolate a failed Maestros document
+                # and still execute the real Secondary adapter transaction.
+                missing={'document_sha':'0'*64,'pdf_path':Path(temp)/'missing.pdf'}
+                real={'document_sha':sha,'pdf_path':pdf}
+                with patch('app.services.historical_secondary_reconcile.FinalAwardListingSecundariaParserService') as parser:
+                    parser.return_value._parse_document.return_value=parsed
+                    combined=reconcile_19nov(src,dst,maestros=missing,secondary=real,execute=True,synthetic_token=cluster.token)
+                self.assertEqual(combined['documents']['maestros']['status'],'failed')
+                self.assertEqual(combined['documents']['secondary']['status'],'applied')
+                self.assertEqual(combined['documents']['secondary']['result'].get('inserted',0),0)
+                self.assertEqual(combined['offer_matches_created'],0)
                 again=run();self.assertEqual(again.get('inserted',0),0)
                 self.assertEqual(dst.execute('SELECT doc_family FROM documents WHERE id=200').fetchone()['doc_family'],'ignored')
                 self.assertEqual(dst.execute('SELECT count(*) AS n FROM award_results').fetchone()['n'],5)
