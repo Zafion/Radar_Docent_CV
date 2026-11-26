@@ -7,10 +7,11 @@ import shutil
 import subprocess
 import sys
 import uuid
+import re
 
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 VOLUME=ROOT/'auditoria_local/recovery_19nov_capacity'
-CURRENT=VOLUME/'funk-439-independent-trial'
+CURRENT=VOLUME/('funk-404-674-independent-trial' if '--compare-404-674' in sys.argv else 'funk-439-independent-trial')
 PRIOR_ORIGINAL=ROOT/'auditoria_local/recovery_final_capacity/funk-baseline-dq0rrzet'
 PRIOR=VOLUME/'funk-439-prior-comparison'
 SHA='2857d03b84439cd2db19cece2139b097a6dc5a16f34f979044383323eb5f6ab4'
@@ -25,7 +26,7 @@ def worker():
         for directory in ('/work/data','/prior/data'):
             subprocess.run([pg,'-D',directory,'-l','/dev/null','-w','start'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);started.append(directory)
         options='-c default_transaction_read_only=on'
-        with psycopg.connect(host='/work/socket',port=55467,user='baseline_owner',dbname='baseline_439_trial',row_factory=dict_row,options=options) as current, \
+        with psycopg.connect(host='/work/socket',port=55467,user='baseline_owner',dbname='baseline_404_674_trial' if '--compare-404-674' in sys.argv else 'baseline_439_trial',row_factory=dict_row,options=options) as current, \
              psycopg.connect(host='/prior/socket',port=55468,user='baseline_owner',dbname='baseline17_fresh',row_factory=dict_row,options=options) as prior:
             for db,datadir in ((current,'/work/data'),(prior,'/prior/data')):
                 x=db.execute("SELECT current_setting('listen_addresses') AS net,current_setting('data_directory') AS data,current_setting('server_version_num') AS version").fetchone()
@@ -34,6 +35,34 @@ def worker():
                 def keys(db):return {x['key'] for x in db.execute('SELECT DISTINCT jsonb_object_keys(payload) AS key FROM recovery_quarantine.positions_19nov')}
                 a=keys(current);b=keys(prior)
                 print(json.dumps({'status':'QUARANTINE_KEYS_COMPARED','current_only':sorted(a-b),'prior_only':sorted(b-a)}));return
+            if '--metadata-only' in sys.argv:
+                names=('availability_checked_at','availability_reason','availability_status','closed_at','closed_by_document_id')
+                def profile(db):
+                    result={}
+                    for field in names:
+                        x=db.execute('''SELECT count(*) AS total,count(*) FILTER(WHERE NOT (payload ? %s)) AS missing,
+                          count(*) FILTER(WHERE payload ? %s AND payload->%s='null'::jsonb) AS json_null,
+                          count(*) FILTER(WHERE payload ? %s AND payload->%s<>'null'::jsonb) AS non_null
+                          FROM recovery_quarantine.positions_19nov''',(field,field,field,field,field)).fetchone()
+                        values=[]
+                        if field in ('availability_status','availability_reason'):
+                            values=db.execute('''SELECT payload->>%s AS value,count(*) AS n FROM recovery_quarantine.positions_19nov
+                              WHERE payload ? %s AND payload->%s<>'null'::jsonb GROUP BY 1 ORDER BY 1''',(field,field,field)).fetchall()
+                        result[field]={**x,'values':values}
+                    return result
+                try:report={'status':'QUARANTINE_METADATA_PROFILE','current':profile(current),'prior':profile(prior)}
+                except psycopg.Error as exc:report={'status':'QUARANTINE_METADATA_ERROR','error_type':type(exc).__name__,'sqlstate':exc.sqlstate}
+                print(json.dumps(report));return
+            if '--notifications-only' in sys.argv:
+                queries={'public_alerts':"SELECT (to_jsonb(t)-'id') AS value FROM public_alerts t",
+                         'notification_posts':"SELECT jsonb_build_array(a.event_key,to_jsonb(t)-ARRAY['id','alert_id']) AS value FROM notification_posts t JOIN public_alerts a ON a.id=t.alert_id",
+                         'push_notification_events':"SELECT (to_jsonb(t)-'id') AS value FROM push_notification_events t"}
+                result={}
+                for name,q in queries.items():
+                    a=Counter(json.dumps(x['value'],sort_keys=True,default=str) for x in current.execute(q))
+                    b=Counter(json.dumps(x['value'],sort_keys=True,default=str) for x in prior.execute(q))
+                    result[name]={'identical':sum((a&b).values()),'current_only':sum((a-b).values()),'prior_only':sum((b-a).values())}
+                print(json.dumps({'status':'NOTIFICATIONS_COMPARED','tables':result}));return
             def sha_set(db):return {r['sha256'] for r in db.execute('SELECT v.sha256 FROM documents d JOIN document_versions v ON v.id=d.document_version_id')}
             a=sha_set(current);b=sha_set(prior)
             def entries(db):
@@ -104,7 +133,8 @@ def worker():
 def main():
     from scripts.restore_baseline_isolated import validate_volatile_storage
     os.environ['FUNK_RECOVERY_WORK_ROOT']=str(VOLUME)
-    if validate_volatile_storage(minimum_bytes=16*1024**3)!=VOLUME:raise ValueError('insufficient_encrypted_space')
+    minimum=8*1024**3 if '--compare-404-674' in sys.argv and '--verify-existing' in sys.argv else 16*1024**3
+    if validate_volatile_storage(minimum_bytes=minimum)!=VOLUME:raise ValueError('insufficient_encrypted_space')
     existing='--verify-existing' in sys.argv
     if not CURRENT.is_dir() or PRIOR_ORIGINAL.is_symlink() or (CURRENT/'data/postmaster.pid').exists() or (PRIOR_ORIGINAL/'data/postmaster.pid').exists():raise ValueError('cluster_identity_or_destination')
     if existing:
@@ -117,16 +147,19 @@ def main():
          '--symlink','usr/lib','/lib','--symlink','usr/lib64','/lib64','--symlink','usr/bin','/bin','--proc','/proc','--dev','/dev','--tmpfs','/tmp','--dir','/etc',
          '--ro-bind',str(CURRENT/'passwd'),'/etc/passwd','--ro-bind',str(CURRENT/'group'),'/etc/group','--ro-bind',str(ROOT),'/project',
          '--bind',str(CURRENT),'/work','--bind',str(PRIOR),'/prior','--clearenv','--setenv','HOME','/tmp','--setenv','PATH','/usr/bin:/bin',
-         '--uid',str(os.getuid()),'--gid',str(os.getgid()),'--','/project/.venv/bin/python','-B','/project/scripts/compare_historical_439_prior.py','--worker']+(['--keys-only'] if '--keys-only' in sys.argv else [])
+         '--uid',str(os.getuid()),'--gid',str(os.getgid()),'--','/project/.venv/bin/python','-B','/project/scripts/compare_historical_439_prior.py','--worker']+(['--compare-404-674'] if '--compare-404-674' in sys.argv else [])+(['--keys-only'] if '--keys-only' in sys.argv else ['--metadata-only'] if '--metadata-only' in sys.argv else ['--notifications-only'] if '--notifications-only' in sys.argv else [])
     p=subprocess.run(cmd,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=1800)
     if p.returncode:
         last=p.stderr.strip().splitlines()[-1] if p.stderr.strip() else ''
-        reason=last.split(':',1)[0] if last and all(c.isascii() and (c.isalnum() or c in '._') for c in last.split(':',1)[0]) else 'isolated_comparison_failed'
-        print(json.dumps({'status':'STOP','reason':reason,'prior_copy_preserved':str(PRIOR)}));return 1
-    result=json.loads(p.stdout.strip().splitlines()[-1]);path=VOLUME/('reconciliation_439_previous_fields_'+uuid.uuid4().hex+'.json' if existing else 'reconciliation_439_previous_comparison.json')
+        name=last.split(':',1)[0].strip()
+        reason=name if name and all(c.isascii() and (c.isalnum() or c in '._') for c in name) else 'isolated_comparison_failed'
+        match=re.search(r'[A-Za-z_.]*(?:Error|Exception)',last)
+        safe_last=match.group(0) if match else ''
+        print(json.dumps({'status':'STOP','reason':reason,'diagnostic':safe_last,'prior_copy_preserved':str(PRIOR)}));return 1
+    result=json.loads(p.stdout.strip().splitlines()[-1]);path=VOLUME/(('reconciliation_404_674_previous_fields_' if '--compare-404-674' in sys.argv else 'reconciliation_439_previous_fields_')+uuid.uuid4().hex+'.json' if existing else 'reconciliation_439_previous_comparison.json')
     fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,'w') as f:json.dump(result,f,indent=2);f.write('\n');f.flush();os.fsync(f.fileno())
-    if result['status']=='QUARANTINE_KEYS_COMPARED':
+    if result['status'] in ('QUARANTINE_KEYS_COMPARED','QUARANTINE_METADATA_PROFILE','QUARANTINE_METADATA_ERROR','NOTIFICATIONS_COMPARED'):
         print(json.dumps({**result,'receipt':str(path)}));return 0
     print(json.dumps({'status':result['status'],'documents':result['documents'],'version_439':result['version_439'],'field_multisets':result['field_multisets'],'quarantine_payload_keys':result['quarantine_payload_keys'],'procedure_relations':result['procedure_relations'],'linked_awards':result['linked_awards'],'receipt':str(path)}));return 0
 

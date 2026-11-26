@@ -25,10 +25,25 @@ def worker():
     kw=dict(host='/work/socket',port=55467,user='baseline_owner',row_factory=dict_row)
     try:
         subprocess.run([pg,'-D','/work/data','-l','/dev/null','-w','start'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);started=True
-        if '--verify' in sys.argv:
+        if '--verify-q-404-674' in sys.argv:
+            options='-c default_transaction_read_only=on'
+            with psycopg.connect(**kw,dbname='baseline_439_trial',options=options) as original,psycopg.connect(**kw,dbname='baseline_404_674_trial',options=options) as trial:
+                s439='2857d03b84439cd2db19cece2139b097a6dc5a16f34f979044383323eb5f6ab4';s404='acf9530d701a06adc5c3c44cc81c3a5554f53dae8e50c13b9f8b3e49a687fcb0';s674='823d06203fa90d2bafefc250793dfafa7141a2b1e1dd3ed2e1ce8a506f9f9793'
+                query="SELECT count(*) AS n,md5(coalesce(string_agg(md5(to_jsonb(t)::text),'' ORDER BY to_jsonb(t)::text),'')) AS digest FROM recovery_batch.quarantined_rows t WHERE source_sha=%s"
+                qold=original.execute(query,(s439,)).fetchone();qnew=trial.execute(query,(s439,)).fetchone()
+                q404=trial.execute('SELECT count(*) AS n FROM recovery_batch.quarantined_rows WHERE source_sha=%s',(s404,)).fetchone()['n']
+                positions=trial.execute('''SELECT p.availability_status,count(*) AS n FROM difficult_coverage_positions p JOIN documents d ON d.id=p.document_id
+                    JOIN document_versions v ON v.id=d.document_version_id WHERE v.sha256=%s GROUP BY p.availability_status''',(s674,)).fetchall()
+                q19=trial.execute('SELECT count(*) AS n FROM recovery_quarantine.positions_19nov').fetchone()['n']
+                if qold!=qnew or qold['n']!=8 or q404!=16 or q19!=598 or positions!=[{'availability_status':'unknown','n':52}]:raise ValueError('quarantine_or_vigency_mismatch')
+                print(json.dumps({'status':'QUARANTINES_PASS','q439_preserved':True,'q439':qold['n'],'q404':q404,'q19':q19,'version674_availability':positions}))
+            return
+        if '--verify' in sys.argv or '--verify-404-674' in sys.argv:
             from psycopg import sql
             options='-c default_transaction_read_only=on';comparisons={};unverified=[]
-            with psycopg.connect(**kw,dbname='baseline_future_trial',options=options) as original,psycopg.connect(**kw,dbname='baseline_439_trial',options=options) as trial:
+            original_db='baseline_439_trial' if '--verify-404-674' in sys.argv else 'baseline_future_trial'
+            trial_db='baseline_404_674_trial' if '--verify-404-674' in sys.argv else 'baseline_439_trial'
+            with psycopg.connect(**kw,dbname=original_db,options=options) as original,psycopg.connect(**kw,dbname=trial_db,options=options) as trial:
                 tables=[r['table_name'] for r in original.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name").fetchall()]
                 for table in tables:
                     names=[x['column_name'] for x in original.execute("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=%s ORDER BY ordinal_position",(table,)).fetchall()]
@@ -164,29 +179,33 @@ def worker():
 def main():
     from scripts.restore_baseline_isolated import validate_volatile_storage
     os.environ['FUNK_RECOVERY_WORK_ROOT']=str(VOLUME)
-    if validate_volatile_storage(minimum_bytes=12*1024**3)!=VOLUME:raise ValueError('encrypted_capacity_insufficient')
+    minimum=8*1024**3 if '--verify-after-404-674' in sys.argv or '--verify-q-after-404-674' in sys.argv else 12*1024**3
+    if validate_volatile_storage(minimum_bytes=minimum)!=VOLUME:raise ValueError('encrypted_capacity_insufficient')
     if json.loads(CERT.read_text()).get('status')!='complete':raise ValueError('source_certification_missing')
-    verifying='--verify-existing' in sys.argv
+    verify_q='--verify-q-after-404-674' in sys.argv
+    verifying='--verify-existing' in sys.argv or '--verify-after-404-674' in sys.argv or verify_q
+    verifying_batch='--verify-after-404-674' in sys.argv or verify_q
     registering='--register-existing' in sys.argv
     if ORIGINAL.is_symlink() or (ORIGINAL/'data/postmaster.pid').exists():raise ValueError('source_running_or_invalid')
+    clone=VOLUME/'funk-404-674-independent-trial' if verifying_batch else CLONE
     if verifying or registering:
-        if not CLONE.is_dir() or CLONE.is_symlink() or (CLONE/'data/postmaster.pid').exists():raise ValueError('trial_cluster_invalid')
+        if not clone.is_dir() or clone.is_symlink() or (clone/'data/postmaster.pid').exists():raise ValueError('trial_cluster_invalid')
     else:
         if os.path.lexists(CLONE):raise ValueError('target_exists')
         shutil.copytree(ORIGINAL,CLONE,symlinks=True)
     cmd=['/usr/bin/bwrap','--unshare-user','--unshare-net','--unshare-pid','--die-with-parent','--ro-bind','/usr','/usr',
          '--symlink','usr/lib','/lib','--symlink','usr/lib64','/lib64','--symlink','usr/bin','/bin','--proc','/proc','--dev','/dev','--tmpfs','/tmp','--dir','/etc',
-         '--ro-bind',str(CLONE/'passwd'),'/etc/passwd','--ro-bind',str(CLONE/'group'),'/etc/group','--ro-bind',str(ROOT),'/project','--bind',str(CLONE),'/work',
+         '--ro-bind',str(clone/'passwd'),'/etc/passwd','--ro-bind',str(clone/'group'),'/etc/group','--ro-bind',str(ROOT),'/project','--bind',str(clone),'/work',
          '--clearenv','--setenv','HOME','/tmp','--setenv','PATH','/usr/bin:/bin','--uid',str(os.getuid()),'--gid',str(os.getgid()),'--',
-         '/project/.venv/bin/python','-B','/project/scripts/rehearse_historical_439.py','--worker']+(['--verify'] if verifying else ['--register-evidence'] if registering else [])
+         '/project/.venv/bin/python','-B','/project/scripts/rehearse_historical_439.py','--worker']+(['--verify-q-404-674'] if verify_q else ['--verify-404-674'] if verifying_batch else ['--verify'] if verifying else ['--register-evidence'] if registering else [])
     p=subprocess.run(cmd,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=2400)
     if p.returncode:
         last=p.stderr.strip().splitlines()[-1] if p.stderr.strip() else ''
         reason=last[len('ValueError: '):] if last.startswith('ValueError: ') else 'isolated_worker_failed'
         if not reason or len(reason)>80 or not all(c.isascii() and (c.isalnum() or c=='_') for c in reason):reason='isolated_worker_failed'
         print(json.dumps({'status':'STOP','condition':reason,'clone_preserved':str(CLONE)}));return 1
-    result=json.loads(p.stdout.strip().splitlines()[-1]);result['clone']=str(CLONE)
-    path=VOLUME/('reconciliation_439_preservation.json' if verifying else 'reconciliation_439_document_evidence.json' if registering else 'reconciliation_439_trial.json');fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
+    result=json.loads(p.stdout.strip().splitlines()[-1]);result['clone']=str(clone)
+    path=VOLUME/('reconciliation_404_674_quarantine.json' if verify_q else 'reconciliation_404_674_preservation.json' if verifying_batch else 'reconciliation_439_preservation.json' if verifying else 'reconciliation_439_document_evidence.json' if registering else 'reconciliation_439_trial.json');fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,'w') as f:json.dump(result,f,indent=2);f.write('\n');f.flush();os.fsync(f.fileno())
     print(json.dumps(result));return 0
 
