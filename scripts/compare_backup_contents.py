@@ -24,28 +24,32 @@ def snapshot(service):
     if not local or addresses or readonly != 'on':
         db.close()
         raise ValueError('database_not_isolated_unix_readonly')
-    if db.execute("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p') AND c.relrowsecurity").fetchone()[0]:
+    if db.execute("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname<>'information_schema' AND c.relkind IN ('r','p') AND c.relrowsecurity").fetchone()[0]:
         db.close()
         raise ValueError('row_level_security_requires_manual_comparison')
     return db
 
 
-def inventory(db):
+def inventory(db, schema='public'):
     return db.execute("""SELECT c.relname, c.relkind,
-       coalesce((SELECT json_agg(json_build_array(a.attname, pg_catalog.format_type(a.atttypid,a.atttypmod),a.attnotnull)
+       coalesce((SELECT json_agg(json_build_array(a.attname, pg_catalog.format_type(a.atttypid,a.atttypmod),a.attnotnull,
+                         a.attidentity,a.attgenerated,
+                         (SELECT pg_get_expr(d.adbin,d.adrelid) FROM pg_attrdef d WHERE d.adrelid=c.oid AND d.adnum=a.attnum),
+                         CASE WHEN a.attcollation=0 THEN NULL ELSE a.attcollation::regcollation::text END)
                   ORDER BY a.attnum)::text FROM pg_attribute a
                   WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped),'[]'),
        coalesce((SELECT array_agg(a.attname ORDER BY k.ordinality)
           FROM pg_index i CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY k(attnum,ordinality)
           JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum=k.attnum
-          WHERE i.indrelid=c.oid AND i.indisprimary),'{}')
+          WHERE i.indrelid=c.oid AND i.indisprimary),'{}'),
+       c.relpersistence,c.relrowsecurity,c.relforcerowsecurity
       FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-      WHERE n.nspname='public' AND c.relkind IN ('r','p') ORDER BY c.relname""").fetchall()
+      WHERE n.nspname=%s AND c.relkind IN ('r','p') ORDER BY c.relname""",(schema,)).fetchall()
 
 
-def digest_table(db, table, keys):
+def digest_table(db, table, keys, schema='public'):
     order = sql.SQL(',').join(sql.Identifier(k) for k in keys) if keys else sql.SQL('to_jsonb(t)::text COLLATE "C"')
-    query = sql.SQL('SELECT to_jsonb(t)::text FROM public.{} t ORDER BY {}').format(sql.Identifier(table), order)
+    query = sql.SQL('SELECT to_jsonb(t)::text FROM {} t ORDER BY {}').format(sql.Identifier(schema,table), order)
     digest = hashlib.sha256()
     count = 0
     with db.cursor(name='comparison_stream') as cur:
@@ -59,15 +63,15 @@ def digest_table(db, table, keys):
     return {'status': 'compared', 'count': count, 'sha256': digest.hexdigest()}
 
 
-def difference_counts(left, right, table, keys):
+def difference_counts(left, right, table, keys, schema='public'):
     # Sort key components as text under C collation on both servers, and merge
     # in Python. Primary keys are non-null; no record values leave this function.
     if keys:
         cols = [sql.SQL('(to_jsonb(t)->>{}) COLLATE "C"').format(sql.Literal(k)) for k in keys]
-        query = sql.SQL('SELECT {},to_jsonb(t)::text FROM public.{} t ORDER BY {}').format(
-            sql.SQL(',').join(cols), sql.Identifier(table), sql.SQL(',').join(cols))
+        query = sql.SQL('SELECT {},to_jsonb(t)::text FROM {} t ORDER BY {}').format(
+            sql.SQL(',').join(cols), sql.Identifier(schema,table), sql.SQL(',').join(cols))
     else:
-        query = sql.SQL('SELECT to_jsonb(t)::text FROM public.{} t ORDER BY to_jsonb(t)::text COLLATE "C"').format(sql.Identifier(table))
+        query = sql.SQL('SELECT to_jsonb(t)::text FROM {} t ORDER BY to_jsonb(t)::text COLLATE "C"').format(sql.Identifier(schema,table))
     def records(db):
         with db.cursor(name='difference_stream') as cur:
             cur.execute(query)
@@ -88,10 +92,10 @@ def difference_counts(left, right, table, keys):
     return {'only_left': only_left, 'only_right': only_right, 'changed_same_primary_key': changed if keys else None}
 
 
-def compare(left, right):
-    li = {r[0]: r[1:] for r in inventory(left)}
-    ri = {r[0]: r[1:] for r in inventory(right)}
-    if not li or not ri:
+def compare(left, right, schema='public'):
+    li = {r[0]: r[1:] for r in inventory(left,schema)}
+    ri = {r[0]: r[1:] for r in inventory(right,schema)}
+    if schema=='public' and (not li or not ri):
         raise ValueError('empty_public_inventory')
     tables = {}
     for name in sorted(li.keys() | ri.keys()):
@@ -100,15 +104,15 @@ def compare(left, right):
         elif li[name] != ri[name]:
             tables[name] = {'status': 'schema_or_primary_key_differs'}
         else:
-            a, b = digest_table(left, name, li[name][2]), digest_table(right, name, ri[name][2])
+            a, b = digest_table(left, name, li[name][2],schema), digest_table(right, name, ri[name][2],schema)
             tables[name] = {'status': 'equal' if a['status'] == b['status'] == 'compared' and a == b
                             else 'not_comparable' if a['status'] != 'compared' or b['status'] != 'compared'
                             else 'rows_differ', 'left_rows': a.get('count'), 'right_rows': b.get('count'),
                             'left_sha256': a.get('sha256'), 'right_sha256': b.get('sha256')}
             if tables[name]['status'] == 'rows_differ':
-                tables[name]['differences'] = difference_counts(left, right, name, li[name][2])
+                tables[name]['differences'] = difference_counts(left, right, name, li[name][2],schema)
     return {'status': 'equal' if all(t['status'] == 'equal' for t in tables.values()) else 'differences_or_unverified',
-            'method': 'public table rows ordered by primary key or full-row multiset; all columns; sha256 stream', 'tables': tables,
+            'method': f'{schema} table rows ordered by primary key or full-row multiset; all columns; sha256 stream', 'tables': tables,
             'limitations': 'Does not compare functions, triggers, privileges, sequences, non-public schemas or physical bytes; different internal keys remain differences.'}
 
 

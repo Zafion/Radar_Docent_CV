@@ -140,12 +140,12 @@ def trial_worker():
     finally:
         if started:subprocess.run([pg,'-D','/work/data','-m','fast','-w','stop'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 
-def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopback=False,hardened_role=False):
+def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopback=False,hardened_role=False,restored_candidate=False):
     import time,uuid,psycopg,httpx
     from psycopg import sql
     from psycopg.conninfo import make_conninfo
     pg='/usr/lib/postgresql/16/bin/pg_ctl';started=False;server=None;role='read17_'+uuid.uuid4().hex[:12];created=False
-    if target_db not in ('baseline17_trial','baseline17_reproduction','baseline17_fresh','baseline_404_674_trial'):raise ValueError('target_identity')
+    if target_db not in ('baseline17_trial','baseline17_reproduction','baseline17_fresh','baseline_404_674_trial') and not (restored_candidate and target_db=='baseline'):raise ValueError('target_identity')
     kw=dict(host='/work/socket',port=55467,user='baseline_owner')
     try:
         subprocess.run([pg,'-D','/work/data','-l','/dev/null','-w','start'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);started=True
@@ -180,7 +180,7 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
             difficult=db.execute("""SELECT d.id FROM documents d JOIN document_versions v ON v.id=d.document_version_id
               WHERE v.sha256='823d06203fa90d2bafefc250793dfafa7141a2b1e1dd3ed2e1ce8a506f9f9793'""").fetchone()
             with psycopg.connect(**kw,dbname='baseline',options='-c default_transaction_read_only=on') as original:
-                oldmax=original.execute('SELECT max(id) FROM award_results').fetchone()[0]
+                oldmax=0 if restored_candidate else original.execute('SELECT max(id) FROM award_results').fetchone()[0]
             recovered=db.execute("""SELECT r.person_name_normalized,r.specialty_code FROM award_results r
               JOIN award_assignments a ON a.award_result_id=r.id JOIN documents d ON d.id=r.document_id
               JOIN document_versions v ON v.id=d.document_version_id WHERE v.sha256='e9647ae9d20db8f1d95e1eafcd712f6c365ba643e1447f9d58da5699db7f1c04'
@@ -292,7 +292,7 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
                   '229556fed06a084a7388e10fbdf6dd65d0895910900bbaa4f58d75c8c15cb94a',
                   '847dcc1233a91b5694d1738f75ddd09e536d6764638ba87e89ab7f714510b348')}
                 if sorted(document_rows.values())!=[6416,11024,17051] or strict03!=213:raise ValueError('recovered_document_count_or_links')
-                if target_db=='baseline_404_674_trial':
+                if target_db=='baseline_404_674_trial' or restored_candidate:
                     pending=db.execute("SELECT count(*) FROM recovery_unawarded.quarantine WHERE reason='raw_block_conflict_unresolved'").fetchone()[0]
                     if pending!=1:raise ValueError('ordinal_99_quarantine_mismatch')
                     checks['ordinal_99_quarantine']=pending

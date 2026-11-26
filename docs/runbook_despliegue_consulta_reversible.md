@@ -88,57 +88,34 @@ recuentos. Si existen cambios, se necesita un nuevo ensayo aislado y aprobación
 
 ## 2. Artefacto local y transferencia
 
-**Autorización:** exportación local de datos sensibles y transferencia cifrada.
-Comprobar que la referencia local sigue protegida, detenida y coincide con sus
-recibos; generar en LUKS un dump custom PostgreSQL 16 de esa base, no del
-baseline antiguo. Registrar versión de código, lista de migraciones aplicadas,
-TOC, tamaño y SHA-256; sin datos personales en recibos. El dump debe contener
-esquemas, datos, índices y secuencias; revisar extensiones y dependencias del
-TOC. Repetir la prueba de restauración aislada del artefacto exacto y validar
-restricciones, contenido y los conteos 778 / 593161 / 48077. Ningún dump
-descifrado fuera de LUKS ni persistente en el servidor; transferir por SSH con
-host verificado directamente a `pg_restore`. No usar un archivo de respaldo
-creado antes de verificar estos requisitos.
+**Autorización:** transferencia cifrada y restauración en el servidor. El
+artefacto definitivo ya se exportó y restauró localmente en PostgreSQL 16.
+Su tamaño es `73218752` bytes y su SHA-256 es
+`a6ede91564e2b236ba61c9d6025904f1508fe4da873de396df40eb5160a2b308`.
+El recibo cifrado `final_candidate_export_20261126_v3/final_validation_receipt_v3.json`
+acredita igualdad de contenido en 44 tablas de seis esquemas, 128 índices,
+115 restricciones, 38 funciones, 2 disparadores, 3 extensiones y el estado de
+27 secuencias; API y rol lector también pasaron. La restauración utiliza
+`--no-owner --no-acl`, por lo que propietarios y permisos se configuran y
+validan por separado. Ningún dump descifrado fuera de LUKS ni persistente en el
+servidor. La recepción por SSH y los permisos efectivos de producción siguen
+sin ensayarse; probar primero en un servidor aislado equivalente.
 
-**Bloqueo:** la exportación de la candidata por streaming y su recepción en
-servidor aún no se han ensayado de extremo a extremo. Ensayar primero los
-siguientes comandos con un destino aislado de prueba, antes de pedir
-autorización productiva. En la estación local, con el LUKS montado, espacio
-confirmado y el clúster de referencia detenido:
+En la estación local, antes de transferir, comprobar el artefacto exacto:
 
 ```bash
 cd /home/zafion/Proyects/Radar_Docent_CV
 V="$PWD/auditoria_local/recovery_19nov_capacity"
-W="$V/funk-404-674-independent-trial"
 test "$(findmnt -n -o SOURCE -T "$V")" = /dev/mapper/funk_recovery_19nov_capacity || exit 1
-test ! -e "$W/data/postmaster.pid" || exit 1
-test ! -e "$V/candidata_consulta_20261126.dump" || exit 1
-test ! -e "$V/candidata_consulta_20261126.partial" || exit 1
-umask 077
-set -o noclobber
-bwrap --unshare-user --unshare-net --unshare-pid --die-with-parent \
-  --ro-bind /usr /usr --symlink usr/lib /lib --symlink usr/lib64 /lib64 \
-  --symlink usr/bin /bin --proc /proc --dev /dev --tmpfs /tmp --dir /etc \
-  --ro-bind "$W/passwd" /etc/passwd --ro-bind "$W/group" /etc/group \
-  --overlay-src "$W" --tmp-overlay /work --clearenv \
-  --setenv HOME /tmp --setenv PATH /usr/bin:/bin -- /bin/bash -c '
-    set -eu
-    pg=/usr/lib/postgresql/16/bin
-    trap "\"$pg/pg_ctl\" -D /work/data -m fast -w stop >/dev/null 2>&1 || :" EXIT
-    "$pg/pg_ctl" -D /work/data -l /tmp/pg.log -w start >/dev/null
-    "$pg/pg_dump" -w -h /work/socket -p 55467 -U baseline_owner \
-      -d baseline_404_674_trial -Fc --lock-wait-timeout=5s
-  ' > "$V/candidata_consulta_20261126.partial" || exit 1
-/usr/lib/postgresql/16/bin/pg_restore --list "$V/candidata_consulta_20261126.partial" >/dev/null || exit 1
-sha256sum "$V/candidata_consulta_20261126.partial"
-ln "$V/candidata_consulta_20261126.partial" "$V/candidata_consulta_20261126.dump" || exit 1
+DUMP="$V/final_candidate_export_20261126_v3/candidate.dump"
+printf '%s  %s\n' a6ede91564e2b236ba61c9d6025904f1508fe4da873de396df40eb5160a2b308 "$DUMP" | sha256sum -c - || exit 1
+test "$(stat -c %s "$DUMP")" = 73218752 || exit 1
+/usr/lib/postgresql/16/bin/pg_restore --list "$DUMP" >/dev/null || exit 1
 ```
 
-`pg_restore --list` no verifica todos los bloques; el ensayo de restauración es
-obligatorio. El archivo `.partial` es un segundo enlace al mismo inode tras
-`ln`, no otra copia; no se elimina automáticamente. La comparación de contenido
-debe usar el artefacto final y el SHA registrado. Comprobar que la capa temporal
-y el swap son seguros antes de ejecutarlo; cancelar si no lo son.
+`pg_restore --list` no verifica todos los bloques; el recibo demuestra una
+restauración completa local del mismo SHA. No regenerar el dump sin repetir la
+restauración y la comparación completas.
 
 El archivo queda cifrado por LUKS en la estación. La transferencia prevista en
 el paso 3 entra directamente al proceso `pg_restore` remoto; no crea un dump
@@ -186,7 +163,7 @@ ssh -T -F /dev/null -i /home/zafion/.ssh/funkcionario_prod \
   -o ProxyJump=none -o ControlMaster=no -o ControlPath=none \
   funkcionario@178.104.237.94 \
   'sudo -n -u postgres /usr/lib/postgresql/16/bin/pg_restore --exit-on-error --single-transaction --no-owner --no-acl -h /var/run/postgresql -p 5432 -d radar_docent_cv_recovered_20261126' \
-  < "$V/candidata_consulta_20261126.dump"
+  < "$DUMP"
 ```
 
 Un error de SSH o de `pg_restore` cancela la operación. Estas opciones no
@@ -360,8 +337,8 @@ la lista exacta de archivos y commits; no incluir `auditoria_local`, dumps,
 LUKS, datos personales ni secretos. No hacer push ni merge automáticamente.
 
 Bloqueos estrictos para abrir: fence y comparación inmediatamente anterior al
-cambio; backup actual y rollback verificables; ensayo del artefacto completo y
-su restauración en base nueva; identidad/autenticación y privilegios del rol;
+cambio; backup actual y rollback verificables; ensayo de transferencia y
+restauración en un servidor aislado equivalente; identidad/autenticación y privilegios del rol;
 revisión del proxy, productores, timers y backup reales; aceptación completa;
 y autorizaciones explícitas. Las cuarentenas y fechas desconocidas pueden
 permanecer como tales si la interfaz las presenta de manera conservadora.
