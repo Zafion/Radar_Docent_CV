@@ -23,6 +23,7 @@ from app.web.i18n import (
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+TEMPLATES.env.globals['recovery_read_only'] = lambda: os.getenv('FUNK_RECOVERY_READ_ONLY', '0') == '1'
 
 router = APIRouter(include_in_schema=False)
 

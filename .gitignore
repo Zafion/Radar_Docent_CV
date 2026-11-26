@@ -5,6 +5,8 @@ data/
 .pytest_cache/
 .vscode/
 env.local.sh
+# Local recovery evidence, encrypted containers, and mounted databases.
+auditoria_local/
 auditoria_local/recuperacion_17nov_luks.img
 auditoria_local/recuperacion_17nov_luks/
 auditoria_local/recovery_final_capacity.luks

@@ -2521,6 +2521,13 @@ def list_non_docent_publications(
         total = conn.execute(count_sql, params).fetchone()[0]
         items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
 
+    if RECOVERY_READ_ONLY:
+        for item in items:
+            if item.get('availability_status') == 'available':
+                item['availability_status'] = 'unknown'
+                item['availability_reason'] = 'vigencia_no_acreditada'
+            if item.get('is_current') is True:
+                item['is_current'] = None
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
@@ -2565,7 +2572,9 @@ def list_non_docent_positions(
         pattern = f"%{q}%"
         params.extend([pattern, pattern, pattern])
     if not include_unavailable:
-        where.append("pos.availability_status = 'available'")
+        # Legacy non-docent rows have no accredited historical-vigency field.
+        # In recovery, the old schema default alone cannot establish availability.
+        where.append("1=0" if RECOVERY_READ_ONLY else "pos.availability_status = 'available'")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     order_sql = build_order_by(
@@ -2621,6 +2630,11 @@ def list_non_docent_positions(
         total = conn.execute(count_sql, params).fetchone()[0]
         items = rows_to_dicts(conn.execute(items_sql, [*params, limit, offset]).fetchall())
 
+    if RECOVERY_READ_ONLY:
+        for item in items:
+            if item.get('availability_status') == 'available':
+                item['availability_status'] = 'unknown'
+                item['availability_reason'] = 'vigencia_no_acreditada'
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 

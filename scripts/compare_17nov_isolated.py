@@ -145,7 +145,7 @@ def api_worker(target_db='baseline17_trial',browser_check=False):
     from psycopg import sql
     from psycopg.conninfo import make_conninfo
     pg='/usr/lib/postgresql/16/bin/pg_ctl';started=False;server=None;role='read17_'+uuid.uuid4().hex[:12];created=False
-    if target_db not in ('baseline17_trial','baseline17_reproduction','baseline17_fresh'):raise ValueError('target_identity')
+    if target_db not in ('baseline17_trial','baseline17_reproduction','baseline17_fresh','baseline_404_674_trial'):raise ValueError('target_identity')
     kw=dict(host='/work/socket',port=55467,user='baseline_owner')
     try:
         subprocess.run([pg,'-D','/work/data','-l','/dev/null','-w','start'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);started=True
@@ -212,6 +212,15 @@ def api_worker(target_db='baseline17_trial',browser_check=False):
                     if key!='procedures' and observed<1:raise ValueError('api_'+key+'_empty')
                 checks[key]={'status':r.status_code,'items_returned':observed}
             if client.post('/api/push/subscribe',json={}).status_code!=405:raise ValueError('write_endpoint_not_blocked')
+            non_docent=client.get('/api/non-docent/positions').json()
+            historical_non_docent=client.get('/api/non-docent/positions',params={'include_unavailable':'true','limit':20}).json()
+            if non_docent.get('total')!=0 or any(x.get('availability_status')=='available' for x in historical_non_docent.get('items',[])):
+                raise ValueError('non_docent_unverified_availability_exposed')
+            checks['non_docent_unverified_availability']={'current_total':0,'historical_sample':len(historical_non_docent.get('items',[]))}
+            publications=client.get('/api/non-docent/publications',params={'limit':100}).json()
+            if any(x.get('availability_status')=='available' or x.get('is_current') is True for x in publications.get('items',[])):
+                raise ValueError('non_docent_unverified_publication_exposed')
+            checks['non_docent_unverified_publications']={'historical_sample':len(publications.get('items',[]))}
             if recovered:
                 search=client.get('/api/search/persons',params={'q':recovered[0],'limit':20}).json()
                 profile=client.get('/api/persons/profile',params={'normalized_name':recovered[0]}).json()
@@ -257,9 +266,15 @@ def api_worker(target_db='baseline17_trial',browser_check=False):
                   '229556fed06a084a7388e10fbdf6dd65d0895910900bbaa4f58d75c8c15cb94a',
                   '847dcc1233a91b5694d1738f75ddd09e536d6764638ba87e89ab7f714510b348')}
                 if sorted(document_rows.values())!=[6416,11024,17051] or strict03!=213:raise ValueError('recovered_document_count_or_links')
-                pending=db.execute("SELECT count(*) FROM recovery_03nov.other_maestros_pending WHERE reason='shared_ordinal_person_conflict'").fetchone()[0]
-                if pending!=14:raise ValueError('shifted_ordinal_quarantine_mismatch')
-                checks['recovered_document_rows']=document_rows;checks['shifted_ordinal_quarantine']=pending
+                if target_db=='baseline_404_674_trial':
+                    pending=db.execute("SELECT count(*) FROM recovery_unawarded.quarantine WHERE reason='raw_block_conflict_unresolved'").fetchone()[0]
+                    if pending!=1:raise ValueError('ordinal_99_quarantine_mismatch')
+                    checks['ordinal_99_quarantine']=pending
+                else:
+                    pending=db.execute("SELECT count(*) FROM recovery_03nov.other_maestros_pending WHERE reason='shared_ordinal_person_conflict'").fetchone()[0]
+                    if pending!=14:raise ValueError('shifted_ordinal_quarantine_mismatch')
+                    checks['shifted_ordinal_quarantine']=pending
+                checks['recovered_document_rows']=document_rows
                 checks['procedure_19_results']=rows19;checks['procedure_19_assignments']=assignments19[0];checks['procedure_03_existing_links']=links03;checks['procedure_03_strict_existing_links']=strict03
             if bag and difficult:
                 profile=client.get('/api/persons/profile',params={'normalized_name':bag[0]}).json()
@@ -280,6 +295,8 @@ def api_worker(target_db='baseline17_trial',browser_check=False):
                     ctx.route('**/*',lambda r:r.continue_() if r.request.url.startswith('http://127.0.0.1:18769/') else r.abort())
                     base='http://127.0.0.1:18769';prefix='/va' if language=='va' else ''
                     if page.goto(base+prefix+'/',wait_until='domcontentloaded').status!=200:raise ValueError('browser_home')
+                    recovery_notice='Consulta històrica: les dades poden estar desactualitzades.' if language=='va' else 'Consulta histórica: los datos pueden estar desactualizados.'
+                    page.get_by_text(recovery_notice,exact=False).first.wait_for(timeout=30000)
                     page.goto(base+prefix+'/consulta-persona',wait_until='domcontentloaded')
                     page.locator('#person-query').fill(recovered[0]);page.locator('#person-search-form').evaluate('(f)=>f.requestSubmit()')
                     page.locator('#person-search-results button[data-person-detail]').first.wait_for(timeout=30000)

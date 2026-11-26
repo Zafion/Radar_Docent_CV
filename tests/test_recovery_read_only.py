@@ -1,6 +1,7 @@
 import asyncio
 import unittest
 from unittest.mock import patch
+from unittest.mock import MagicMock
 
 import httpx
 import psycopg
@@ -11,6 +12,33 @@ from tests.postgres_isolated_validation import FreshCluster
 
 
 class RecoveryReadOnlyTests(unittest.TestCase):
+    def test_recovery_non_docent_does_not_treat_legacy_default_as_current(self):
+        conn=MagicMock();conn.execute.return_value.fetchone.return_value=(0,);conn.execute.return_value.fetchall.return_value=[]
+        context=MagicMock();context.__enter__.return_value=conn
+        with patch.object(main,'RECOVERY_READ_ONLY',True),patch.object(main,'get_connection',return_value=context),patch.object(main,'_register_normalize_function'):
+            response=main.list_non_docent_positions(q=None,include_unavailable=False,order_dir='asc',limit=10,offset=0)
+        self.assertEqual(response['total'],0)
+        self.assertTrue(any('1=0' in str(c.args[0]) for c in conn.execute.call_args_list))
+
+    def test_recovery_non_docent_publication_does_not_claim_current(self):
+        conn=MagicMock();conn.execute.return_value.fetchone.return_value=(1,)
+        conn.execute.return_value.fetchall.return_value=[{'availability_status':'available','is_current':True}]
+        context=MagicMock();context.__enter__.return_value=conn
+        with patch.object(main,'RECOVERY_READ_ONLY',True),patch.object(main,'get_connection',return_value=context),patch.object(main,'_register_normalize_function'):
+            response=main.list_non_docent_publications(q=None,from_date=None,to_date=None,order_dir='asc',limit=10,offset=0)
+        self.assertEqual(response['items'][0]['availability_status'],'unknown')
+        self.assertIsNone(response['items'][0]['is_current'])
+
+    def test_recovery_banner_is_localized_and_omits_external_fonts(self):
+        from app.web.routes import TEMPLATES
+        request=MagicMock();request.url_for.side_effect=lambda name,**kw:'/static/'+kw.get('path','')
+        with patch.dict('os.environ',{'FUNK_RECOVERY_READ_ONLY':'1'}):
+            template=TEMPLATES.get_template('base.html')
+            es=template.render(request=request,current_lang='es')
+            va=template.render(request=request,current_lang='va')
+        self.assertIn('Consulta histórica: los datos pueden estar desactualizados',es)
+        self.assertIn('Consulta històrica: les dades poden estar desactualitzades',va)
+        self.assertNotIn('fonts.googleapis.com',es)
     def test_startup_refuses_enabled_notifications(self):
         with patch.object(main,'RECOVERY_READ_ONLY',True),patch.object(main,'DB_URL','postgresql://example.invalid/db'),patch.object(main,'get_pool'),patch.dict('os.environ',{'ENABLE_NOTIFICATIONS':'1'}):
             with self.assertRaisesRegex(RuntimeError,'notifications_must_be_disabled'):
