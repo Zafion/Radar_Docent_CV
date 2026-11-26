@@ -10,7 +10,9 @@ BROWSER=Path.home()/'.cache/ms-playwright/chromium_headless_shell-1208/chrome-he
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-name',default='final_readonly_web_check.json')
-    output_name=parser.parse_args().output_name
+    parser.add_argument('--loopback', action='store_true', help='exercise the recovery 127.0.0.1:8001 entrypoint')
+    args=parser.parse_args()
+    output_name=args.output_name
     if not output_name or Path(output_name).name!=output_name or not output_name.endswith('.json'):raise ValueError('output_name_invalid')
     sys.path.insert(0,str(ROOT))
     from scripts.restore_baseline_isolated import validate_volatile_storage
@@ -26,9 +28,9 @@ def main():
     cmd=['/usr/bin/bwrap','--unshare-user','--unshare-net','--unshare-pid','--die-with-parent','--ro-bind','/usr','/usr',
          '--symlink','usr/lib','/lib','--symlink','usr/lib64','/lib64','--symlink','usr/bin','/bin','--proc','/proc','--dev','/dev','--tmpfs','/tmp','--dir','/etc',
          '--ro-bind',str(WORK/'passwd'),'/etc/passwd','--ro-bind',str(WORK/'group'),'/etc/group','--ro-bind',str(ROOT),'/project',
-         '--ro-bind',str(BROWSER),'/browser','--bind',str(WORK),'/work','--clearenv','--setenv','HOME','/tmp','--setenv','PATH','/usr/bin:/bin',
+         '--ro-bind',str(BROWSER),'/browser','--overlay-src',str(WORK),'--tmp-overlay','/work','--clearenv','--setenv','HOME','/tmp','--setenv','PATH','/usr/bin:/bin',
          '--uid',str(os.getuid()),'--gid',str(os.getgid()),'--chdir','/project','--','/project/.venv/bin/python','-B','-c',
-         "from scripts.compare_17nov_isolated import api_worker; api_worker('baseline_404_674_trial',browser_check=True)"]
+         "from scripts.compare_17nov_isolated import api_worker; api_worker('baseline_404_674_trial',browser_check=True,hardened_role=True,recovery_loopback="+str(args.loopback)+")"]
     p=subprocess.run(cmd,cwd=ROOT,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=900)
     if p.returncode:
         matches=re.findall(r'(?:ValueError|RuntimeError): ([A-Za-z0-9_]+)',p.stderr)

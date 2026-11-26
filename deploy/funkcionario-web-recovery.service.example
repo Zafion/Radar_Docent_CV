@@ -1,0 +1,25 @@
+# Example only. Requires separately reviewed network, PostgreSQL and proxy setup.
+[Unit]
+Description=Funkcionario independent read-only recovery web
+After=postgresql.service
+
+[Service]
+Type=simple
+User=funkcionario
+Group=funkcionario
+WorkingDirectory=/srv/funkcionario/app
+EnvironmentFile=/etc/funkcionario/recovery-web.env
+ExecStart=/bin/bash /srv/funkcionario/app/scripts/start_recovery_loopback.sh
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=127.0.0.1/32
+IPAddressAllow=::1/128
+StandardOutput=null
+StandardError=null
+Restart=no
+
+# No Install section: start only in a separately authorized recovery window.

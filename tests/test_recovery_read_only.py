@@ -59,6 +59,11 @@ class RecoveryReadOnlyTests(unittest.TestCase):
             with psycopg.connect(cluster.dsn('postgres'),autocommit=True,row_factory=dict_row) as db:
                 cluster.verify(db)
                 db.execute('CREATE ROLE recovery_reader NOLOGIN')
+                db.execute('REVOKE TEMPORARY ON DATABASE postgres FROM PUBLIC')
+                db.execute("""DO $$ DECLARE f record; BEGIN FOR f IN
+                  SELECT p.oid::regprocedure AS fn FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                  WHERE n.nspname='pg_catalog' AND p.proname IN ('pg_notify','lo_create','lo_creat','lo_import','lo_unlink','lo_put')
+                  LOOP EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC',f.fn); END LOOP; END $$""")
                 db.execute('CREATE TABLE public.recovery_fixture (id integer)')
                 db.execute('GRANT USAGE ON SCHEMA public TO recovery_reader')
                 db.execute('GRANT SELECT ON public.recovery_fixture TO recovery_reader')
@@ -76,6 +81,15 @@ class RecoveryReadOnlyTests(unittest.TestCase):
                     main.verify_recovery_database_role(db)
                 db.execute('RESET ROLE')
                 db.execute('GRANT INSERT ON public.recovery_fixture TO recovery_reader')
+                db.execute('SET ROLE recovery_reader')
+                db.execute('SET default_transaction_read_only=on')
+                with self.assertRaisesRegex(RuntimeError,'write_capabilities'):
+                    main.verify_recovery_database_role(db)
+                db.execute('RESET ROLE')
+                db.execute('SET default_transaction_read_only=off')
+                db.execute('REVOKE INSERT ON public.recovery_fixture FROM recovery_reader')
+                db.execute('CREATE SEQUENCE public.recovery_fixture_seq')
+                db.execute('GRANT USAGE ON SEQUENCE public.recovery_fixture_seq TO recovery_reader')
                 db.execute('SET ROLE recovery_reader')
                 db.execute('SET default_transaction_read_only=on')
                 with self.assertRaisesRegex(RuntimeError,'write_capabilities'):

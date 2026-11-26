@@ -76,15 +76,21 @@ def verify_recovery_database_role(conn) -> None:
         raise RuntimeError('recovery_role_has_elevated_membership')
     if conn.execute("SELECT current_setting('transaction_read_only') AS value").fetchone()['value'] != 'on':
         raise RuntimeError('recovery_transaction_not_read_only')
-    unsafe = conn.execute("""SELECT EXISTS (
+    unsafe = conn.execute("""SELECT has_database_privilege(current_user,current_database(),'TEMP') OR EXISTS (
       SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%'
         AND c.relkind IN ('r','p','v','m','f','S')
         AND has_table_privilege(current_user,c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     ) OR EXISTS (SELECT 1 FROM pg_namespace n WHERE n.nspname NOT LIKE 'pg_%'
        AND n.nspname <> 'information_schema' AND has_schema_privilege(current_user,n.oid,'CREATE'))
+      OR EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+       WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND c.relkind='S'
+       AND has_sequence_privilege(current_user,c.oid,'USAGE,UPDATE'))
       OR EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-       WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND p.prosecdef
+       WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND (p.prosecdef OR p.provolatile='v')
+       AND has_function_privilege(current_user,p.oid,'EXECUTE'))
+      OR EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='pg_catalog' AND p.proname IN ('pg_notify','lo_create','lo_creat','lo_import','lo_unlink','lo_put')
        AND has_function_privilege(current_user,p.oid,'EXECUTE')) AS unsafe""").fetchone()
     if unsafe['unsafe']:
         raise RuntimeError('recovery_role_has_write_capabilities')

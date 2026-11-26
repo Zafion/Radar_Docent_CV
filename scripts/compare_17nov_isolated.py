@@ -140,7 +140,7 @@ def trial_worker():
     finally:
         if started:subprocess.run([pg,'-D','/work/data','-m','fast','-w','stop'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 
-def api_worker(target_db='baseline17_trial',browser_check=False):
+def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopback=False,hardened_role=False):
     import time,uuid,psycopg,httpx
     from psycopg import sql
     from psycopg.conninfo import make_conninfo
@@ -152,6 +152,18 @@ def api_worker(target_db='baseline17_trial',browser_check=False):
         with psycopg.connect(**kw,dbname='postgres',autocommit=True) as admin:
             admin.execute(sql.SQL('CREATE ROLE {} LOGIN').format(sql.Identifier(role)));created=True
         with psycopg.connect(**kw,dbname=target_db,autocommit=True) as db:
+            if hardened_role:
+                db.execute(sql.SQL('REVOKE TEMPORARY ON DATABASE {} FROM PUBLIC').format(sql.Identifier(target_db)))
+                db.execute("""DO $$ DECLARE f record; BEGIN
+                  FOR f IN SELECT p.oid::regprocedure AS fn FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                           WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND (p.prosecdef OR p.provolatile='v')
+                  LOOP EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC',f.fn); END LOOP;
+                END $$""")
+                db.execute("""DO $$ DECLARE f record; BEGIN
+                  FOR f IN SELECT p.oid::regprocedure AS fn FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                           WHERE n.nspname='pg_catalog' AND p.proname IN ('pg_notify','lo_create','lo_creat','lo_import','lo_unlink','lo_put')
+                  LOOP EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC',f.fn); END LOOP;
+                END $$""")
             db.execute(sql.SQL('GRANT CONNECT ON DATABASE {} TO {}').format(sql.Identifier(target_db),sql.Identifier(role)))
             db.execute(sql.SQL('GRANT USAGE ON SCHEMA public TO {}').format(sql.Identifier(role)))
             db.execute(sql.SQL('GRANT SELECT ON ALL TABLES IN SCHEMA public TO {}').format(sql.Identifier(role)))
@@ -179,6 +191,11 @@ def api_worker(target_db='baseline17_trial',browser_check=False):
             before={t:db.execute('SELECT count(*) FROM '+t).fetchone()[0] for t in ('public_alerts','notification_posts','push_notification_events')}
         env={'PATH':'/usr/bin:/bin','HOME':'/tmp','LANG':'C.UTF-8','ENABLE_NOTIFICATIONS':'0','FUNK_RECOVERY_READ_ONLY':'1',
              'RADAR_DOCENT_DB_URL':make_conninfo(host='/work/socket',port=55467,user=role,dbname=target_db,options='-c default_transaction_read_only=on')}
+        if recovery_loopback:
+            from psycopg.rows import dict_row
+            from app.api.main import verify_recovery_database_role
+            with psycopg.connect(env['RADAR_DOCENT_DB_URL'],row_factory=dict_row) as inspection:
+                verify_recovery_database_role(inspection)
         with psycopg.connect(env['RADAR_DOCENT_DB_URL']) as restricted:
             try:restricted.execute('INSERT INTO public_alerts DEFAULT VALUES')
             except (psycopg.errors.ReadOnlySqlTransaction,psycopg.errors.InsufficientPrivilege):restricted.rollback()
@@ -187,8 +204,17 @@ def api_worker(target_db='baseline17_trial',browser_check=False):
             try:restricted.execute('INSERT INTO public_alerts DEFAULT VALUES')
             except psycopg.errors.InsufficientPrivilege:restricted.rollback()
             else:raise ValueError('readonly_role_grants_allow_write')
-        server=subprocess.Popen(['/project/.venv/bin/python','-B','-m','uvicorn','app.api.main:app','--host','127.0.0.1','--port','18769','--no-access-log'],cwd='/project',env=env,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        with httpx.Client(base_url='http://127.0.0.1:18769',trust_env=False,timeout=60) as client:
+            if recovery_loopback:
+                try:restricted.execute('CREATE TEMPORARY TABLE forbidden_recovery_write (id int)')
+                except psycopg.errors.InsufficientPrivilege:restricted.rollback()
+                else:raise ValueError('readonly_role_temp_table_allowed')
+                try:restricted.execute("SELECT pg_catalog.pg_notify('recovery_test','')")
+                except psycopg.errors.InsufficientPrivilege:restricted.rollback()
+                else:raise ValueError('readonly_role_notify_allowed')
+        port=8001 if recovery_loopback else 18769
+        command=['/bin/bash','/project/scripts/start_recovery_loopback.sh'] if recovery_loopback else ['/project/.venv/bin/python','-B','-m','uvicorn','app.api.main:app','--host','127.0.0.1','--port',str(port),'--no-access-log']
+        server=subprocess.Popen(command,cwd='/project',env=env,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        with httpx.Client(base_url=f'http://127.0.0.1:{port}',trust_env=False,timeout=60) as client:
             for _ in range(150):
                 try:
                     if client.get('/').status_code==200:break
@@ -292,8 +318,8 @@ def api_worker(target_db='baseline17_trial',browser_check=False):
                 browser=playwright.chromium.launch(executable_path='/browser/chrome-headless-shell',headless=True,args=['--no-sandbox','--disable-background-networking','--disable-dev-shm-usage'])
                 for language,viewport in (('es',{'width':1440,'height':900}),('va',{'width':390,'height':844})):
                     ctx=browser.new_context(viewport=viewport,service_workers='block');page=ctx.new_page()
-                    ctx.route('**/*',lambda r:r.continue_() if r.request.url.startswith('http://127.0.0.1:18769/') else r.abort())
-                    base='http://127.0.0.1:18769';prefix='/va' if language=='va' else ''
+                    ctx.route('**/*',lambda r:r.continue_() if r.request.url.startswith(f'http://127.0.0.1:{port}/') else r.abort())
+                    base=f'http://127.0.0.1:{port}';prefix='/va' if language=='va' else ''
                     if page.goto(base+prefix+'/',wait_until='domcontentloaded').status!=200:raise ValueError('browser_home')
                     recovery_notice='Consulta històrica: les dades poden estar desactualitzades.' if language=='va' else 'Consulta histórica: los datos pueden estar desactualizados.'
                     page.get_by_text(recovery_notice,exact=False).first.wait_for(timeout=30000)
