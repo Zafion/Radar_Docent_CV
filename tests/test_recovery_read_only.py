@@ -100,6 +100,12 @@ class RecoveryReadOnlyTests(unittest.TestCase):
                 db.execute('SET default_transaction_read_only=off')
                 with self.assertRaises(psycopg.errors.InsufficientPrivilege):
                     db.execute('INSERT INTO public.recovery_fixture VALUES (1)')
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                    db.execute('CREATE TEMPORARY TABLE denied_temp (id int)')
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                    db.execute("SELECT pg_catalog.pg_notify('test','')")
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                    db.execute('SELECT pg_catalog.lo_create(0)')
                 with self.assertRaisesRegex(RuntimeError,'transaction_not_read_only'):
                     main.verify_recovery_database_role(db)
                 db.execute('RESET ROLE')

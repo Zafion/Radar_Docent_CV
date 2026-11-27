@@ -140,16 +140,20 @@ def trial_worker():
     finally:
         if started:subprocess.run([pg,'-D','/work/data','-m','fast','-w','stop'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 
-def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopback=False,hardened_role=False,restored_candidate=False,production_restrictions=False):
+def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopback=False,hardened_role=False,restored_candidate=False,production_restrictions=False,approved_sql=False):
     import time,uuid,psycopg,httpx
     from psycopg import sql
     from psycopg.conninfo import make_conninfo
-    pg='/usr/lib/postgresql/16/bin/pg_ctl';started=False;server=None;role='read17_'+uuid.uuid4().hex[:12];created=False
+    pg='/usr/lib/postgresql/16/bin/pg_ctl';started=False;server=None;role='funkcionario_reader' if approved_sql else 'read17_'+uuid.uuid4().hex[:12];created=False
     if target_db not in ('baseline17_trial','baseline17_reproduction','baseline17_fresh','baseline_404_674_trial') and not (restored_candidate and target_db=='baseline'):raise ValueError('target_identity')
     kw=dict(host='/work/socket',port=55467,user='baseline_owner')
     try:
         subprocess.run([pg,'-D','/work/data','-l','/dev/null','-w','start'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);started=True
         with psycopg.connect(**kw,dbname='postgres',autocommit=True) as admin:
+            if approved_sql:
+                if target_db!='baseline_404_674_trial' or not production_restrictions or not hardened_role:raise ValueError('approved_sql_test_configuration')
+                admin.execute('ALTER DATABASE baseline_404_674_trial RENAME TO radar_docent_cv_recovered_20261126')
+                target_db='radar_docent_cv_recovered_20261126'
             admin.execute(sql.SQL('CREATE ROLE {} LOGIN').format(sql.Identifier(role)));created=True
         with psycopg.connect(**kw,dbname=target_db,autocommit=True) as db:
             if hardened_role:
@@ -174,12 +178,20 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
                     try:restricted_probe.execute("SELECT public.normalize_text('GARCÍA')")
                     except psycopg.errors.InsufficientPrivilege:pass
                     else:raise ValueError('expected_normalize_permission_failure_missing')
-                db.execute(sql.SQL('GRANT EXECUTE ON FUNCTION public.normalize_text(text) TO {}').format(sql.Identifier(role)))
-                with psycopg.connect(**{**kw,'user':role},dbname=target_db,autocommit=True) as restricted_probe:
-                    try:restricted_probe.execute("SELECT public.normalize_text('GARCÍA')")
-                    except psycopg.errors.InsufficientPrivilege:pass
-                    else:raise ValueError('expected_unaccent_permission_failure_missing')
-                db.execute(sql.SQL('GRANT EXECUTE ON FUNCTION public.unaccent(regdictionary,text) TO {}').format(sql.Identifier(role)))
+                if approved_sql:
+                    acl_sql="SELECT md5(string_agg(p.oid::regprocedure::text || ':' || coalesce(p.proacl::text,'NULL'), '|' ORDER BY p.oid::regprocedure::text)) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.oid NOT IN ('public.normalize_text(text)'::regprocedure,'public.unaccent(regdictionary,text)'::regprocedure)"
+                    before_acl=db.execute(acl_sql).fetchone()[0]
+                    wrong_db=subprocess.run(['/usr/lib/postgresql/16/bin/psql','-X','-w','-v','ON_ERROR_STOP=1','-h','/work/socket','-p','55467','-U','baseline_owner','-d','postgres','-f','/project/scripts/grant_recovery_search_functions.sql'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                    if wrong_db.returncode==0:raise ValueError('grant_sql_wrong_database_not_rejected')
+                    subprocess.run(['/usr/lib/postgresql/16/bin/psql','-X','-w','-v','ON_ERROR_STOP=1','-h','/work/socket','-p','55467','-U','baseline_owner','-d',target_db,'-f','/project/scripts/grant_recovery_search_functions.sql'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                    if db.execute(acl_sql).fetchone()[0]!=before_acl:raise ValueError('unrelated_function_acl_changed')
+                else:
+                    db.execute(sql.SQL('GRANT EXECUTE ON FUNCTION public.normalize_text(text) TO {}').format(sql.Identifier(role)))
+                    with psycopg.connect(**{**kw,'user':role},dbname=target_db,autocommit=True) as restricted_probe:
+                        try:restricted_probe.execute("SELECT public.normalize_text('GARCÍA')")
+                        except psycopg.errors.InsufficientPrivilege:pass
+                        else:raise ValueError('expected_unaccent_permission_failure_missing')
+                    db.execute(sql.SQL('GRANT EXECUTE ON FUNCTION public.unaccent(regdictionary,text) TO {}').format(sql.Identifier(role)))
             for schema in ('recovery_batch','recovery_03nov','recovery_0519','recovery_quarantine'):
                 if db.execute('SELECT to_regnamespace(%s) IS NOT NULL',(schema,)).fetchone()[0]:
                     db.execute(sql.SQL('GRANT USAGE ON SCHEMA {} TO {}').format(sql.Identifier(schema),sql.Identifier(role)))
@@ -224,6 +236,9 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
                 try:restricted.execute("SELECT pg_catalog.pg_notify('recovery_test','')")
                 except psycopg.errors.InsufficientPrivilege:restricted.rollback()
                 else:raise ValueError('readonly_role_notify_allowed')
+                try:restricted.execute('SELECT pg_catalog.lo_create(0)')
+                except psycopg.errors.InsufficientPrivilege:restricted.rollback()
+                else:raise ValueError('readonly_role_large_object_write_allowed')
         port=8001 if recovery_loopback else 18769
         command=['/bin/bash','/project/scripts/start_recovery_loopback.sh'] if recovery_loopback else ['/project/.venv/bin/python','-B','-m','uvicorn','app.api.main:app','--host','127.0.0.1','--port',str(port),'--no-access-log']
         server=subprocess.Popen(command,cwd='/project',env=env,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -322,7 +337,7 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
                   '229556fed06a084a7388e10fbdf6dd65d0895910900bbaa4f58d75c8c15cb94a',
                   '847dcc1233a91b5694d1738f75ddd09e536d6764638ba87e89ab7f714510b348')}
                 if sorted(document_rows.values())!=[6416,11024,17051] or strict03!=213:raise ValueError('recovered_document_count_or_links')
-                if target_db=='baseline_404_674_trial' or restored_candidate:
+                if target_db=='baseline_404_674_trial' or restored_candidate or approved_sql:
                     pending=db.execute("SELECT count(*) FROM recovery_unawarded.quarantine WHERE reason='raw_block_conflict_unresolved'").fetchone()[0]
                     if pending!=1:raise ValueError('ordinal_99_quarantine_mismatch')
                     checks['ordinal_99_quarantine']=pending

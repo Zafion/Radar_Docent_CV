@@ -346,11 +346,32 @@ permanecer como tales si la interfaz las presenta de manera conservadora.
 ## Corrección de la instancia de recuperación — 27/11
 
 En un clon local se reprodujo que `REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA public
-FROM PUBLIC` impide las búsquedas. `public.normalize_text(text)` es inmutable,
-pero llama a `public.unaccent(regdictionary,text)`, que PostgreSQL declara
-`STABLE`: conceder solo la primera no basta. No abrir ni reiniciar la instancia
-hasta que se apruebe una solución que respete el alcance de permisos autorizado
-y se pruebe con la identidad real. Nunca restaurar EXECUTE general a PUBLIC.
+FROM PUBLIC` impide las búsquedas. El usuario aprobó preparar la excepción
+individual para `public.normalize_text(text)` y `public.unaccent(regdictionary,
+text)` exclusivamente para `funkcionario_reader`. El SQL preparado es
+`scripts/grant_recovery_search_functions.sql`: valida base, rol, definición y
+diccionario y ejecuta exactamente esos dos GRANT en una transacción. Nunca
+restaurar EXECUTE general a PUBLIC. La autorización de preparación no autoriza
+su ejecución en producción.
+
+En el laboratorio, `unaccent` es miembro de la extensión 1.1, función C
+`$libdir/unaccent`/`unaccent_dict`, STABLE, STRICT y sin SECURITY DEFINER; el
+paquete PostgreSQL 16 pasó `dpkg -V`. Antes de solicitar autorización de
+ejecución, un administrador debe verificar en el servidor la versión del
+paquete y los archivos instalados, sin cambiarlos. **Detenerse si difieren:**
+
+```bash
+test -z "$(dpkg -V postgresql-16)" || { echo 'STOP: package verification failed'; exit 1; }
+printf '%s  %s\n' 5c97dcce195b8d7c38fcfeb132da9148570be613e4c07e1816aaaac370ca71d0 /usr/lib/postgresql/16/lib/unaccent.so | sha256sum -c - || exit 1
+printf '%s  %s\n' 0976b49849393a5d501ceb9020775114a203da84d2c8ecf70b8054368c543210 /usr/share/postgresql/16/tsearch_data/unaccent.rules | sha256sum -c - || exit 1
+```
+
+Los hashes acreditan los archivos locales examinados; no se ha comprobado el
+servidor. El SQL verifica además la firma de la función, miembro de extensión,
+version, flags, cuerpo de normalización y configuración del diccionario. Si
+hay una diferencia, detenerse y revisar: no editar las comprobaciones para que
+pasen. Registrar las concesiones directas existentes antes de aplicar SQL para
+poder revertir solo las que se añadan.
 
 Para desplegar una corrección futura, bajo autorización independiente: guardar
 el commit, la unidad y el entorno actuales de `/srv/funkcionario/recovery-app`;
@@ -364,7 +385,167 @@ no tocar `/srv/funkcionario/app`, el servicio del puerto 8000, Cloudflare ni
 productores. Validar `/health`, búsqueda `garcia` con resultados, perfiles y
 tablas históricas, en lugar de limitarse al estado HTTP de `/health`.
 
-Si falla, volver a la release anterior y reiniciar solo la misma unidad. Revertir
-únicamente permisos añadidos por ese cambio y registrados en el preflight, sin
-revocar concesiones anteriores; la versión previa puede seguir presentando la
-regresión y no debe declararse sana. Conservar ambas bases y configuraciones.
+### Procedimiento concreto para el puerto 8001
+
+**No ejecutar sin autorización independiente de despliegue.** La prueba local
+usa el SQL exacto con el nombre de base y rol previstos, pero el catálogo y los
+archivos de producción aún no se han inspeccionado en esta intervención. Antes
+de continuar, verificar privadamente que la unidad en 8001 es
+`funkcionario-web-recovery.service`, que usa `/srv/funkcionario/recovery-app` y
+`radar_docent_cv_recovered_20261126`, y que 8000 sigue sirviendo la aplicación
+anterior. Si no coincide, detenerse. Mantener Cloudflare y productores intactos.
+
+1. En la estación local, después del commit revisado, fijar `COMMIT` al SHA
+   completo entregado y crear un tar **solo de los archivos de esta corrección**:
+
+```bash
+cd /home/zafion/Proyects/Radar_Docent_CV
+COMMIT=REEMPLAZAR_POR_EL_SHA_COMPLETO_DEL_COMMIT
+[[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || exit 1
+RUNTIME=(app/api/main.py app/web/static/css/ui-overrides.css
+ app/web/static/js/difficult_coverage.js app/web/static/js/i18n.js
+ app/web/static/js/non_docent_home.js app/web/static/js/non_docent_positions.js
+ app/web/static/js/offered_positions.js app/web/templates/base.html
+ app/web/templates/difficult_coverage.html app/web/templates/non_docent_positions.html
+ app/web/templates/offered_positions.html app/web/templates/valencia_no_docentes.html)
+umask 077
+set -o noclobber
+git archive --format=tar "$COMMIT" -- "${RUNTIME[@]}" scripts/grant_recovery_search_functions.sql > "/tmp/funk-recovery-$COMMIT.tar" || exit 1
+sha256sum "/tmp/funk-recovery-$COMMIT.tar"
+```
+
+2. Tras autorización de transferencia, enviar el tar de código mediante SSH
+   autenticado y host verificado. No contiene dump ni credenciales; el destino
+   exclusivo falla si ya existe:
+
+```bash
+ssh -T -F /dev/null -i /home/zafion/.ssh/funkcionario_prod \
+  -o BatchMode=yes -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes \
+  -o UserKnownHostsFile=/home/zafion/.ssh/known_hosts -o IdentityAgent=none \
+  -o ForwardAgent=no -o ClearAllForwardings=yes -o ProxyCommand=none \
+  -o ProxyJump=none -o ControlMaster=no -o ControlPath=none \
+  funkcionario@178.104.237.94 \
+  "umask 077; set -C; cat > /tmp/funk-recovery-$COMMIT.tar" < "/tmp/funk-recovery-$COMMIT.tar"
+```
+
+3. En el servidor fijar el mismo `COMMIT` y comparar manualmente el SHA del tar
+   con el de la estación. Confirmar que el listado solo contiene los archivos
+   anteriores y el SQL. Revisar también los hashes de `unaccent` indicados
+   arriba. Registrar las concesiones **directas** existentes sobre ambas
+   funciones para revertir únicamente las nuevas. No imprimir el entorno:
+
+```bash
+COMMIT=REEMPLAZAR_POR_EL_MISMO_SHA_COMPLETO
+[[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || exit 1
+ARCHIVE="/tmp/funk-recovery-$COMMIT.tar"
+sha256sum "$ARCHIVE"
+tar -tf "$ARCHIVE"
+BACKUP="/var/backups/funk-recovery-$COMMIT"
+sudo mkdir -m 0700 "$BACKUP"
+sudo -u postgres psql -X -w -v ON_ERROR_STOP=1 -h /var/run/postgresql -p 5432 \
+  -d radar_docent_cv_recovered_20261126 -At -F '|' -c "
+SELECT p.oid::regprocedure::text,
+       coalesce(bool_or(a.grantee=r.oid AND a.privilege_type='EXECUTE'),false)
+FROM pg_proc p CROSS JOIN pg_roles r
+LEFT JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a ON true
+WHERE r.rolname='funkcionario_reader'
+  AND p.oid IN ('public.normalize_text(text)'::regprocedure,
+                'public.unaccent(regdictionary,text)'::regprocedure)
+GROUP BY p.oid ORDER BY 1;" | sudo tee "$BACKUP/acl-before.txt" >/dev/null
+sudo awk 'END { if (NR != 2) exit 1 }' "$BACKUP/acl-before.txt" || exit 1
+```
+
+   Deben registrarse exactamente dos filas. Si falta alguna, si el tar o el
+   paquete difieren, o si la unidad/base no son las esperadas, detenerse.
+
+4. Con autorización específica para las dos concesiones, ejecutar en el
+   servidor el SQL guardado en el tar verificado. Si cualquier comprobación
+   falla, no continuar; la transacción revierte ambas concesiones:
+
+```bash
+set -o pipefail
+tar -xOf "$ARCHIVE" scripts/grant_recovery_search_functions.sql | \
+  sudo -u postgres psql -X -w -v ON_ERROR_STOP=1 -h /var/run/postgresql -p 5432 \
+  -d radar_docent_cv_recovered_20261126
+```
+
+5. Tras autorización de actualización de código, guardar los archivos actuales
+   del puerto 8001 y sustituir únicamente los de la lista. El servicio 8000 no
+   se detiene. Si falla algún comando, no avanzar y restaurar el tar anterior:
+
+```bash
+RUNTIME=(app/api/main.py app/web/static/css/ui-overrides.css
+ app/web/static/js/difficult_coverage.js app/web/static/js/i18n.js
+ app/web/static/js/non_docent_home.js app/web/static/js/non_docent_positions.js
+ app/web/static/js/offered_positions.js app/web/templates/base.html
+ app/web/templates/difficult_coverage.html app/web/templates/non_docent_positions.html
+ app/web/templates/offered_positions.html app/web/templates/valencia_no_docentes.html)
+sudo tar -C /srv/funkcionario/recovery-app -cf "$BACKUP/runtime-before.tar" "${RUNTIME[@]}"
+sudo systemctl stop funkcionario-web-recovery.service
+sudo tar --no-same-owner --no-same-permissions -C /srv/funkcionario/recovery-app -xf "$ARCHIVE" "${RUNTIME[@]}"
+sudo systemctl start funkcionario-web-recovery.service
+systemctl is-active funkcionario-web-recovery.service funkcionario-web.service
+ss -ltn '( sport = :8000 or sport = :8001 )'
+```
+
+6. Consultar desde el propio servidor sin imprimir identidades; confirmar
+   búsqueda, perfil y las tres familias históricas, y después verificar con
+   Chromium castellano/valenciano y escritorio/móvil. Los recuentos exactos
+   dependen de los filtros, pero no deben ser cero:
+
+```bash
+python3 - <<'PY'
+import json, urllib.parse, urllib.request
+base='http://127.0.0.1:8001'
+def get(path):
+    with urllib.request.urlopen(base+path,timeout=120) as response:
+        return json.load(response)
+assert get('/health')['status']=='ok'
+search=get('/api/search/persons?q=garcia&limit=5')
+assert search['items']
+name=search['items'][0]['normalized_name']
+profile=get('/api/persons/profile?'+urllib.parse.urlencode({'normalized_name':name}))
+assert profile.get('awards') or profile.get('bag_memberships') or profile.get('difficult_coverage')
+for path in ('/api/offered-positions','/api/difficult-coverage/positions','/api/non-docent/positions'):
+    result=get(path+'?include_unavailable=true&limit=5')
+    assert result['total']>0 and result['items']
+    assert all(item.get('availability_status')!='available' for item in result['items'])
+print('PASS: health, search, profile and historical lists')
+PY
+```
+
+   Comprobar también que POST devuelve 405, que los 598 registros del 19/11
+   permanecen en cuarentena y que alertas/posts/push no cambian. No cambiar
+   Cloudflare ni reiniciar la instancia 8000 durante esta reparación.
+
+### Rollback de esta reparación
+
+Si algo falla, detener solo `funkcionario-web-recovery.service`, restaurar
+`runtime-before.tar` en `/srv/funkcionario/recovery-app`, arrancar esa misma
+unidad y verificar 8000 y 8001. Consultar `acl-before.txt`: revocar de
+`funkcionario_reader` **solo** la concesión que figure `f` antes del cambio;
+conservar las que figuraran `t` y no tocar PUBLIC. Requiere autorización para
+el rollback de permisos y ausencia de cambios concurrentes de ACL. La versión
+previa puede seguir presentando la regresión; no declararla sana. No eliminar
+ninguna base ni tocar `/srv/funkcionario/app`.
+
+Con autorización de rollback y sin cambios concurrentes de permisos, los
+siguientes comandos usan el mismo `BACKUP` del paso 3. Comprueba antes que el
+archivo de permisos contiene exactamente las dos filas guardadas:
+
+```bash
+sudo awk 'END { if (NR != 2) exit 1 }' "$BACKUP/acl-before.txt" || exit 1
+sudo systemctl stop funkcionario-web-recovery.service
+sudo tar -C /srv/funkcionario/recovery-app -xf "$BACKUP/runtime-before.tar"
+sudo systemctl start funkcionario-web-recovery.service
+systemctl is-active funkcionario-web-recovery.service funkcionario-web.service
+ss -ltn '( sport = :8000 or sport = :8001 )'
+if sudo grep -Eq '(^|[.])normalize_text\(text\)\|f$' "$BACKUP/acl-before.txt"; then
+  sudo -u postgres psql -X -w -v ON_ERROR_STOP=1 -h /var/run/postgresql -p 5432 \
+    -d radar_docent_cv_recovered_20261126 -c 'REVOKE EXECUTE ON FUNCTION public.normalize_text(text) FROM funkcionario_reader'
+fi
+if sudo grep -Eq '(^|[.])unaccent\(regdictionary,text\)\|f$' "$BACKUP/acl-before.txt"; then
+  sudo -u postgres psql -X -w -v ON_ERROR_STOP=1 -h /var/run/postgresql -p 5432 \
+    -d radar_docent_cv_recovered_20261126 -c 'REVOKE EXECUTE ON FUNCTION public.unaccent(regdictionary,text) FROM funkcionario_reader'
+fi
+```
