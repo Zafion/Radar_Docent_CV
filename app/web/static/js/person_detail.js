@@ -292,6 +292,7 @@
       if (row.validation_status === 'needs_validation') flags.push(t('Validación documental pendiente'));
       if (row.validation_status === 'validated_with_limitations') flags.push(t('Validación documental con limitaciones'));
       if (row.extraction_completeness === 'partial') flags.push(t('Extracción parcial: quedan registros por revisar'));
+      if (row.reconciliation_evidence_status === 'unavailable') flags.push(t('Detalle de reconciliación no disponible'));
       if (row.historical_status === 'unknown' || row.publication_date_quality === 'unknown') flags.push(t('Vigencia y fecha de publicación sin acreditar'));
       return flags.length ? `<br><span class="muted">${escapeHtml(flags.join(' · '))}</span>` : '';
     }

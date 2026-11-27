@@ -282,9 +282,15 @@ configuración, con autorización expresa:
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl start funkcionario-web-recovery.service
+ready=0
+for attempt in {1..30}; do
+  if curl --noproxy '*' --max-time 3 -fsS http://127.0.0.1:8001/health >/dev/null 2>&1; then ready=1; break; fi
+  systemctl is-active --quiet funkcionario-web-recovery.service || break
+  sleep 2
+done
+test "$ready" -eq 1 || { echo 'STOP: recovery service not ready'; exit 1; }
 systemctl is-active funkcionario-web.service funkcionario-web-recovery.service
 ss -ltn '( sport = :8000 or sport = :8001 )'
-curl --noproxy '*' -fsS http://127.0.0.1:8001/health
 ```
 
 Confirmar que 8000 sigue activo y 8001 escucha solo en 127.0.0.1. No habilitar
@@ -378,9 +384,10 @@ el commit, la unidad y el entorno actuales de `/srv/funkcionario/recovery-app`;
 preparar y verificar en un directorio nuevo un archivo de código del commit
 aprobado y sus dependencias, sin copiar secretos; ensayar el cambio y la vuelta
 en un entorno aislado. Comprobar que la unidad de recuperación sigue apuntando
-a esa ruta, al puerto 8001 y a la base recuperada. Una vez autorizadas y
-aplicadas únicamente las concesiones individuales aprobadas, cambiar la ruta de
-release de la instancia de recuperación y reiniciar exclusivamente su unidad;
+a esa ruta, al puerto 8001 y a la base recuperada. Las dos concesiones de
+funciones ya aprobadas deben permanecer intactas; no repetir ni modificar
+permisos para esta corrección. Actualizar el código de la instancia de
+recuperación y reiniciar exclusivamente su unidad;
 no tocar `/srv/funkcionario/app`, el servicio del puerto 8000, Cloudflare ni
 productores. Validar `/health`, búsqueda `garcia` con resultados, perfiles y
 tablas históricas, en lugar de limitarse al estado HTTP de `/health`.
@@ -405,12 +412,12 @@ COMMIT=REEMPLAZAR_POR_EL_SHA_COMPLETO_DEL_COMMIT
 RUNTIME=(app/api/main.py app/web/static/css/ui-overrides.css
  app/web/static/js/difficult_coverage.js app/web/static/js/i18n.js
  app/web/static/js/non_docent_home.js app/web/static/js/non_docent_positions.js
- app/web/static/js/offered_positions.js app/web/templates/base.html
+ app/web/static/js/offered_positions.js app/web/static/js/person_detail.js app/web/templates/base.html
  app/web/templates/difficult_coverage.html app/web/templates/non_docent_positions.html
- app/web/templates/offered_positions.html app/web/templates/valencia_no_docentes.html)
+ app/web/templates/offered_positions.html app/web/templates/person_detail.html app/web/templates/valencia_no_docentes.html)
 umask 077
 set -o noclobber
-git archive --format=tar "$COMMIT" -- "${RUNTIME[@]}" scripts/grant_recovery_search_functions.sql > "/tmp/funk-recovery-$COMMIT.tar" || exit 1
+git archive --format=tar "$COMMIT" -- "${RUNTIME[@]}" > "/tmp/funk-recovery-$COMMIT.tar" || exit 1
 sha256sum "/tmp/funk-recovery-$COMMIT.tar"
 ```
 
@@ -430,9 +437,7 @@ ssh -T -F /dev/null -i /home/zafion/.ssh/funkcionario_prod \
 
 3. En el servidor fijar el mismo `COMMIT` y comparar manualmente el SHA del tar
    con el de la estación. Confirmar que el listado solo contiene los archivos
-   anteriores y el SQL. Revisar también los hashes de `unaccent` indicados
-   arriba. Registrar las concesiones **directas** existentes sobre ambas
-   funciones para revertir únicamente las nuevas. No imprimir el entorno:
+   anteriores. No imprimir el entorno ni modificar los permisos existentes:
 
 ```bash
 COMMIT=REEMPLAZAR_POR_EL_MISMO_SHA_COMPLETO
@@ -442,34 +447,17 @@ sha256sum "$ARCHIVE"
 tar -tf "$ARCHIVE"
 BACKUP="/var/backups/funk-recovery-$COMMIT"
 sudo mkdir -m 0700 "$BACKUP"
-sudo -u postgres psql -X -w -v ON_ERROR_STOP=1 -h /var/run/postgresql -p 5432 \
-  -d radar_docent_cv_recovered_20261126 -At -F '|' -c "
-SELECT p.oid::regprocedure::text,
-       coalesce(bool_or(a.grantee=r.oid AND a.privilege_type='EXECUTE'),false)
-FROM pg_proc p CROSS JOIN pg_roles r
-LEFT JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a ON true
-WHERE r.rolname='funkcionario_reader'
-  AND p.oid IN ('public.normalize_text(text)'::regprocedure,
-                'public.unaccent(regdictionary,text)'::regprocedure)
-GROUP BY p.oid ORDER BY 1;" | sudo tee "$BACKUP/acl-before.txt" >/dev/null
-sudo awk 'END { if (NR != 2) exit 1 }' "$BACKUP/acl-before.txt" || exit 1
+PERMS=$(sudo -u postgres psql -X -w -v ON_ERROR_STOP=1 -h /var/run/postgresql -p 5432 \
+  -d radar_docent_cv_recovered_20261126 -At -F '|' -c "SELECT
+  has_function_privilege('funkcionario_reader','public.normalize_text(text)','EXECUTE'),
+  has_function_privilege('funkcionario_reader','public.unaccent(regdictionary,text)','EXECUTE')")
+test "$PERMS" = 't|t' || { echo 'STOP: approved grants missing'; exit 1; }
 ```
 
-   Deben registrarse exactamente dos filas. Si falta alguna, si el tar o el
-   paquete difieren, o si la unidad/base no son las esperadas, detenerse.
+   Si falta una concesión, si el tar difiere o si la unidad/base no son las
+   esperadas, detenerse. No añadir permisos como parte de este cambio.
 
-4. Con autorización específica para las dos concesiones, ejecutar en el
-   servidor el SQL guardado en el tar verificado. Si cualquier comprobación
-   falla, no continuar; la transacción revierte ambas concesiones:
-
-```bash
-set -o pipefail
-tar -xOf "$ARCHIVE" scripts/grant_recovery_search_functions.sql | \
-  sudo -u postgres psql -X -w -v ON_ERROR_STOP=1 -h /var/run/postgresql -p 5432 \
-  -d radar_docent_cv_recovered_20261126
-```
-
-5. Tras autorización de actualización de código, guardar los archivos actuales
+4. Tras autorización de actualización de código, guardar los archivos actuales
    del puerto 8001 y sustituir únicamente los de la lista. El servicio 8000 no
    se detiene. Si falla algún comando, no avanzar y restaurar el tar anterior:
 
@@ -477,18 +465,25 @@ tar -xOf "$ARCHIVE" scripts/grant_recovery_search_functions.sql | \
 RUNTIME=(app/api/main.py app/web/static/css/ui-overrides.css
  app/web/static/js/difficult_coverage.js app/web/static/js/i18n.js
  app/web/static/js/non_docent_home.js app/web/static/js/non_docent_positions.js
- app/web/static/js/offered_positions.js app/web/templates/base.html
+ app/web/static/js/offered_positions.js app/web/static/js/person_detail.js app/web/templates/base.html
  app/web/templates/difficult_coverage.html app/web/templates/non_docent_positions.html
- app/web/templates/offered_positions.html app/web/templates/valencia_no_docentes.html)
+ app/web/templates/offered_positions.html app/web/templates/person_detail.html app/web/templates/valencia_no_docentes.html)
 sudo tar -C /srv/funkcionario/recovery-app -cf "$BACKUP/runtime-before.tar" "${RUNTIME[@]}"
 sudo systemctl stop funkcionario-web-recovery.service
 sudo tar --no-same-owner --no-same-permissions -C /srv/funkcionario/recovery-app -xf "$ARCHIVE" "${RUNTIME[@]}"
 sudo systemctl start funkcionario-web-recovery.service
+ready=0
+for attempt in {1..30}; do
+  if curl --noproxy '*' --max-time 3 -fsS http://127.0.0.1:8001/health >/dev/null 2>&1; then ready=1; break; fi
+  systemctl is-active --quiet funkcionario-web-recovery.service || break
+  sleep 2
+done
+test "$ready" -eq 1 || { echo 'STOP: recovery service not ready'; exit 1; }
 systemctl is-active funkcionario-web-recovery.service funkcionario-web.service
 ss -ltn '( sport = :8000 or sport = :8001 )'
 ```
 
-6. Consultar desde el propio servidor sin imprimir identidades; confirmar
+5. Consultar desde el propio servidor sin imprimir identidades; confirmar
    búsqueda, perfil y las tres familias históricas, y después verificar con
    Chromium castellano/valenciano y escritorio/móvil. Los recuentos exactos
    dependen de los filtros, pero no deben ser cero:
@@ -522,30 +517,25 @@ PY
 
 Si algo falla, detener solo `funkcionario-web-recovery.service`, restaurar
 `runtime-before.tar` en `/srv/funkcionario/recovery-app`, arrancar esa misma
-unidad y verificar 8000 y 8001. Consultar `acl-before.txt`: revocar de
-`funkcionario_reader` **solo** la concesión que figure `f` antes del cambio;
-conservar las que figuraran `t` y no tocar PUBLIC. Requiere autorización para
-el rollback de permisos y ausencia de cambios concurrentes de ACL. La versión
+unidad y verificar 8000 y 8001. No modificar ni revocar concesiones PostgreSQL.
+La versión
 previa puede seguir presentando la regresión; no declararla sana. No eliminar
 ninguna base ni tocar `/srv/funkcionario/app`.
 
-Con autorización de rollback y sin cambios concurrentes de permisos, los
-siguientes comandos usan el mismo `BACKUP` del paso 3. Comprueba antes que el
-archivo de permisos contiene exactamente las dos filas guardadas:
+Con autorización de rollback, los siguientes comandos usan el mismo `BACKUP`
+del paso 3 y no cambian permisos PostgreSQL:
 
 ```bash
-sudo awk 'END { if (NR != 2) exit 1 }' "$BACKUP/acl-before.txt" || exit 1
 sudo systemctl stop funkcionario-web-recovery.service
 sudo tar -C /srv/funkcionario/recovery-app -xf "$BACKUP/runtime-before.tar"
 sudo systemctl start funkcionario-web-recovery.service
+ready=0
+for attempt in {1..30}; do
+  if curl --noproxy '*' --max-time 3 -fsS http://127.0.0.1:8001/health >/dev/null 2>&1; then ready=1; break; fi
+  systemctl is-active --quiet funkcionario-web-recovery.service || break
+  sleep 2
+done
+test "$ready" -eq 1 || { echo 'STOP: previous release not ready'; exit 1; }
 systemctl is-active funkcionario-web-recovery.service funkcionario-web.service
 ss -ltn '( sport = :8000 or sport = :8001 )'
-if sudo grep -Eq '(^|[.])normalize_text\(text\)\|f$' "$BACKUP/acl-before.txt"; then
-  sudo -u postgres psql -X -w -v ON_ERROR_STOP=1 -h /var/run/postgresql -p 5432 \
-    -d radar_docent_cv_recovered_20261126 -c 'REVOKE EXECUTE ON FUNCTION public.normalize_text(text) FROM funkcionario_reader'
-fi
-if sudo grep -Eq '(^|[.])unaccent\(regdictionary,text\)\|f$' "$BACKUP/acl-before.txt"; then
-  sudo -u postgres psql -X -w -v ON_ERROR_STOP=1 -h /var/run/postgresql -p 5432 \
-    -d radar_docent_cv_recovered_20261126 -c 'REVOKE EXECUTE ON FUNCTION public.unaccent(regdictionary,text) FROM funkcionario_reader'
-fi
 ```

@@ -134,7 +134,7 @@
     window.FUNKCIONARIO_LANG = {{ (current_lang or 'es') | tojson }};
     window.FUNKCIONARIO_RECOVERY = {{ recovery_read_only() | tojson }};
   </script>
-  <script src="{{ url_for('static', path='js/i18n.js') }}?v=20261127-recovery"></script>
+  <script src="{{ url_for('static', path='js/i18n.js') }}?v=20261127-restricted"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

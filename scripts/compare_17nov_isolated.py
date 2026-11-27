@@ -140,7 +140,7 @@ def trial_worker():
     finally:
         if started:subprocess.run([pg,'-D','/work/data','-m','fast','-w','stop'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 
-def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopback=False,hardened_role=False,restored_candidate=False,production_restrictions=False,approved_sql=False):
+def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopback=False,hardened_role=False,restored_candidate=False,production_restrictions=False,approved_sql=False,no_internal=False):
     import time,uuid,psycopg,httpx
     from psycopg import sql
     from psycopg.conninfo import make_conninfo
@@ -151,7 +151,7 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
         subprocess.run([pg,'-D','/work/data','-l','/dev/null','-w','start'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);started=True
         with psycopg.connect(**kw,dbname='postgres',autocommit=True) as admin:
             if approved_sql:
-                if target_db!='baseline_404_674_trial' or not production_restrictions or not hardened_role:raise ValueError('approved_sql_test_configuration')
+                if target_db!='baseline_404_674_trial' or not production_restrictions or not hardened_role or not no_internal:raise ValueError('approved_sql_test_configuration')
                 admin.execute('ALTER DATABASE baseline_404_674_trial RENAME TO radar_docent_cv_recovered_20261126')
                 target_db='radar_docent_cv_recovered_20261126'
             admin.execute(sql.SQL('CREATE ROLE {} LOGIN').format(sql.Identifier(role)));created=True
@@ -192,10 +192,20 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
                         except psycopg.errors.InsufficientPrivilege:pass
                         else:raise ValueError('expected_unaccent_permission_failure_missing')
                     db.execute(sql.SQL('GRANT EXECUTE ON FUNCTION public.unaccent(regdictionary,text) TO {}').format(sql.Identifier(role)))
-            for schema in ('recovery_batch','recovery_03nov','recovery_0519','recovery_quarantine'):
+            internal_schemas=[r[0] for r in db.execute("SELECT nspname FROM pg_namespace WHERE left(nspname,9)='recovery_' ORDER BY nspname").fetchall()] if no_internal else ('recovery_batch','recovery_03nov','recovery_0519','recovery_quarantine')
+            for schema in internal_schemas:
                 if db.execute('SELECT to_regnamespace(%s) IS NOT NULL',(schema,)).fetchone()[0]:
-                    db.execute(sql.SQL('GRANT USAGE ON SCHEMA {} TO {}').format(sql.Identifier(schema),sql.Identifier(role)))
-                    db.execute(sql.SQL('GRANT SELECT ON ALL TABLES IN SCHEMA {} TO {}').format(sql.Identifier(schema),sql.Identifier(role)))
+                    if no_internal:
+                        db.execute(sql.SQL('REVOKE USAGE ON SCHEMA {} FROM PUBLIC').format(sql.Identifier(schema)))
+                        if db.execute('SELECT has_schema_privilege(%s,%s,\'USAGE\')',(role,schema)).fetchone()[0]:raise ValueError('internal_schema_access_not_restricted')
+                    else:
+                        db.execute(sql.SQL('GRANT USAGE ON SCHEMA {} TO {}').format(sql.Identifier(schema),sql.Identifier(role)))
+                        db.execute(sql.SQL('GRANT SELECT ON ALL TABLES IN SCHEMA {} TO {}').format(sql.Identifier(schema),sql.Identifier(role)))
+            if no_internal:
+                with psycopg.connect(**{**kw,'user':role},dbname=target_db,autocommit=True) as probe:
+                    try:probe.execute("SELECT to_regclass('recovery_batch.documents')")
+                    except psycopg.errors.InsufficientPrivilege:pass
+                    else:raise ValueError('expected_internal_permission_failure_missing')
             row=db.execute('SELECT person_name_normalized FROM award_results WHERE person_name_normalized IS NOT NULL LIMIT 1').fetchone()
             if not row:raise ValueError('sample_missing')
             name=row[0]
@@ -214,6 +224,9 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
               JOIN documents d ON d.id=r.document_id JOIN document_versions v ON v.id=d.document_version_id
               WHERE v.sha256='229556fed06a084a7388e10fbdf6dd65d0895910900bbaa4f58d75c8c15cb94a' AND r.id>%s LIMIT 1""",(oldmax,)).fetchone()
             before={t:db.execute('SELECT count(*) FROM '+t).fetchone()[0] for t in ('public_alerts','notification_posts','push_notification_events')}
+            if no_internal:
+                quarantine_before=db.execute('SELECT count(*) FROM recovery_quarantine.positions_19nov').fetchone()[0]
+                if quarantine_before!=598:raise ValueError('quarantine_baseline_mismatch')
         env={'PATH':'/usr/bin:/bin','HOME':'/tmp','LANG':'C.UTF-8','ENABLE_NOTIFICATIONS':'0','FUNK_RECOVERY_READ_ONLY':'1',
              'RADAR_DOCENT_DB_URL':make_conninfo(host='/work/socket',port=55467,user=role,dbname=target_db,options='-c default_transaction_read_only=on')}
         if recovery_loopback:
@@ -317,9 +330,14 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
                 if any(not d.get('source_document_sha256') for d in docs):raise ValueError('procedure_sha_missing')
                 if any(d.get('historical_status')=='accredited' for d in docs):raise ValueError('unaccredited_procedure_promoted')
                 if 'expertos' in key and (len(detail['unawarded_vacancies'])!=6 or docs[0].get('extracted_rows')!=6):raise ValueError('expert_vacancies_missing')
-                if key.endswith('19') and sorted(d.get('quarantined_rows',0) for d in docs)!=[0,0,299,299]:raise ValueError('quarantine_19nov_mismatch')
+                if no_internal:
+                    if any(d.get('quarantine_evidence_status')!='unavailable' for d in docs):raise ValueError('quarantine_unavailable_not_reported')
+                    if key.endswith('19'):
+                        hidden=[d for d in docs if d.get('persisted_rows')==0 and d.get('extracted_rows') is None]
+                        if len(hidden)!=2:raise ValueError('hidden_quarantine_not_conservative')
+                elif key.endswith('19') and sorted(d.get('quarantined_rows',0) for d in docs)!=[0,0,299,299]:raise ValueError('quarantine_19nov_mismatch')
                 checks['procedure_'+key]={'documents':len(docs),'unawarded':len(detail['unawarded_vacancies']),'publication_date_quality':'unknown',
-                    'document_sha_and_counts':[{'sha':d['source_document_sha256'],'extracted_rows':d.get('extracted_rows'),'quarantined_rows':d.get('quarantined_rows',0),'validation_status':d.get('validation_status'),'historical_status':d.get('historical_status')} for d in docs]}
+                    'document_sha_and_counts':[{'sha':d['source_document_sha256'],'extracted_rows':d.get('extracted_rows'),'quarantined_rows':d.get('quarantined_rows') if no_internal else d.get('quarantined_rows',0),'validation_status':d.get('validation_status'),'historical_status':d.get('historical_status')} for d in docs]}
             with psycopg.connect(**kw,dbname=target_db,options='-c default_transaction_read_only=on') as db:
                 rows19=db.execute("""SELECT count(*) FROM award_results r JOIN historical_procedure_documents pd ON pd.document_id=r.document_id WHERE pd.procedure_key='interino-2026-11-19'""").fetchone()[0]
                 assignments19=db.execute("""SELECT count(*),count(*) FILTER (WHERE a.matched_offered_position_id IS NOT NULL) FROM award_assignments a JOIN award_results r ON r.id=a.award_result_id JOIN historical_procedure_documents pd ON pd.document_id=r.document_id WHERE pd.procedure_key='interino-2026-11-19'""").fetchone()
@@ -349,12 +367,15 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
                 checks['procedure_19_results']=rows19;checks['procedure_19_assignments']=assignments19[0];checks['procedure_03_existing_links']=links03;checks['procedure_03_strict_existing_links']=strict03
             if bag and difficult:
                 profile=client.get('/api/persons/profile',params={'normalized_name':bag[0]}).json()
-                if not any(r.get('pending_source_rows')==16 and r.get('staff_kind')=='career_practice' for r in profile.get('bag_memberships',[])):raise ValueError('reconciled_bag_provenance_missing')
+                if no_internal:
+                    if not any(r.get('reconciliation_evidence_status')=='unavailable' and r.get('staff_kind')=='career_practice' for r in profile.get('bag_memberships',[])):raise ValueError('unavailable_bag_evidence_not_reported')
+                elif not any(r.get('pending_source_rows')==16 and r.get('staff_kind')=='career_practice' for r in profile.get('bag_memberships',[])):raise ValueError('reconciled_bag_provenance_missing')
                 params={'document_id':difficult[0],'include_unavailable':'true','limit':1}
                 response=client.get('/api/difficult-coverage/positions',params=params).json()
                 if response.get('total')!=52:raise ValueError('reconciled_difficult_count')
                 if client.get('/api/difficult-coverage/positions',params={'document_id':difficult[0]}).json().get('total')!=0:raise ValueError('unknown_vigency_exposed')
-                checks['reconciled_bag']={'pending_rows':16};checks['reconciled_difficult']={'historical_positions':52,'current_positions':0}
+                checks['reconciled_bag']={'evidence':'unavailable'} if no_internal else {'pending_rows':16}
+                checks['reconciled_difficult']={'historical_positions':52,'current_positions':0}
         if browser_check:
             from playwright.sync_api import sync_playwright
             if not recovered or not recovered436:raise ValueError('recovered_browser_sample_missing')
@@ -379,7 +400,7 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
                     if not bag:raise ValueError('partial_bag_sample_missing')
                     page.evaluate("n => sessionStorage.setItem('radar_docent_selected_person',JSON.stringify({normalizedName:n}))",bag[0])
                     page.goto(base+prefix+'/resultado-persona',wait_until='domcontentloaded')
-                    partial='Extracción parcial: quedan registros por revisar' if language=='es' else 'Extracció parcial: queden registres per revisar'
+                    partial=('Detalle de reconciliación no disponible' if language=='es' else 'Detall de reconciliació no disponible') if no_internal else ('Extracción parcial: quedan registros por revisar' if language=='es' else 'Extracció parcial: queden registres per revisar')
                     page.get_by_text(partial,exact=False).first.wait_for(timeout=30000)
                     for path in ('/plazas-ofertadas','/centros','/dificil-cobertura','/no-docente/plazas'):
                         response=page.goto(base+prefix+path,wait_until='domcontentloaded')
@@ -391,7 +412,7 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
                             header=page.locator('.site-header').bounding_box();notice_box=page.locator('.recovery-notice').bounding_box()
                             if not header or not notice_box or notice_box['y']<header['y']+header['height']-1:raise ValueError('recovery_notice_header_overlap')
                     if page.evaluate('document.documentElement.scrollWidth>window.innerWidth+2'):raise ValueError('browser_overflow')
-                    browser_result[language]={'viewport':viewport,'search':True,'recovered_profiles':2,'historical_notice':True,'partial_notice':True,'navigation':True,'overflow':False}
+                    browser_result[language]={'viewport':viewport,'search':True,'recovered_profiles':2,'historical_notice':True,'evidence_notice':True,'navigation':True,'overflow':False}
                     ctx.close()
                 browser.close()
             checks['chromium']=browser_result
@@ -406,6 +427,9 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
         with psycopg.connect(**kw,dbname=target_db,autocommit=True) as db:
             after={t:db.execute('SELECT count(*) FROM '+t).fetchone()[0] for t in before}
             if before!=after:raise ValueError('notifications_changed')
+            if no_internal:
+                if db.execute('SELECT count(*) FROM recovery_quarantine.positions_19nov').fetchone()[0]!=quarantine_before:raise ValueError('quarantine_changed')
+                checks['restricted_internal_schemas']={'reader_usage':False,'quarantine_rows_unchanged':quarantine_before}
         print(json.dumps({'status':'PASS','api_checks':checks,'write_endpoint':'405','notification_counts':after,'network':'private_namespace','personal_data_exported':False,'limitations':['One reused Maestros block differs and remains under review; prior association identity mapping remains incomplete.']}))
     finally:
         if server and server.poll() is None:server.terminate();server.wait(timeout=20)

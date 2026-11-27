@@ -13,6 +13,7 @@ def main():
     parser.add_argument('--loopback', action='store_true', help='exercise the recovery 127.0.0.1:8001 entrypoint')
     parser.add_argument('--production-restrictions', action='store_true', help='simulate revoked routine permissions')
     parser.add_argument('--approved-sql', action='store_true', help='test exact role, database name and guarded grant script in the temporary overlay')
+    parser.add_argument('--no-internal', action='store_true', help='deny the reader access to internal recovery schemas')
     args=parser.parse_args()
     output_name=args.output_name
     if not output_name or Path(output_name).name!=output_name or not output_name.endswith('.json'):raise ValueError('output_name_invalid')
@@ -32,7 +33,7 @@ def main():
          '--ro-bind',str(WORK/'passwd'),'/etc/passwd','--ro-bind',str(WORK/'group'),'/etc/group','--ro-bind',str(ROOT),'/project',
          '--ro-bind',str(BROWSER),'/browser','--overlay-src',str(WORK),'--tmp-overlay','/work','--clearenv','--setenv','HOME','/tmp','--setenv','PATH','/usr/bin:/bin',
          '--uid',str(os.getuid()),'--gid',str(os.getgid()),'--chdir','/project','--','/project/.venv/bin/python','-B','-c',
-         "from scripts.compare_17nov_isolated import api_worker; api_worker('baseline_404_674_trial',browser_check=True,hardened_role=True,recovery_loopback="+str(args.loopback)+",production_restrictions="+str(args.production_restrictions)+",approved_sql="+str(args.approved_sql)+")"]
+         "from scripts.compare_17nov_isolated import api_worker; api_worker('baseline_404_674_trial',browser_check=True,hardened_role=True,recovery_loopback="+str(args.loopback)+",production_restrictions="+str(args.production_restrictions)+",approved_sql="+str(args.approved_sql)+",no_internal="+str(args.no_internal)+")"]
     p=subprocess.run(cmd,cwd=ROOT,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=900)
     if p.returncode:
         matches=re.findall(r'(?:ValueError|RuntimeError): ([A-Za-z0-9_]+)',p.stderr)

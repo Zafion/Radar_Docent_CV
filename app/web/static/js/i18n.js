@@ -34,6 +34,7 @@
     "Validación documental pendiente": "Validació documental pendent",
     "Validación documental con limitaciones": "Validació documental amb limitacions",
     "Extracción parcial: quedan registros por revisar": "Extracció parcial: queden registres per revisar",
+    "Detalle de reconciliación no disponible": "Detall de reconciliació no disponible",
     "Vigencia y fecha de publicación sin acreditar": "Vigència i data de publicació sense acreditar",
     "Vigencia actual sin acreditar": "Vigència actual sense acreditar",
     "Registro histórico": "Registre històric",

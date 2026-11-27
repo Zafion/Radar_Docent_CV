@@ -12,6 +12,30 @@ from tests.postgres_isolated_validation import FreshCluster
 
 
 class RecoveryReadOnlyTests(unittest.TestCase):
+    def test_optional_relation_requires_both_schema_and_table_access(self):
+        with FreshCluster() as cluster:
+            with psycopg.connect(cluster.dsn('postgres'),autocommit=True,row_factory=dict_row) as db:
+                cluster.verify(db)
+                db.execute('CREATE ROLE limited_reader NOLOGIN')
+                db.execute('CREATE SCHEMA hidden_evidence')
+                db.execute('CREATE TABLE hidden_evidence.example (id integer)')
+                db.execute('GRANT SELECT ON hidden_evidence.example TO limited_reader')
+                db.execute('SET ROLE limited_reader')
+                compat=main.PgCompatConnection(db)
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                    db.execute("SELECT to_regclass('hidden_evidence.example')")
+                self.assertFalse(main.optional_relations_readable(compat,('hidden_evidence','example')))
+                self.assertFalse(main.optional_relations_readable(compat,('absent_schema','example')))
+                db.execute('RESET ROLE')
+                db.execute('GRANT USAGE ON SCHEMA hidden_evidence TO limited_reader')
+                db.execute('SET ROLE limited_reader')
+                self.assertTrue(main.optional_relations_readable(compat,('hidden_evidence','example')))
+                self.assertFalse(main.optional_relations_readable(compat,('hidden_evidence','example'),('hidden_evidence','missing')))
+                db.execute('RESET ROLE')
+                db.execute('REVOKE SELECT ON hidden_evidence.example FROM limited_reader')
+                db.execute('SET ROLE limited_reader')
+                self.assertFalse(main.optional_relations_readable(compat,('hidden_evidence','example')))
+
     def test_recovery_historical_accreditation_is_not_current_availability(self):
         item={'historical_status':'accredited','availability_status':'available'}
         with patch.object(main,'RECOVERY_READ_ONLY',True):

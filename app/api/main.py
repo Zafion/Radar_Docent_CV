@@ -1137,6 +1137,21 @@ def get_center_detail(
     }
 
 
+def optional_relations_readable(conn, *relations: tuple[str, str]) -> bool:
+    """Check catalogue visibility and effective privileges without resolving names in denied schemas."""
+    for schema, relation in relations:
+        row = conn.execute("""SELECT EXISTS (
+          SELECT 1 FROM pg_catalog.pg_class c
+          JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+          WHERE n.nspname=? AND c.relname=? AND c.relkind IN ('r','p','v','m')
+            AND pg_catalog.has_schema_privilege(current_user,n.oid,'USAGE')
+            AND pg_catalog.has_table_privilege(current_user,c.oid,'SELECT')
+        )""", [schema, relation]).fetchone()
+        if not row or not row[0]:
+            return False
+    return True
+
+
 def enrich_document_provenance(conn, items: list[dict[str, Any]]) -> None:
     """Attach only attestations tied to the current successful parse run.
 
@@ -1160,11 +1175,12 @@ def enrich_document_provenance(conn, items: list[dict[str, Any]]) -> None:
     evidence = {row['id']: row for row in rows}
     relationships: dict[int, list[dict[str, Any]]] = {}
     batch_evidence: dict[int, dict[str, Any]] = {}
-    if conn.execute("SELECT to_regclass('recovery_batch.documents')").fetchone()[0] is not None:
+    batch_readable = optional_relations_readable(conn, ('recovery_batch','documents'))
+    if batch_readable:
         batch_rows=conn.execute('''SELECT target_document_id,source_rows,source_total,quality FROM recovery_batch.documents
             WHERE target_document_id=ANY(?)''',[ids]).fetchall()
         batch_evidence={r['target_document_id']:r for r in batch_rows}
-    if conn.execute("SELECT to_regclass('public.historical_procedure_documents')").fetchone()[0] is not None:
+    if optional_relations_readable(conn, ('public','historical_procedure_documents'), ('public','historical_procedures')):
         relations = conn.execute('''SELECT pd.document_id, p.procedure_key, p.procedure_kind,
                     p.procedure_date::text AS procedure_date, p.date_evidence,
                     p.publication_date::text AS publication_date, p.publication_date_quality,
@@ -1185,6 +1201,8 @@ def enrich_document_provenance(conn, items: list[dict[str, Any]]) -> None:
         item['publication_date_quality'] = row['publication_date_quality'] if row['publication_date_quality'] in ('official', 'inferred', 'unknown') else 'unknown'
         item['source_document_sha256'] = row['sha256']
         item['procedures'] = relationships.get(item['document_id'], [])
+        if not batch_readable:
+            item['reconciliation_evidence_status']='unavailable'
         batch=batch_evidence.get(item['document_id'])
         if batch and batch['source_total'] is not None:
             item['extraction_completeness']='partial' if batch['source_rows']<batch['source_total'] else 'complete_with_limitations'
@@ -1203,7 +1221,7 @@ def mask_unaccredited_availability(items: list[dict[str, Any]]) -> None:
 @app.get('/api/historical-procedures')
 def list_historical_procedures() -> dict[str, Any]:
     with get_connection() as conn:
-        if conn.execute("SELECT to_regclass('public.historical_procedures')").fetchone()[0] is None:
+        if not optional_relations_readable(conn, ('public','historical_procedures')):
             return {'items': [], 'status': 'not_configured'}
         items = rows_to_dicts(conn.execute('''SELECT procedure_key, procedure_kind,
             procedure_date::text AS procedure_date, date_evidence,
@@ -1215,7 +1233,7 @@ def list_historical_procedures() -> dict[str, Any]:
 @app.get('/api/historical-procedures/{procedure_key}')
 def get_historical_procedure(procedure_key: str) -> dict[str, Any]:
     with get_connection() as conn:
-        if conn.execute("SELECT to_regclass('public.historical_procedures')").fetchone()[0] is None:
+        if not optional_relations_readable(conn, ('public','historical_procedures')):
             raise HTTPException(status_code=404, detail='procedimientos históricos no configurados')
         procedure=conn.execute('''SELECT procedure_key,procedure_kind,procedure_date::text AS procedure_date,
             date_evidence,publication_date::text AS publication_date,publication_date_quality
@@ -1237,11 +1255,11 @@ def get_historical_procedure(procedure_key: str) -> dict[str, Any]:
             WHERE pd.procedure_key=? ORDER BY d.id''',[procedure_key]).fetchall())
         enrich_document_provenance(conn,docs)
         source_links={}
-        if conn.execute("SELECT to_regclass('recovery_03nov.document_evidence')").fetchone()[0] is not None:
+        if optional_relations_readable(conn, ('recovery_03nov','document_evidence'), ('recovery_03nov','document_map')):
             links=conn.execute('''SELECT m.target_document_id,e.canonical_url FROM recovery_03nov.document_evidence e
                 JOIN recovery_03nov.document_map m ON m.source_sha=e.source_sha''').fetchall()
             source_links.update({r['target_document_id']:(r['canonical_url'],'verified_inventory_reference') for r in links})
-        if conn.execute("SELECT to_regclass('recovery_0519.document_map')").fetchone()[0] is not None:
+        if optional_relations_readable(conn, ('recovery_0519','document_map')):
             links=conn.execute('SELECT target_document_id,canonical_url,page_url,html_sha,evidence_quality FROM recovery_0519.document_map').fetchall()
             source_links.update({r['target_document_id']:(r['canonical_url'],r['evidence_quality']) for r in links})
         for item in docs:
@@ -1249,7 +1267,7 @@ def get_historical_procedure(procedure_key: str) -> dict[str, Any]:
                 item['official_document_url'],item['document_url_evidence']=source_links[item['document_id']]
         # Historical alternate offer lists can be retained without presenting
         # either version as a current offer. The table is optional on older DBs.
-        if conn.execute("SELECT to_regclass('recovery_quarantine.positions_19nov')").fetchone()[0] is not None:
+        if optional_relations_readable(conn, ('recovery_quarantine','positions_19nov')):
             pending=conn.execute('''SELECT document_id,count(*) AS n,min(stage_label) AS stage
                 FROM recovery_quarantine.positions_19nov GROUP BY document_id''').fetchall()
             pending_by_document={row['document_id']:row for row in pending}
@@ -1261,6 +1279,12 @@ def get_historical_procedure(procedure_key: str) -> dict[str, Any]:
                     item['extraction_storage']='quarantined'
                     item['document_stage_label']=row['stage']
                     item['stage_evidence']='url_label_observed_bytes_at_capture_unverified'
+        else:
+            for item in docs:
+                item['quarantine_evidence_status']='unavailable'
+                if item.get('doc_family')=='offered_positions' and item.get('extracted_rows')==0:
+                    item['persisted_rows']=0
+                    item['extracted_rows']=None
         unawarded=rows_to_dicts(conn.execute('''SELECT u.document_id,u.center_code,u.source_position_id,
             u.province,u.locality,u.center_name,u.cycle,u.modules,u.teaching_hours,u.total_hours,u.result_status
             FROM historical_unawarded_expert_vacancies u JOIN historical_procedure_documents pd ON pd.document_id=u.document_id
