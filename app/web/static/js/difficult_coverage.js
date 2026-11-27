@@ -187,7 +187,7 @@
       return latestPublicationDate;
     }
 
-    const data = await apiGet("/api/difficult-coverage/positions?limit=1&order_by=document_date&order_dir=desc");
+    const data = await apiGet(`/api/difficult-coverage/positions?limit=1&order_by=document_date&order_dir=desc${includeHistoryInput?.checked ? "&include_unavailable=true" : ""}`);
     latestPublicationDate = data.items?.[0]?.document_date_iso || null;
     return latestPublicationDate;
   }
@@ -353,6 +353,7 @@
           <td data-label="${t("Fecha del documento")}">${escapeHtml(formatDate(item.document_date_iso))}
             ${item.validation_status === 'needs_validation' ? `<br><span class="muted">${escapeHtml(t("Validación documental pendiente"))}</span>` : ""}
             ${item.historical_status === 'unknown' || item.publication_date_quality === 'unknown' ? `<br><span class="muted">${escapeHtml(t("Vigencia y fecha de publicación sin acreditar"))}</span>` : ""}
+            ${item.availability_status === 'unknown' ? `<br><span class="muted">${escapeHtml(t("Vigencia actual sin acreditar"))}</span>` : ""}
           </td>
           <td data-label="Especialidad">${escapeHtml(specialty)}</td>
           <td data-label="Centro">
@@ -423,6 +424,7 @@
   });
 
   includeHistoryInput?.addEventListener("change", async () => {
+    latestPublicationDate = null;
     if (includeHistoryInput.checked && latestOnlyInput) latestOnlyInput.checked = false;
     await loadFilterOptions();
     await loadPositions();
@@ -461,7 +463,8 @@
   });
 
   updateLocationStatus();
+  if (window.FUNKCIONARIO_RECOVERY) loadPositions();
   loadFilterOptions().catch((error) => {
     resultsMetaEl.textContent = `No se pudieron cargar los filtros: ${error.message}`;
-  }).then(loadPositions);
+  }).then(() => { if (!window.FUNKCIONARIO_RECOVERY) return loadPositions(); });
 })();

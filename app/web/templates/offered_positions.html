@@ -48,7 +48,7 @@
       Activa tu ubicación para ordenar por distancia. La fecha del documento no acredita su fecha de publicación ni la vigencia de las plazas.
     </p>
     <p class="panel-card__hint">
-      Las plazas adjudicadas dejan de mostrarse como disponibles.
+      {% if recovery_read_only() %}{% if current_lang == 'va' %}Es mostren registres històrics; comprova la disponibilitat actual en la font oficial.{% else %}Se muestran registros históricos; comprueba la disponibilidad actual en la fuente oficial.{% endif %}{% else %}Las plazas adjudicadas dejan de mostrarse como disponibles.{% endif %}
     </p>
 
     <form id="op-filters-form" class="search-form">
@@ -90,11 +90,11 @@
       </div>
       <div class="search-form__row search-form__row--secondary">
         <label class="checkbox-inline" for="op-latest-only">
-          <input id="op-latest-only" type="checkbox" checked>
+          <input id="op-latest-only" type="checkbox" {% if not recovery_read_only() %}checked{% endif %}>
           <span>Solo fecha de documento más reciente</span>
         </label>
         <label class="checkbox-inline" for="op-include-history">
-          <input id="op-include-history" type="checkbox">
+          <input id="op-include-history" type="checkbox" {% if recovery_read_only() %}checked{% endif %}>
           <span>Incluir registros históricos o sin vigencia acreditada</span>
         </label>
       </div>
@@ -130,5 +130,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='js/offered_positions.js') }}"></script>
+<script src="{{ url_for('static', path='js/offered_positions.js') }}?v=20261127-recovery"></script>
 {% endblock %}

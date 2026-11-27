@@ -140,7 +140,7 @@ def trial_worker():
     finally:
         if started:subprocess.run([pg,'-D','/work/data','-m','fast','-w','stop'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 
-def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopback=False,hardened_role=False,restored_candidate=False):
+def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopback=False,hardened_role=False,restored_candidate=False,production_restrictions=False):
     import time,uuid,psycopg,httpx
     from psycopg import sql
     from psycopg.conninfo import make_conninfo
@@ -154,6 +154,8 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
         with psycopg.connect(**kw,dbname=target_db,autocommit=True) as db:
             if hardened_role:
                 db.execute(sql.SQL('REVOKE TEMPORARY ON DATABASE {} FROM PUBLIC').format(sql.Identifier(target_db)))
+                if production_restrictions:
+                    db.execute('REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA public FROM PUBLIC')
                 db.execute("""DO $$ DECLARE f record; BEGIN
                   FOR f IN SELECT p.oid::regprocedure AS fn FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
                            WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND (p.prosecdef OR p.provolatile='v')
@@ -167,6 +169,17 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
             db.execute(sql.SQL('GRANT CONNECT ON DATABASE {} TO {}').format(sql.Identifier(target_db),sql.Identifier(role)))
             db.execute(sql.SQL('GRANT USAGE ON SCHEMA public TO {}').format(sql.Identifier(role)))
             db.execute(sql.SQL('GRANT SELECT ON ALL TABLES IN SCHEMA public TO {}').format(sql.Identifier(role)))
+            if production_restrictions:
+                with psycopg.connect(**{**kw,'user':role},dbname=target_db,autocommit=True) as restricted_probe:
+                    try:restricted_probe.execute("SELECT public.normalize_text('GARCÍA')")
+                    except psycopg.errors.InsufficientPrivilege:pass
+                    else:raise ValueError('expected_normalize_permission_failure_missing')
+                db.execute(sql.SQL('GRANT EXECUTE ON FUNCTION public.normalize_text(text) TO {}').format(sql.Identifier(role)))
+                with psycopg.connect(**{**kw,'user':role},dbname=target_db,autocommit=True) as restricted_probe:
+                    try:restricted_probe.execute("SELECT public.normalize_text('GARCÍA')")
+                    except psycopg.errors.InsufficientPrivilege:pass
+                    else:raise ValueError('expected_unaccent_permission_failure_missing')
+                db.execute(sql.SQL('GRANT EXECUTE ON FUNCTION public.unaccent(regdictionary,text) TO {}').format(sql.Identifier(role)))
             for schema in ('recovery_batch','recovery_03nov','recovery_0519','recovery_quarantine'):
                 if db.execute('SELECT to_regnamespace(%s) IS NOT NULL',(schema,)).fetchone()[0]:
                     db.execute(sql.SQL('GRANT USAGE ON SCHEMA {} TO {}').format(sql.Identifier(schema),sql.Identifier(role)))
@@ -223,6 +236,23 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
                 time.sleep(.2)
             else:raise ValueError('readonly_api_timeout')
             checks={}
+            if production_restrictions:
+                if client.get('/health').status_code!=200:raise ValueError('health_search_check_failed')
+                search=client.get('/api/search/persons',params={'q':'garcia','limit':5}).json()
+                if search.get('count',0)<1 or not search.get('items'):raise ValueError('garcia_search_empty')
+                checks['garcia_search']={'returned':len(search['items'])}
+                for family,path in (('offered','/api/offered-positions'),('difficult','/api/difficult-coverage/positions'),('non_docent','/api/non-docent/positions')):
+                    params={'include_unavailable':'true','limit':5,'order_by':'id','order_dir':'asc'}
+                    first=client.get(path,params=params);second=client.get(path,params={**params,'offset':5})
+                    if first.status_code!=200 or second.status_code!=200:raise ValueError('historical_'+family+'_failed')
+                    a,b=first.json(),second.json()
+                    if a['total']<6 or not a['items'] or not b['items'] or set(x['id'] for x in a['items']) & set(x['id'] for x in b['items']):raise ValueError('historical_'+family+'_pagination')
+                    if any(x.get('availability_status')=='available' and (family=='non_docent' or x.get('historical_status')!='accredited') for x in a['items']+b['items']):raise ValueError('historical_'+family+'_availability')
+                    sample=a['items'][0]
+                    if sample.get('position_code'):
+                        filtered=client.get(path,params={**params,'position_code':sample['position_code']}).json()
+                        if not filtered['items'] or any(x['position_code']!=sample['position_code'] for x in filtered['items']):raise ValueError('historical_'+family+'_filter')
+                    checks['historical_'+family]={'total':a['total'],'page_1':len(a['items']),'page_2':len(b['items']),'distinct_pages':True}
             for key,path,params in (('search','/api/search/persons',{'q':name[:10]}),('profile','/api/persons/profile',{'normalized_name':name}),
                                     ('positions','/api/offered-positions',{'limit':1,'include_unavailable':'true'}),
                                     ('centers','/api/centers',{'limit':1}),('difficult','/api/difficult-coverage/positions',{'limit':1,'include_unavailable':'true'}),
@@ -336,9 +366,15 @@ def api_worker(target_db='baseline17_trial',browser_check=False,recovery_loopbac
                     page.goto(base+prefix+'/resultado-persona',wait_until='domcontentloaded')
                     partial='Extracción parcial: quedan registros por revisar' if language=='es' else 'Extracció parcial: queden registres per revisar'
                     page.get_by_text(partial,exact=False).first.wait_for(timeout=30000)
-                    for path in ('/plazas-ofertadas','/centros','/dificil-cobertura'):
+                    for path in ('/plazas-ofertadas','/centros','/dificil-cobertura','/no-docente/plazas'):
                         response=page.goto(base+prefix+path,wait_until='domcontentloaded')
                         if not response or response.status!=200:raise ValueError('browser_navigation')
+                        if production_restrictions and path in ('/plazas-ofertadas','/dificil-cobertura','/no-docente/plazas'):
+                            body={'/plazas-ofertadas':'#op-table-body','/dificil-cobertura':'#dc-table-body','/no-docente/plazas':'#nd-positions-body'}[path]
+                            try:page.wait_for_function("s => {const e=document.querySelector(s); return e && e.querySelector('tr td:not(.data-table__empty)');}",arg=body,timeout=60000)
+                            except Exception as exc:raise ValueError('browser_rows_missing_'+body[1:].replace('-','_')) from exc
+                            header=page.locator('.site-header').bounding_box();notice_box=page.locator('.recovery-notice').bounding_box()
+                            if not header or not notice_box or notice_box['y']<header['y']+header['height']-1:raise ValueError('recovery_notice_header_overlap')
                     if page.evaluate('document.documentElement.scrollWidth>window.innerWidth+2'):raise ValueError('browser_overflow')
                     browser_result[language]={'viewport':viewport,'search':True,'recovered_profiles':2,'historical_notice':True,'partial_notice':True,'navigation':True,'overflow':False}
                     ctx.close()

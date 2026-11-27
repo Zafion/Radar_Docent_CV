@@ -42,7 +42,7 @@
       La fecha del documento no acredita su fecha de publicación ni la vigencia de los puestos.
     </p>
     <p class="panel-card__hint">
-      Los puestos ya seleccionados dejan de mostrarse como disponibles.
+      {% if recovery_read_only() %}{% if current_lang == 'va' %}Es mostren registres històrics; comprova la disponibilitat actual en la font oficial.{% else %}Se muestran registros históricos; comprueba la disponibilidad actual en la fuente oficial.{% endif %}{% else %}Los puestos ya seleccionados dejan de mostrarse como disponibles.{% endif %}
     </p>
     <p class="panel-card__meta">
       Ubicación: <strong id="dc-location-status">No activada · sin distancia calculada</strong>
@@ -89,11 +89,11 @@
       </div>
       <div class="search-form__row search-form__row--secondary">
         <label class="checkbox-inline">
-          <input id="dc-latest-only" type="checkbox" checked>
+          <input id="dc-latest-only" type="checkbox" {% if not recovery_read_only() %}checked{% endif %}>
           <span>Solo fecha de documento más reciente</span>
         </label>
         <label class="checkbox-inline" for="dc-include-history">
-          <input id="dc-include-history" type="checkbox">
+          <input id="dc-include-history" type="checkbox" {% if recovery_read_only() %}checked{% endif %}>
           <span>Incluir registros históricos o sin vigencia acreditada</span>
         </label>
       </div>
@@ -138,5 +138,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='js/difficult_coverage.js') }}"></script>
+<script src="{{ url_for('static', path='js/difficult_coverage.js') }}?v=20261127-recovery"></script>
 {% endblock %}

@@ -93,11 +93,13 @@
       const totals = data.totals || {};
       summaryEl.innerHTML = `
         <div class="status-grid__item"><span>Publicaciones</span><strong>${ui.compactNumber(totals.publications)}</strong></div>
-        <div class="status-grid__item"><span>Plazas disponibles</span><strong>${ui.compactNumber(totals.available_positions || 0)}</strong></div>
+        <div class="status-grid__item"><span>${t(window.FUNKCIONARIO_RECOVERY ? "Plazas registradas" : "Plazas disponibles")}</span><strong>${ui.compactNumber(window.FUNKCIONARIO_RECOVERY ? totals.offered_positions : (totals.available_positions || 0))}</strong></div>
         <div class="status-grid__item"><span>Adjudicaciones</span><strong>${ui.compactNumber(totals.awards)}</strong></div>
         <div class="status-grid__item"><span>Personas en bolsa</span><strong>${ui.compactNumber(totals.bag_members)}</strong></div>
       `;
-      feedbackEl.textContent = `Datos cargados desde publicaciones oficiales procesadas. Las plazas adjudicadas o ya no visibles no se muestran como disponibles. ${ui.compactNumber(totals.offered_positions)} plazas detectadas en total.`;
+      feedbackEl.textContent = window.FUNKCIONARIO_RECOVERY
+        ? t("Consulta histórica: la disponibilidad actual no está acreditada.")
+        : `Datos cargados desde publicaciones oficiales procesadas. Las plazas adjudicadas o ya no visibles no se muestran como disponibles. ${ui.compactNumber(totals.offered_positions)} plazas detectadas en total.`;
       renderLatestPublications(data);
 
       groupsMetaEl.textContent = `${ui.compactNumber((data.by_group || []).length)} ${t("colectivos con datos detectados")}.`;

@@ -342,3 +342,29 @@ restauración en un servidor aislado equivalente; identidad/autenticación y pri
 revisión del proxy, productores, timers y backup reales; aceptación completa;
 y autorizaciones explícitas. Las cuarentenas y fechas desconocidas pueden
 permanecer como tales si la interfaz las presenta de manera conservadora.
+
+## Corrección de la instancia de recuperación — 27/11
+
+En un clon local se reprodujo que `REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA public
+FROM PUBLIC` impide las búsquedas. `public.normalize_text(text)` es inmutable,
+pero llama a `public.unaccent(regdictionary,text)`, que PostgreSQL declara
+`STABLE`: conceder solo la primera no basta. No abrir ni reiniciar la instancia
+hasta que se apruebe una solución que respete el alcance de permisos autorizado
+y se pruebe con la identidad real. Nunca restaurar EXECUTE general a PUBLIC.
+
+Para desplegar una corrección futura, bajo autorización independiente: guardar
+el commit, la unidad y el entorno actuales de `/srv/funkcionario/recovery-app`;
+preparar y verificar en un directorio nuevo un archivo de código del commit
+aprobado y sus dependencias, sin copiar secretos; ensayar el cambio y la vuelta
+en un entorno aislado. Comprobar que la unidad de recuperación sigue apuntando
+a esa ruta, al puerto 8001 y a la base recuperada. Una vez autorizadas y
+aplicadas únicamente las concesiones individuales aprobadas, cambiar la ruta de
+release de la instancia de recuperación y reiniciar exclusivamente su unidad;
+no tocar `/srv/funkcionario/app`, el servicio del puerto 8000, Cloudflare ni
+productores. Validar `/health`, búsqueda `garcia` con resultados, perfiles y
+tablas históricas, en lugar de limitarse al estado HTTP de `/health`.
+
+Si falla, volver a la release anterior y reiniciar solo la misma unidad. Revertir
+únicamente permisos añadidos por ese cambio y registrados en el preflight, sin
+revocar concesiones anteriores; la versión previa puede seguir presentando la
+regresión y no debe declararse sana. Conservar ambas bases y configuraciones.

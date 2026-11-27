@@ -886,6 +886,13 @@ def unsubscribe_push(payload: PushUnsubscribePayload) -> dict[str, Any]:
 def health() -> dict[str, Any]:
     with get_connection() as conn:
         _register_normalize_function(conn)
+        if RECOVERY_READ_ONLY:
+            try:
+                normalized = conn.execute("SELECT public.normalize_text(?)", ("GARCÍA",)).fetchone()[0]
+            except Exception as exc:
+                raise HTTPException(status_code=503, detail="recovery_search_unavailable") from exc
+            if normalized != "garcia":
+                raise HTTPException(status_code=503, detail="recovery_search_unavailable")
         counts = {
             "documents": conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0],
             "offered_positions": conn.execute("SELECT COUNT(*) FROM offered_positions").fetchone()[0],
@@ -1188,7 +1195,7 @@ def enrich_document_provenance(conn, items: list[dict[str, Any]]) -> None:
 def mask_unaccredited_availability(items: list[dict[str, Any]]) -> None:
     """A historical extraction is not evidence of present availability."""
     for item in items:
-        if item.get('historical_status') != 'accredited' and item.get('availability_status') == 'available':
+        if (RECOVERY_READ_ONLY or item.get('historical_status') != 'accredited') and item.get('availability_status') == 'available':
             item['availability_status'] = 'unknown'
             item['availability_reason'] = 'vigencia_no_acreditada'
 
@@ -1984,7 +1991,7 @@ def list_offered_positions(
     elif only_unmatched is False:
         where.append("EXISTS (SELECT 1 FROM award_assignments aa WHERE aa.matched_offered_position_id = op.id)")
     if not include_unavailable:
-        where.append("op.availability_status = 'available' AND COALESCE(to_jsonb(d)->>'historical_status', 'unknown') = 'accredited'")
+        where.append("1=0" if RECOVERY_READ_ONLY else "op.availability_status = 'available' AND COALESCE(to_jsonb(d)->>'historical_status', 'unknown') = 'accredited'")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     order_params: list[Any] = []
@@ -2001,6 +2008,7 @@ def list_offered_positions(
             ALLOWED_OFFERED_ORDER_FIELDS,
             "d.document_date_iso",
         )
+    order_sql += ", op.id ASC"
     base_sql = f"""
         FROM offered_positions op
         JOIN documents d ON d.id = op.document_id
@@ -2126,7 +2134,7 @@ def list_difficult_positions(
     elif selected_only is False:
         where.append("NOT EXISTS (SELECT 1 FROM difficult_coverage_candidates dc WHERE dc.position_id = p.id AND dc.is_selected IS TRUE)")
     if not include_unavailable:
-        where.append("p.availability_status = 'available' AND COALESCE(to_jsonb(d)->>'historical_status', 'unknown') = 'accredited'")
+        where.append("1=0" if RECOVERY_READ_ONLY else "p.availability_status = 'available' AND COALESCE(to_jsonb(d)->>'historical_status', 'unknown') = 'accredited'")
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     order_params: list[Any] = []
@@ -2143,6 +2151,7 @@ def list_difficult_positions(
             ALLOWED_DIFFICULT_ORDER_FIELDS,
             "d.document_date_iso",
         )
+    order_sql += ", p.id ASC"
 
     base_sql = f"""
         FROM difficult_coverage_positions p
@@ -2589,6 +2598,7 @@ def list_non_docent_positions(
         ALLOWED_NON_DOCENT_POSITION_ORDER_FIELDS,
         "p.publication_date_iso",
     )
+    order_sql += ", pos.id ASC"
     base_sql = f"""
         FROM non_docent_offered_positions pos
         JOIN non_docent_publications p ON p.id = pos.publication_id

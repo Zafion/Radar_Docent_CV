@@ -12,6 +12,12 @@ from tests.postgres_isolated_validation import FreshCluster
 
 
 class RecoveryReadOnlyTests(unittest.TestCase):
+    def test_recovery_historical_accreditation_is_not_current_availability(self):
+        item={'historical_status':'accredited','availability_status':'available'}
+        with patch.object(main,'RECOVERY_READ_ONLY',True):
+            main.mask_unaccredited_availability([item])
+        self.assertEqual(item['availability_status'],'unknown')
+
     def test_recovery_non_docent_does_not_treat_legacy_default_as_current(self):
         conn=MagicMock();conn.execute.return_value.fetchone.return_value=(0,);conn.execute.return_value.fetchall.return_value=[]
         context=MagicMock();context.__enter__.return_value=conn
@@ -39,6 +45,15 @@ class RecoveryReadOnlyTests(unittest.TestCase):
         self.assertIn('Consulta histórica: los datos pueden estar desactualizados',es)
         self.assertIn('Consulta històrica: les dades poden estar desactualitzades',va)
         self.assertNotIn('fonts.googleapis.com',es)
+
+    def test_recovery_position_templates_default_to_historical_view(self):
+        from app.web.routes import TEMPLATES
+        request=MagicMock();request.url_for.side_effect=lambda name,**kw:'/static/'+kw.get('path','')
+        with patch.dict('os.environ',{'FUNK_RECOVERY_READ_ONLY':'1'}):
+            for filename,prefix in (('offered_positions.html','op'),('difficult_coverage.html','dc')):
+                html=TEMPLATES.get_template(filename).render(request=request,current_lang='es')
+                self.assertRegex(html,rf'id="{prefix}-include-history" type="checkbox"\s+checked')
+                self.assertNotRegex(html,rf'id="{prefix}-latest-only" type="checkbox"\s+checked')
     def test_startup_refuses_enabled_notifications(self):
         with patch.object(main,'RECOVERY_READ_ONLY',True),patch.object(main,'DB_URL','postgresql://example.invalid/db'),patch.object(main,'get_pool'),patch.dict('os.environ',{'ENABLE_NOTIFICATIONS':'1'}):
             with self.assertRaisesRegex(RuntimeError,'notifications_must_be_disabled'):
@@ -53,6 +68,14 @@ class RecoveryReadOnlyTests(unittest.TestCase):
                         self.assertEqual(response.status_code,405)
                         self.assertEqual(response.json()['detail'],'read_only_recovery_mode')
         asyncio.run(check())
+
+    def test_health_fails_if_search_normalization_is_unavailable(self):
+        conn=MagicMock();conn.execute.side_effect=psycopg.errors.InsufficientPrivilege('denied')
+        context=MagicMock();context.__enter__.return_value=conn
+        with patch.object(main,'RECOVERY_READ_ONLY',True),patch.object(main,'get_connection',return_value=context),patch.object(main,'_register_normalize_function'):
+            with self.assertRaises(main.HTTPException) as error:
+                main.health()
+            self.assertEqual(error.exception.status_code,503)
 
     def test_real_postgres_role_and_writes(self):
         with FreshCluster() as cluster:

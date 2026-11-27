@@ -36,18 +36,20 @@
   }
 
   function render(items, total, offset) {
-    metaEl.textContent = ui.t(`${ui.compactNumber(total)} plazas disponibles encontradas. Mostrando ${ui.compactNumber(items.length)} por página.`);
+    metaEl.textContent = window.FUNKCIONARIO_RECOVERY
+      ? `${ui.compactNumber(total)} ${ui.t("registros históricos encontrados")} · ${ui.t("Vigencia actual sin acreditar")}`
+      : ui.t(`${ui.compactNumber(total)} plazas disponibles encontradas. Mostrando ${ui.compactNumber(items.length)} por página.`);
     bodyEl.innerHTML = items.map((item) => `
       <tr>
         <td data-label="Colectivo"><strong>${ui.escapeHtml(item.staff_group_code || "—")}</strong><br><span class="muted">${ui.escapeHtml(item.staff_group_name || "")}</span></td>
-        <td data-label="Puesto"><strong>${ui.escapeHtml(item.denomination || "—")}</strong><br><span class="muted">${ui.escapeHtml(item.reason || "")}</span></td>
+        <td data-label="Puesto"><strong>${ui.escapeHtml(item.denomination || "—")}</strong><br><span class="muted">${ui.escapeHtml(item.reason || "")}</span>${window.FUNKCIONARIO_RECOVERY ? `<br><span class="muted">${ui.escapeHtml(ui.t(item.availability_status === "unknown" ? "Vigencia actual sin acreditar" : "Registro histórico"))}</span>` : ""}</td>
         <td data-label="Centro"><strong>${ui.escapeHtml(item.center_name || item.functional_assignment || "—")}</strong>${item.center_full_address ? `<br><span class="muted">${ui.escapeHtml(item.center_full_address)}</span>` : ""}</td>
         <td data-label="Localidad">${ui.escapeHtml(item.locality || "—")}</td>
         <td data-label="Provincia">${ui.escapeHtml(item.province || "—")}</td>
         <td data-label="Código">${ui.escapeHtml(item.position_code || "—")}</td>
         <td data-label="Acciones" class="data-table__actions">${actions(item)}</td>
       </tr>
-    `).join("") || ui.tableEmpty(7, "No hay plazas no docentes disponibles actualmente para los filtros seleccionados.");
+    `).join("") || ui.tableEmpty(7, window.FUNKCIONARIO_RECOVERY ? ui.t("No hay registros para los filtros seleccionados.") : "No hay plazas no docentes disponibles actualmente para los filtros seleccionados.");
 
     ui.renderPager(pagerEl, {
       total,
@@ -61,6 +63,7 @@
     currentOffset = offset;
     const { orderBy, orderDir } = parseOrder();
     const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset), order_by: orderBy, order_dir: orderDir });
+    if (window.FUNKCIONARIO_RECOVERY) params.set("include_unavailable", "true");
     if (groupInput.value) params.set("staff_group_code", groupInput.value);
     if (provinceInput.value) params.set("province", provinceInput.value);
     if (queryInput.value.trim()) params.set("q", queryInput.value.trim());
@@ -75,7 +78,7 @@
   function loadOptions() {
     return ui.apiGet("/api/non-docent/summary").then((summary) => {
       ui.setSelectOptions(groupInput, "Todos", ui.groupOptionsFromSummary(summary));
-    }).then(() => ui.apiGet("/api/non-docent/positions?limit=200&order_by=publication_date&order_dir=desc"))
+    }).then(() => ui.apiGet(`/api/non-docent/positions?limit=200&order_by=publication_date&order_dir=desc${window.FUNKCIONARIO_RECOVERY ? "&include_unavailable=true" : ""}`))
       .then((data) => {
         const provinces = Array.from(new Set((data.items || []).map((item) => item.province).filter(Boolean))).sort();
         ui.setSelectOptions(provinceInput, "Todas", provinces.map((value) => ({ value, label: value })));

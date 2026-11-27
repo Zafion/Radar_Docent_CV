@@ -342,7 +342,7 @@
     latestDateEl.textContent = t("Cargando...");
 
     try {
-      const data = await apiGet("/api/offered-positions?limit=1&order_by=document_date&order_dir=desc");
+      const data = await apiGet(`/api/offered-positions?limit=1&order_by=document_date&order_dir=desc${includeHistoryInput?.checked ? "&include_unavailable=true" : ""}`);
       latestOffersDate = data.items?.[0]?.document_date_iso || null;
       latestDateEl.textContent = latestOffersDate ? formatDate(latestOffersDate) : t("Sin datos");
     } catch (error) {
@@ -370,6 +370,7 @@
             ${item.validation_status === 'needs_validation' ? `<br><span class="muted">${escapeHtml(t("Validación documental pendiente"))}</span>` : ""}
             ${item.validation_status === 'validated_with_limitations' ? `<br><span class="muted">${escapeHtml(t("Validación documental con limitaciones"))}</span>` : ""}
             ${item.historical_status === 'unknown' || item.publication_date_quality === 'unknown' ? `<br><span class="muted">${escapeHtml(t("Vigencia y fecha de publicación sin acreditar"))}</span>` : ""}
+            ${item.availability_status === 'unknown' ? `<br><span class="muted">${escapeHtml(t("Vigencia actual sin acreditar"))}</span>` : ""}
           </td>
           <td data-label="Especialidad">${escapeHtml(specialty)}</td>
           <td data-label="Tipo">${escapeHtml(item.position_type || "—")}</td>
@@ -463,10 +464,11 @@
   });
 
   updateLocationStatus();
+  if (window.FUNKCIONARIO_RECOVERY) loadPositions();
   loadLatestOffersMeta().then(async () => {
     await loadFilterOptions().catch((error) => {
       resultsMetaEl.textContent = `No se pudieron cargar los filtros: ${error.message}`;
     });
-    await loadPositions();
+    if (!window.FUNKCIONARIO_RECOVERY) await loadPositions();
   });
 })();

@@ -22,6 +22,15 @@
   margin-top: 0;
 }
 
+.recovery-notice {
+  background: #edf4fd;
+  color: #17395f;
+  border-bottom: 1px solid #c8daf0;
+  padding: .65rem 0;
+  font-size: .9rem;
+  line-height: 1.4;
+}
+
 .hero__content--landing {
   padding-top: 106px;
 }
